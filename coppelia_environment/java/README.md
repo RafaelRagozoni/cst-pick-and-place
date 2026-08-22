@@ -8,31 +8,39 @@
 | `BridgeSmokeTest.java` | BRG-02 acceptance — drives the arm and gripper over the wire, no task logic |
 | `CstMindBench.java` | BRG-03 — a minimal **CST mind** (two codelets) driving the simulator, and the timing |
 
-## Build and run
+## Build and run — currently unbuildable, on purpose
 
-The jars in `lib/` are fetched, not checked in (see the repo `.gitignore`):
+`lib/` and `out/` were **deleted** on 2026-08-22. They are not coming back in this form.
 
-```bash
-mkdir -p lib && cd lib
-curl -LO https://repo1.maven.org/maven2/org/zeromq/jeromq/0.5.4/jeromq-0.5.4.jar
-curl -LO https://repo1.maven.org/maven2/com/google/code/gson/gson/2.11.0/gson-2.11.0.jar
-cp ~/Mestrado/Projetos/cst/build/libs/cst-1.6.1-full.jar .        # only for CstMindBench
-cd ..
+`lib/` held `cst-1.6.1-full.jar` built on **May 4**, while the CST source had moved on to
+**Jun 2** (`3ae65c8`). The May jar contains `HabitExecutionerCodelet` and nothing else — no
+`GroupHabitExecutionerCodelet`, the class WP2's habit fusion is built on. BRG-02 and BRG-03 both
+passed against it because a two-codelet mind never touches habit execution. The old recipe here
+told you to `cp` that jar, so following this file reproduced the bug.
 
-javac -cp "lib/*" -d out *.java
+CST now comes from the **`cst/` submodule at the repo root**, pinned at `3ae65c8`
+(`RafaelRagozoni/cst` @ `feat/parallel_Habit_Executioner`) and built from source. Verified
+2026-08-22: `./gradlew jar` produces `GroupHabitExecutionerCodelet.class`, with no trace of the
+older `ParallelHabitExecutionerCodelet` name.
 
-# with CoppeliaSim running and `python3 ../bridge.py --port 5555` up:
-java -cp "lib/*:out" BridgeSmokeTest 5555
-java -cp "lib/*:out" CstMindBench   5555 400          # publish-subscribe
-java -cp "lib/*:out" CstMindBench   5555 400 timer    # negative control
-```
-
-In a real Gradle build these are two ordinary dependencies — jeromq is pure Java, so there is no
-native library and no code generation:
+These three files move into the `agent/` Gradle module, where jeromq and gson are two ordinary
+declared dependencies (jeromq is pure Java — no native library, no code generation):
 
 ```groovy
 implementation 'org.zeromq:jeromq:0.5.4'
 implementation 'com.google.code.gson:gson:2.11.0'
+// CST from the submodule, not a copied jar
+```
+
+The move is deliberately **not done yet** — the agent architecture is still being designed, and
+where `BridgeClient` lives depends on it. Until then these do not compile, which is the honest
+state. What they do, once the module exists, with CoppeliaSim running and
+`python3 ../bridge.py --port 5555` up:
+
+```
+BridgeSmokeTest 5555              # BRG-02 acceptance
+CstMindBench    5555 400          # BRG-03, publish-subscribe
+CstMindBench    5555 400 timer    # BRG-03, negative control
 ```
 
 ## The one thing to carry into WP2
