@@ -80,8 +80,20 @@ public class BridgeClient implements AutoCloseable {
 
     /** Apply one cycle's command records and advance the simulation once. */
     public JsonObject step(JsonArray records) {
+        return step(records, null);
+    }
+
+    /**
+     * As {@link #step(JsonArray)}, and log {@code annotate} with this step: the habit id, drive
+     * levels, the repertoire for metric 4. It may add fields to the log record, never replace one
+     * the bridge owns (see translog.py).
+     */
+    public JsonObject step(JsonArray records, JsonObject annotate) {
         JsonObject o = op("step");
         o.add("records", records);
+        if (annotate != null) {
+            o.add("annotate", annotate);
+        }
         return call(o);
     }
 

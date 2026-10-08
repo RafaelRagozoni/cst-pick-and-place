@@ -57,7 +57,7 @@ from episode import EpisodeReset
 from goals import GoalTracker, succeeded
 from grasp_rule import GraspRule
 from observations import TABLE_TOP_Z, Observer
-from runner import open_log
+from translog import open_log
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCENE = os.path.join(HERE, 'pick_and_place.ttt')

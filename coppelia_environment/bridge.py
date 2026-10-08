@@ -13,11 +13,18 @@ The bridge also owns the **environment rules** -- notably the grasp predicate (S
 opens and closes the gripper; the environment decides when the cube is attached. No habit can reach
 that decision, which is what keeps the C1 ablation meaningful.
 
+The bridge also **writes the run log** (translog.py), because it is the one place that sees every
+observation and every command of a CST-driven run; metrics.py reduces that file. A step request may
+carry an `annotate` dict -- the habit id, drive levels, the repertoire for metric 4 -- which is
+logged with that step. Logging is not optional by accident: the bridge refuses to start unless it
+is given either `--log` or an explicit `--no-log`, so a run that produces no data is a decision.
+
 Transport is ZeroMQ REQ/REP with JSON bodies (DEC-03). It is deliberately confined to `serve()`:
 the whole request handler is a plain dict-in/dict-out function, so swapping the transport is one
 function, not a redesign.
 
-    python3 bridge.py [--port 5555] [--mode fixed|annulus] [--step-limit 500]
+    python3 bridge.py --log runs/C0_s1.jsonl.gz --condition C0 [--port 5555] [--mode fixed|annulus]
+    python3 bridge.py --no-log                       # driving by hand, smoke tests
 """
 import argparse
 import json
@@ -31,6 +38,7 @@ from episode import EpisodeReset
 from goals import GoalTracker, STEPS, succeeded
 from grasp_rule import GraspRule
 from observations import Observer
+from translog import EpisodeLog, check_annotation, open_log
 
 # 2: MOVE records carry a relative `angle` (signed, the angle still to go) and a non-negative
 #    `speed`; in 1 the direction was the sign of `speed` and a record lasted exactly one tick.
@@ -41,7 +49,10 @@ DEFAULT_PORT = 5555
 class Bridge:
     """Owns the simulator. Plain methods -- no transport in here."""
 
-    def __init__(self, sim, simIK=None, mode='fixed', step_limit=500, manipulability=True):
+    def __init__(self, sim, simIK=None, mode='fixed', step_limit=500, manipulability=True,
+                 log_path=None, condition=None):
+        if log_path and not condition:
+            raise ValueError('a logged run needs a condition label')
         self.sim = sim
         self.step_limit = step_limit
         simconfig.pin_physics(sim)
@@ -54,7 +65,11 @@ class Bridge:
         self.reset_ctl.on_start = self.actuator.use_velocity_control
         self.tracker = GoalTracker()
         self.steps = 0
+        self.done = True            # no episode until the first reset
         self.warmed = False
+        self.log_path, self.condition = log_path, condition
+        self.sink = open_log(log_path) if log_path else None
+        self.episode = None         # the EpisodeLog of the episode in progress, when logging
 
     # --- operations ------------------------------------------------------
     def ping(self):
@@ -68,9 +83,12 @@ class Bridge:
             'goalSteps': list(STEPS),
             'stepLimit': self.step_limit,
             'physics': simconfig.physics_signature(self.sim),
+            'log': self.log_path,
+            'condition': self.condition,
         }
 
     def reset(self, seed, episode):
+        self._close_episode(aborted=True)
         # One discarded reset per process, for the same reason run() does it: a reset is
         # history-independent only from the second one onward (SIM-08).
         if not self.warmed:
@@ -79,21 +97,49 @@ class Bridge:
         placement = self.reset_ctl.reset(seed, episode)
         self.tracker.reset()
         self.steps = 0
+        self.done = False
         obs = self.obs.read()
+        if self.sink is not None:
+            self.episode = EpisodeLog(self.sink, seed, episode, self.condition, obs,
+                                      placement['cube'])
         return {'obs': obs, 'placement': placement, 'goal': self._goal(obs, None),
                 'success': False, 'done': False, 'step': 0}
 
-    def step(self, records):
-        """Apply one cycle's records, advance the simulation exactly once, return the result."""
+    def step(self, records, annotate=None):
+        """Apply one cycle's records, advance the simulation exactly once, return the result.
+
+        Refused outside an episode -- before the first reset, or once one is done -- so the log
+        never holds steps that belong to no episode.
+        """
+        if self.done:
+            raise RuntimeError('no episode in progress: reset first')
+        check_annotation(annotate)
         self.actuator.apply(records)
         self.sim.step()
         self.steps += 1
         obs = self.obs.read()
         fired = self.tracker.update(obs)
         success = succeeded(obs)
-        done = success or self.steps >= self.step_limit
+        self.done = success or self.steps >= self.step_limit
+        if self.episode is not None:
+            self.episode.step(records, obs, self.tracker.current, fired, success, annotate)
+            if self.done:
+                self._close_episode()
         return {'obs': obs, 'goal': self._goal(obs, fired), 'success': success,
-                'done': done, 'step': self.steps}
+                'done': self.done, 'step': self.steps}
+
+    def _close_episode(self, aborted=False):
+        """Write the episode's terminal record. `aborted`: reset or shut down before it was done."""
+        if self.episode is not None:
+            self.episode.close(self.tracker.current, False if aborted else succeeded(self.episode.obs),
+                               [t[0] for t in self.tracker.transitions], aborted=aborted)
+            self.episode = None
+
+    def close(self):
+        self._close_episode(aborted=True)
+        if self.sink is not None:
+            self.sink.close()
+            self.sink = None
 
     def _goal(self, obs, fired):
         return {'current': self.tracker.current, 'fired': fired,
@@ -113,7 +159,10 @@ class Bridge:
                 recs = req.get('records') or []
                 if not isinstance(recs, list):
                     return {'ok': False, 'error': 'records must be a list'}
-                return dict(ok=True, **self.step(recs))
+                note = req.get('annotate')
+                if note is not None and not isinstance(note, dict):
+                    return {'ok': False, 'error': 'annotate must be an object'}
+                return dict(ok=True, **self.step(recs, note))
             if op == 'shutdown':
                 return {'ok': True, 'bye': True}
             return {'ok': False, 'error': 'unknown op: %r' % op}
@@ -152,7 +201,14 @@ def main():
     ap.add_argument('--step-limit', type=int, default=500)
     ap.add_argument('--sim-port', type=int, default=23000)
     ap.add_argument('--no-manipulability', action='store_true')
+    ap.add_argument('--log', help='write the run log here (.jsonl.gz recommended)')
+    ap.add_argument('--condition', help='condition label written into the log, e.g. C0')
+    ap.add_argument('--no-log', action='store_true', help='run without a log, deliberately')
     a = ap.parse_args()
+    if bool(a.log) == a.no_log:
+        ap.error('give either --log PATH (with --condition) or --no-log')
+    if a.log and not a.condition:
+        ap.error('--log needs --condition')
 
     c = RemoteAPIClient(port=a.sim_port)
     sim, simIK = c.require('sim'), c.require('simIK')
@@ -162,9 +218,12 @@ def main():
     sim.loadScene(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pick_and_place.ttt'))
 
     bridge = Bridge(sim, simIK, mode=a.mode, step_limit=a.step_limit,
-                    manipulability=not a.no_manipulability)
-    serve(bridge, a.port)
-    sim.stopSimulation()
+                    manipulability=not a.no_manipulability, log_path=a.log, condition=a.condition)
+    try:
+        serve(bridge, a.port)
+    finally:
+        bridge.close()
+        sim.stopSimulation()
 
 
 if __name__ == '__main__':

@@ -35,7 +35,7 @@ implementation 'com.google.code.gson:gson:2.11.0'
 The move is deliberately **not done yet** — the agent architecture is still being designed, and
 where `BridgeClient` lives depends on it. Until then these do not compile, which is the honest
 state. What they do, once the module exists, with CoppeliaSim running and
-`python3 ../bridge.py --port 5555` up:
+`python3 ../bridge.py --port 5555 --no-log` up (or `--log run.jsonl.gz --condition X`):
 
 ```
 BridgeSmokeTest 5555              # BRG-02 acceptance
