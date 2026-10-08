@@ -79,6 +79,13 @@ def main():
 
     set_gripper(sim, True)
     run(40)
+    # Close on empty air and reopen, far from the cube. Nothing is touched, so the contact flag
+    # must stay false here even though the finger force sensors load up -- test_observations.py
+    # checks exactly that.
+    set_gripper(sim, False)
+    run(50)
+    set_gripper(sim, True)
+    run(50)
     sim.setObjectPose(target, sim.getObjectPose(tip, -1), -1)
     simIK.syncFromSim(env, [grp])
 

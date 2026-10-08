@@ -38,6 +38,16 @@ class Observer:
                       if sim.getObjectAlias(h, 2).endswith(('link1_visible', 'link2_visible'))]
         self._prev_cube = None
 
+        # The robot as one collision entity: every collidable shape in the arm and gripper, added
+        # one by one rather than as a tree. A tree collection is re-evaluated on every query, so a
+        # cube attached by the grasp rule would join it, and "the robot touches the cube" would
+        # become true by membership instead of by contact. Created once; collections made while
+        # the simulation runs survive stopSimulation (measured), so episode resets keep it valid.
+        self.robot = sim.createCollection(0)
+        for h in sim.getObjectsInTree(self.ur5, sim.sceneobject_shape):
+            if sim.getObjectSpecialProperty(h) & sim.objectspecialproperty_collidable:
+                sim.addItemToCollection(self.robot, sim.handle_single, h, 0)
+
         # Manipulability needs a kinematic model of the chain. Costs two extra round trips per
         # cycle (syncFromSim + computeGroupJacobian); set manipulability=False to drop it.
         self._ik = None
@@ -68,13 +78,21 @@ class Observer:
             out.append(min(1.0, abs(v - mid) / half))
         return out
 
+    def _hit(self, a, b):
+        r = self.sim.checkCollision(a, b)
+        return bool(r[0] if isinstance(r, (list, tuple)) else r)
+
+    def _touching_cube(self):
+        """Any part of the robot geometrically touching the cube.
+
+        Not the finger force sensors: closing on empty air loads them to ~6.7 N, as much as
+        gripping does (grasp_rule.py), so a force threshold reports contact every time the gripper
+        closes. Measured over a scripted grasp: this check is false for all 50 steps of closing on
+        air, and true from the fingers meeting the cube until the release."""
+        return self._hit(self.robot, self.cube)
+
     def _self_collision(self):
-        for h in self.upper:
-            r = self.sim.checkCollision(self.rg2, h)
-            r = r[0] if isinstance(r, (list, tuple)) else r
-            if r:
-                return True
-        return False
+        return any(self._hit(self.rg2, h) for h in self.upper)
 
     def _manipulability(self):
         """sqrt(det(J J^T)) -- Yoshikawa's measure, 0 at a singularity. None if unavailable."""
@@ -133,7 +151,9 @@ class Observer:
                     'commanded_open': g['gripper_open'],
                     'isHolding': g['is_holding'],
                     'contactForce': list(g['contact_force']),
-                    'inContact': min(g['contact_force']) > 1.0,
+                    # The robot touching the cube -- any link, not only the fingers -- so pushing
+                    # the cube counts as contact too.
+                    'inContact': self._touching_cube(),
                 },
                 'jointLimitProximity': self._joint_limit_proximity(q),
                 'selfCollision': self._self_collision(),
