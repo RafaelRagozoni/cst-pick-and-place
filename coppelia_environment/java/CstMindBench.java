@@ -117,7 +117,7 @@ public class CstMindBench {
             JsonArray recs = new JsonArray();
             int k = rng.nextInt(14);
             if (k < 12) {
-                recs.add(BridgeClient.move(k / 2, (k % 2 == 0) ? 0.4 : -0.4));
+                recs.add(BridgeClient.move(k / 2, (k % 2 == 0 ? 1 : -1) * Math.toRadians(1.0), 0.4));
             } else {
                 recs.add(BridgeClient.grab(k == 12));
             }

@@ -1,11 +1,9 @@
 """BRG-02: the simulation bridge server.
 
 cap4 4.5: "a thin simulation bridge: a small service that owns the CoppeliaSim connection and
-exposes a structured interface to the Java HECs. Each cycle the MotorHEC sends the command records,
-the bridge applies them and steps the simulation exactly once, and the sensory HECs read back joint
-states and object poses."
-
-That is exactly this. One round trip per control cycle: command records in, one simulation step,
+exposes a structured interface to the Java codelets." Each cycle the Motor codelet sends the command
+records, the bridge applies them and steps the simulation exactly once, and the observation comes
+back for the Sensory codelet. One round trip per control cycle: command records in, one simulation step,
 the full observation back. **CST drives the clock** -- the bridge never steps on its own, never runs
 an episode loop, and holds no task logic. Everything task-shaped (the goal step list, success) is
 computed from the observation by the same pure functions the Python side uses, and returned; the
@@ -34,7 +32,9 @@ from goals import GoalTracker, STEPS, succeeded
 from grasp_rule import GraspRule
 from observations import Observer
 
-PROTOCOL_VERSION = 1
+# 2: MOVE records carry a relative `angle` (signed, the angle still to go) and a non-negative
+#    `speed`; in 1 the direction was the sign of `speed` and a record lasted exactly one tick.
+PROTOCOL_VERSION = 2
 DEFAULT_PORT = 5555
 
 

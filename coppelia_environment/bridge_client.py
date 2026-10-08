@@ -11,6 +11,9 @@ Protocol: ZeroMQ REQ/REP, one JSON object each way. Every reply carries `ok`; on
     info  -> {primitives, goalSteps, stepLimit, physics}
     reset {seed, episode} -> {obs, placement, goal, success, done, step}
     step  {records}       -> {obs, goal, success, done, step}
+
+Records follow actions.py. A MOVE record's `angle` is the signed angle the joint still has to turn
+in the current step; `speed` is a magnitude.
     shutdown
 """
 import json

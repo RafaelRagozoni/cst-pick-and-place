@@ -8,8 +8,8 @@ import org.zeromq.ZMQ;
 /**
  * Java client for the CoppeliaSim simulation bridge (BRG-02).
  *
- * <p>This is the class the CST side uses. The MotorHEC calls {@link #step} with the cycle's command
- * records; the sensory HECs read the returned observation. One request per control cycle -- the
+ * <p>This is the class the CST side uses. The Motor codelet calls {@link #step} with the cycle's
+ * command records; the Sensory codelet reads the returned observation. One request per control cycle -- the
  * bridge applies the records, advances the simulation exactly once, and replies. CST drives the
  * clock.
  *
@@ -89,11 +89,16 @@ public class BridgeClient implements AutoCloseable {
         call(op("shutdown"));
     }
 
-    /** A MOVE record: rotate one joint at a signed speed, in cap4's record schema. */
-    public static JsonObject move(int joint, double speed) {
+    /**
+     * A MOVE record, in cap4's record schema: rotate one joint by {@code angle} radians (signed,
+     * relative to where the step started; on the wire, the angle still to go) at {@code speed}
+     * rad/s (a magnitude). See actions.py for the full contract.
+     */
+    public static JsonObject move(int joint, double angle, double speed) {
         JsonObject r = new JsonObject();
         r.addProperty("action", "MOVE");
         r.addProperty("joint", joint);
+        r.addProperty("angle", angle);
         r.addProperty("speed", speed);
         r.addProperty("force", 20.0);
         r.addProperty("step", 0);
@@ -105,6 +110,7 @@ public class BridgeClient implements AutoCloseable {
         JsonObject r = new JsonObject();
         r.addProperty("action", "GRAB");
         r.addProperty("joint", -1);
+        r.addProperty("angle", 0.0);
         r.addProperty("speed", 0.0);
         r.addProperty("force", opening ? -20.0 : 20.0);
         r.addProperty("step", 0);

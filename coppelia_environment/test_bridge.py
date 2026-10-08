@@ -37,7 +37,7 @@ def main():
         c = BridgeClient(port=PORT)
         info = c.info()
         checks = [
-            ('protocol advertised', info['protocol'] == 1),
+            ('protocol advertised', info['protocol'] == 2),
             ('14 primitives offered', len(info['primitives']) == 14),
             ('goal steps advertised', info['goalSteps'] == ['reach', 'grasp', 'transport', 'release']),
             ('physics reported', info['physics']['engineName'] == 'bullet'),

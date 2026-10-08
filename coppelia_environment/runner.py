@@ -35,7 +35,7 @@ import time
 
 import numpy as np
 
-from actions import Actuator, primitive_repertoire, record_id
+from actions import Actuator, StepCompletion, primitive_repertoire, record_id
 from episode import EpisodeReset
 from goals import GoalTracker, succeeded
 
@@ -43,15 +43,27 @@ DEFAULT_STEP_LIMIT = 500     # DEC-04: provisional, to be replaced by a pilot-de
 
 
 class RandomPolicy:
-    """Uniform-random over the primitive repertoire: condition C6."""
+    """Uniform-random over the primitive repertoire: condition C6.
+
+    Like the agent, it runs the chosen primitive until its step completes (actions.StepCompletion)
+    and only then picks again. Picking afresh every tick would give C6 a finer action grain than
+    the agent has, and the C4-vs-C6 contrast is meant to isolate motivated *selection* only.
+    """
 
     name = 'random'
 
     def __init__(self):
         self.repertoire = primitive_repertoire()
+        self.current = None
+
+    def reset(self):
+        self.current = None
 
     def __call__(self, obs, rng):
-        return self.repertoire[int(rng.integers(len(self.repertoire)))]
+        if self.current is None or self.current.update(obs) is not None:
+            habit = self.repertoire[int(rng.integers(len(self.repertoire)))]
+            self.current = StepCompletion(habit, obs)
+        return self.current.commands(obs)
 
 
 class Runner:
@@ -65,6 +77,8 @@ class Runner:
 
     def run_episode(self, policy, seed, index, sink, condition):
         info = self.reset.reset(seed, index)   # establishes velocity control before settling
+        if hasattr(policy, 'reset'):
+            policy.reset()
         tracker = GoalTracker()
         rng = np.random.default_rng(np.random.SeedSequence([int(seed), int(index), 0xA]))
 

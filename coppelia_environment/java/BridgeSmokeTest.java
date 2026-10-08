@@ -49,7 +49,7 @@ public class BridgeSmokeTest {
             long[] lat = new long[200];
             for (int i = 0; i < lat.length; i++) {
                 JsonArray recs = new JsonArray();
-                recs.add(BridgeClient.move(1, i < 120 ? 0.4 : -0.4));
+                recs.add(BridgeClient.move(1, (i < 120 ? 1 : -1) * Math.toRadians(1.0), 0.4));
                 long t = System.nanoTime();
                 s = c.step(recs);
                 lat[i] = System.nanoTime() - t;
