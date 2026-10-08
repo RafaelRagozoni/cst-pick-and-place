@@ -8,8 +8,10 @@ Part 2 needs CoppeliaSim: primitives run to completion on the real arm and land 
 import math
 import os
 
-from actions import (ANGLE_TOL, GRIP_MIN_TICKS, PRIMITIVE_ANGLE, StepCompletion, grab, move,
-                     primitive_repertoire, record_id, tick_velocity)
+from actions import (ANGLE_TOL, GRIP_MIN_TICKS, PRIMITIVE_ANGLE, StepCompletion, grab,
+                     joint_positions, limit_velocity, move, primitive_repertoire, record_id,
+                     tick_velocity)
+from simconfig import JOINT_LIMIT
 
 
 def _obs(q, width=0.1054):
@@ -32,6 +34,15 @@ def part1():
     v_big = tick_velocity(move(0, -1, angle=math.radians(30)), dt)
     checks.append(('1 deg in one tick, not 1.15', abs(v_small * dt - PRIMITIVE_ANGLE) < 1e-12))
     checks.append(('large angle runs at full speed', abs(v_big + 0.4) < 1e-12))
+
+    # Joint limit: a tick lands on the limit, never passes it, never moves a joint uncommanded.
+    L = JOINT_LIMIT
+    checks.append(('limit: last tick lands on it', abs(limit_velocity(0.4, L - 0.01, dt) - 0.2) < 1e-12))
+    checks.append(('limit: no further at the limit', limit_velocity(0.4, L, dt) == 0.0
+                   and limit_velocity(-0.4, -L, dt) == 0.0))
+    checks.append(('limit: outside, only back in', limit_velocity(0.4, L + 0.1, dt) == 0.0
+                   and limit_velocity(-0.4, L + 0.1, dt) == -0.4))
+    checks.append(('limit: nothing moves uncommanded', limit_velocity(0.0, L + 0.1, dt) == 0.0))
 
     # A MOVE ends on arrival, and the commands carry the angle still to go.
     q = [0.0] * 6
@@ -102,7 +113,7 @@ def part2():
         q0 = [j['pos'] for j in o['innerSense']['joints']]
         step = StepCompletion(habit, o)
         while True:
-            act.apply(step.commands(o))
+            act.apply(step.commands(o), joint_positions(o))
             sim.step()
             o = obs.read()
             res = step.update(o)

@@ -16,9 +16,19 @@ once, deliberately, before the grid starts.
 The engine *version* (2.78 vs 2.83) is chosen in the scene's dynamics dialog and is not exposed as
 a settable parameter, so it cannot be pinned from here; the loaded plugin is visible in the
 CoppeliaSim startup log.
+
+Joint limits are pinned here too. The UR5 model's joints span [-360, +360] deg -- a real UR5 is
+effectively unbounded -- and Bullet does not enforce a joint's interval under velocity control
+anyway: measured, a wrist joint driven at 0.8 rad/s went to 917 deg with the interval set to
++/-180. So the limit is a constant, enforced by the actuator (actions.limit_velocity) and reported by
+the observer as a margin (observations.py, for the Safety drive). Changing it means re-checking the
+pilot: its solution reaches -151 deg on the shoulder.
 """
+import math
+
 TIMESTEP = 0.05
 SOLVER_ITERATIONS = 100
+JOINT_LIMIT = math.radians(180)     # rad, every arm joint is kept within +/- this
 
 
 def pin_physics(sim):
@@ -46,4 +56,5 @@ def physics_signature(sim):
         'engineName': 'bullet',
         'timestep': sim.getFloatParam(sim.floatparam_simulation_time_step),
         'solverIterations': iters,
+        'jointLimitDeg': math.degrees(JOINT_LIMIT),
     }

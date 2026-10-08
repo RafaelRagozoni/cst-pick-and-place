@@ -33,7 +33,7 @@ import traceback
 import zmq
 
 import simconfig
-from actions import Actuator, primitive_repertoire, record_id
+from actions import Actuator, joint_positions, primitive_repertoire, record_id
 from episode import EpisodeReset
 from goals import GoalTracker, STEPS, succeeded
 from grasp_rule import GraspRule
@@ -66,6 +66,7 @@ class Bridge:
         self.tracker = GoalTracker()
         self.steps = 0
         self.done = True            # no episode until the first reset
+        self.last_obs = None
         self.warmed = False
         self.log_path, self.condition = log_path, condition
         self.sink = open_log(log_path) if log_path else None
@@ -98,7 +99,7 @@ class Bridge:
         self.tracker.reset()
         self.steps = 0
         self.done = False
-        obs = self.obs.read()
+        obs = self.last_obs = self.obs.read()
         if self.sink is not None:
             self.episode = EpisodeLog(self.sink, seed, episode, self.condition, obs,
                                       placement['cube'])
@@ -114,10 +115,10 @@ class Bridge:
         if self.done:
             raise RuntimeError('no episode in progress: reset first')
         check_annotation(annotate)
-        self.actuator.apply(records)
+        self.actuator.apply(records, joint_positions(self.last_obs))
         self.sim.step()
         self.steps += 1
-        obs = self.obs.read()
+        obs = self.last_obs = self.obs.read()
         fired = self.tracker.update(obs)
         success = succeeded(obs)
         self.done = success or self.steps >= self.step_limit

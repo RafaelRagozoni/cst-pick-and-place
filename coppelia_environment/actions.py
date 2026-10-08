@@ -27,6 +27,8 @@ one in the mutation operator.
 """
 import math
 
+from simconfig import JOINT_LIMIT
+
 MOVE, GRAB, HOLD = 'MOVE', 'GRAB', 'HOLD'
 
 PRIMITIVE_ANGLE = math.radians(1.0)   # rad, the rotation of one primitive joint move
@@ -77,7 +79,17 @@ def tick_velocity(rec, dt):
     return math.copysign(min(abs(rec['speed']), abs(rec['angle']) / dt), rec['angle'])
 
 
-def _q(obs):
+def limit_velocity(v, q, dt, limit=JOINT_LIMIT):
+    """Clip a tick's velocity so the joint does not pass +/-limit. A joint already outside may only
+    move back in; a command toward the range is untouched, and nothing un-commanded ever moves."""
+    if v > 0:
+        return max(0.0, min(v, (limit - q) / dt))
+    if v < 0:
+        return min(0.0, max(v, (-limit - q) / dt))
+    return 0.0
+
+
+def joint_positions(obs):
     return [j['pos'] for j in obs['innerSense']['joints']]
 
 
@@ -99,7 +111,7 @@ class StepCompletion:
 
     def __init__(self, records, obs):
         self.records = list(records)
-        self.q0 = _q(obs)
+        self.q0 = joint_positions(obs)
         self.q_prev = self.q0
         self.w_prev = _width(obs)
         self.ticks = 0
@@ -108,7 +120,7 @@ class StepCompletion:
 
     def remaining(self, rec, obs):
         """Signed angle the record's joint still has to turn."""
-        turned = _q(obs)[rec['joint']] - self.q0[rec['joint']]
+        turned = joint_positions(obs)[rec['joint']] - self.q0[rec['joint']]
         return rec['angle'] - turned
 
     def commands(self, obs):
@@ -126,7 +138,7 @@ class StepCompletion:
         """Account for one more tick. Returns None while running, else 'done', 'stalled' or
         'timeout' -- 'stalled' when any MOVE ended by stopping rather than by arriving."""
         self.ticks += 1
-        q, w = _q(obs), _width(obs)
+        q, w = joint_positions(obs), _width(obs)
         for i, rec in enumerate(self.records):
             if self.finished[i]:
                 continue
@@ -164,8 +176,9 @@ class Actuator:
             self.sim.setObjectInt32Param(j, self.sim.jointintparam_dynctrlmode,
                                          self.sim.jointdynctrl_velocity)
 
-    def apply(self, records):
-        """Apply one tick's worth of records.
+    def apply(self, records, q):
+        """Apply one tick's worth of records. `q`: the arm's joint positions now (the latest
+        observation's), needed because the joint limit is enforced here -- see simconfig.
 
         Joints not named by any record are commanded to zero velocity, not left free -- a stale
         velocity command would otherwise keep running after the habit that issued it ended.
@@ -174,7 +187,8 @@ class Actuator:
         vel = [0.0] * len(self.arm)
         for rec in records:
             if rec['action'] == MOVE and 0 <= rec['joint'] < len(self.arm):
-                vel[rec['joint']] = tick_velocity(rec, self.dt)
+                j = rec['joint']
+                vel[j] = limit_velocity(tick_velocity(rec, self.dt), q[j], self.dt)
             elif rec['action'] == GRAB:
                 set_gripper(self.sim, rec['force'] < 0)
             # HOLD: issue no command; the zero-velocity default already holds position.

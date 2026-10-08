@@ -52,7 +52,7 @@ import time
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 
 import simconfig
-from actions import Actuator, StepCompletion, grab, primitive_repertoire, record_id
+from actions import Actuator, StepCompletion, grab, joint_positions, primitive_repertoire, record_id
 from episode import EpisodeReset
 from goals import GoalTracker, succeeded
 from grasp_rule import GraspRule
@@ -199,7 +199,7 @@ class Pilot:
         for r in records:
             assert any(record_id(r) == record_id(h[0]) for h in self.repertoire), \
                 'pilot emitted a non-primitive record: %r' % r
-        self.actuator.apply(records)
+        self.actuator.apply(records, joint_positions(o_before))
         self.sim.step()
         if self.slow:
             time.sleep(self.slow)      # only for watching; does not affect the simulation

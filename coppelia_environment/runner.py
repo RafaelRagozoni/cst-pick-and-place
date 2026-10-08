@@ -12,7 +12,7 @@ import time
 
 import numpy as np
 
-from actions import Actuator, StepCompletion, primitive_repertoire
+from actions import Actuator, StepCompletion, joint_positions, primitive_repertoire
 from episode import EpisodeReset
 from goals import GoalTracker, succeeded
 from translog import EpisodeLog, open_log
@@ -66,7 +66,7 @@ class Runner:
 
         for k in range(self.step_limit):
             records = policy(obs, rng)
-            self.actuator.apply(records)
+            self.actuator.apply(records, joint_positions(obs))
             self.sim.step()
             obs = self.obs.read()
             fired = tracker.update(obs)
