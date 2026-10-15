@@ -88,4 +88,7 @@ class EpisodeLog:
             self.head, step=self.steps, t=self.obs['t'], obs=self.obs, action=None, habit_id=None,
             goal_step=goal_step, goal_fired=None, success=success, done=True, rewards={},
             episode_summary=summary)) + '\n')
+        # Flush every finished episode: a gzip stream is readable up to its last flush, so a
+        # summary or a replay can read a run that is still going (summarize_run.py, replay.py).
+        self.sink.flush()
         return summary

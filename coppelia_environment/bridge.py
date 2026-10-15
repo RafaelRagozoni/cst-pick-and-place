@@ -33,6 +33,8 @@ ends (simprocess.py); without it the bridge attaches to one already open (`--sim
 """
 import argparse
 import json
+import signal
+import sys
 import traceback
 
 import zmq
@@ -222,6 +224,9 @@ def main():
     if a.log and not a.condition:
         ap.error('--log needs --condition')
 
+    # SIGTERM (run_live.py stopping a batch) unwinds like an exception, so the finally blocks
+    # below still close the log and stop a launched CoppeliaSim instead of orphaning it.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     proc = None
     if a.launch:
         proc = simprocess.SimProcess(a.coppelia_root, gui=a.launch == 'gui', rpc_port=a.sim_port)
@@ -243,7 +248,12 @@ def main():
             serve(bridge, a.port)
         finally:
             bridge.close()
-            sim.stopSimulation()
+            try:
+                sim.stopSimulation()
+            except Exception:
+                # Stopped mid-call (SIGTERM during a remote call): this client's socket is
+                # unusable. Best effort only -- a launched CoppeliaSim is stopped below anyway.
+                pass
     finally:
         if proc:
             proc.close()
