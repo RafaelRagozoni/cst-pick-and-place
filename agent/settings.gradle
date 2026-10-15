@@ -1,0 +1,5 @@
+rootProject.name = 'agent'
+
+// CST is built from the submodule, never from a copied jar (see README, "Why not a jar").
+// The composite build substitutes the dependency 'com.github.CST-Group:cst' with ../cst.
+includeBuild('../cst')

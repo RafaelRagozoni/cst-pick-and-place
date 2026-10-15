@@ -5,9 +5,9 @@ that a finished run reduces to every reported metric **without re-running anythi
 cannot be computed from the log, the log is missing a field and that is a bug to fix now, not after
 a two-day experiment grid.
 
-Metric 4 (repertoire size and fusion fraction) needs the HabitPool, which lives on the CST side and
-does not exist yet (WP2). The reducer reports it as unavailable rather than silently returning 0 --
-a zero would look like a real measurement.
+Metric 4 (repertoire size and fusion fraction) needs the HabitPool, which lives on the CST side: the
+agent logs it with every step (agent/.../Telemetry.java). A log without it -- the Python runner's --
+reports it as unavailable rather than silently returning 0, which would look like a real measurement.
 """
 import gzip
 import json
@@ -73,7 +73,7 @@ def reduce_log(records):
         'episodesToFirstSuccess': first,
         'stepsPerSuccess': steps_per_success,
         'jointEnergyPerSuccess': energy_per_success,
-        'repertoire': repertoire,          # None == not logged (no HabitPool yet, WP2)
+        'repertoire': repertoire,          # None == not logged (e.g. runner.py, no HabitPool)
         'coverageBins': len(bins),
         'goalStepsReached': dict(goals),
         'totalSteps': sum(s['steps'] for s in summaries),
@@ -88,7 +88,7 @@ def report(m):
                                                 else 'never'))
     print('  3. steps / success       : %.1f' % m['stepsPerSuccess'])
     print('     joint energy / success: %.2f rad' % m['jointEnergyPerSuccess'])
-    print('  4. repertoire            : %s' % (m['repertoire'] or 'unavailable (no HabitPool yet)'))
+    print('  4. repertoire            : %s' % (m['repertoire'] or 'unavailable (not logged)'))
     print('  5. coverage bins visited : %d' % m['coverageBins'])
     print('  goal steps reached       : %s' % (m['goalStepsReached'] or 'none'))
 

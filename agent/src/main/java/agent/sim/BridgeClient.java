@@ -1,3 +1,5 @@
+package agent.sim;
+
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -28,7 +30,7 @@ import org.zeromq.ZMQ;
  * so {@link #call} is synchronized: sharing one client across codelets is then safe, though the
  * cycle is still strictly serialised (which is what a synchronous simulation wants anyway).
  */
-public class BridgeClient implements AutoCloseable {
+public class BridgeClient implements Environment, AutoCloseable {
 
     private final ZContext ctx;
     private final ZMQ.Socket sock;
