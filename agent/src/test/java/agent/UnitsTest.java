@@ -6,6 +6,7 @@ import agent.habit.Command;
 import agent.habit.HabitIdeas;
 import agent.memory.ExecutionBuffer;
 import agent.motivation.NoveltyArchive;
+import agent.selection.Selector;
 import agent.selection.Selector.Candidate;
 import agent.selection.Selectors;
 import br.unicamp.cst.representation.idea.Idea;
@@ -136,8 +137,8 @@ class UnitsTest {
     // --- selection ---------------------------------------------------------------
     @Test
     void selectorsReturnNullToKeepThePlanInExecution() {
-        Candidate a = new Candidate(new Idea("a"), 0.2);
-        Candidate b = new Candidate(new Idea("b"), 0.5);
+        Candidate a = new Candidate(new Idea("a"), 0.2, 1, 0.0);
+        Candidate b = new Candidate(new Idea("b"), 0.5, 1, 0.0);
         List<Candidate> pool = List.of(a, b);
         Random rng = new Random(0);
         assertSame(b, Selectors.GREEDY.select(pool, null, rng));
@@ -145,5 +146,62 @@ class UnitsTest {
         assertNull(Selectors.GREEDY.select(pool, b, rng), "the best one running is kept");
         assertNull(Selectors.RANDOM.select(pool, a, rng), "C6 never preempts");
         assertTrue(pool.contains(Selectors.RANDOM.select(pool, null, rng)));
+    }
+
+    @Test
+    void anExecutionIsOneSampleOnceItsCreditStopsArriving() {
+        CreditTable t = new CreditTable();
+        t.add("a", "ctx", new double[]{1, 0, 0, 0}, 1.0, true);
+        t.add("a", "ctx", new double[]{1, 0, 0, 0}, 0.5, false);   // later credit, same execution
+        assertEquals(0, t.snapshot("a").samples(), "still receiving credit: not a sample yet");
+        t.add("a", "ctx", new double[]{2, 0, 0, 0}, 1.0, true);    // runs again: 1.5 is closed
+        assertEquals(1, t.snapshot("a").samples());
+        t.closeExecutions();                                        // episode ends: 2.0 is closed
+        CreditSnapshot s = t.snapshot("a");
+        assertEquals(2, s.samples());
+        // samples 1.5 and 2.0: variance 0.125
+        assertEquals(Math.sqrt(0.125), CreditSnapshot.spread(List.of(s), new double[]{1, 0, 0, 0}),
+                1e-12);
+        assertEquals(0.0, CreditSnapshot.spread(List.of(s), new double[]{0, 1, 1, 1}), 1e-12);
+        assertEquals(2, s.count("ctx"));
+        assertEquals(2, s.count("elsewhere"), "no record here: the total's count, as value() reads");
+    }
+
+    @Test
+    void ucbRetriesAHabitWithOneUnluckyResult() {
+        Candidate unlucky = new Candidate(new Idea("a"), -0.1, 1, 0.1);
+        Candidate tried = new Candidate(new Idea("b"), 0.0, 50, 0.1);
+        Candidate untried = new Candidate(new Idea("c"), -5.0, 0, 0.1);
+        Random rng = new Random(0);
+        assertSame(tried, Selectors.GREEDY.select(List.of(unlucky, tried), null, rng));
+        assertSame(unlucky, Selectors.ucb(1.0).select(List.of(unlucky, tried), null, rng));
+        assertSame(untried, Selectors.ucb(1.0).select(List.of(unlucky, tried, untried), null, rng),
+                "never executed comes first");
+    }
+
+    @Test
+    void thompsonDrawsOncePerDecision() {
+        List<Candidate> pool = new ArrayList<>();
+        for (int i = 0; i < 14; i++) {
+            pool.add(new Candidate(new Idea("h" + i), 0.0, 1, 1.0));
+        }
+        Selector ts = Selectors.thompson();
+        Random rng = new Random(3);
+        Candidate first = ts.select(pool, null, rng);
+        for (int i = 0; i < 50; i++) {
+            assertNull(ts.select(pool, first, rng), "held draws: no preemption while scores stay");
+        }
+        List<String> a = new ArrayList<>();
+        List<String> b = new ArrayList<>();
+        Selector s1 = Selectors.thompson();
+        Selector s2 = Selectors.thompson();
+        Random r1 = new Random(9);
+        Random r2 = new Random(9);
+        for (int i = 0; i < 20; i++) {
+            a.add(HabitIdeas.id(s1.select(pool, null, r1).habit()));
+            b.add(HabitIdeas.id(s2.select(pool, null, r2).habit()));
+        }
+        assertEquals(a, b, "a seed reproduces the draws");
+        assertTrue(new java.util.HashSet<>(a).size() > 3, "equal scores: the choice varies");
     }
 }

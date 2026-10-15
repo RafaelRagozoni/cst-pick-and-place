@@ -30,9 +30,47 @@ public final class CreditTable {
         }
     }
 
+    /**
+     * The credit of each finished execution of one habit, as running statistics (Welford): how much
+     * one execution's credit varies, which is what UCB and Thompson need to know how far to trust a
+     * mean. An execution's credit keeps arriving through its trace after it ends, so it is one sample
+     * only once it is complete: when the habit runs again (its trace restarts) or the episode ends.
+     */
+    static final class Samples {
+        long n;
+        final double[] mean = new double[Drives.N];
+        /** Sum of outer products of deviations from the mean: covariance * (n - 1). */
+        final double[][] scatter = new double[Drives.N][Drives.N];
+
+        void add(double[] x) {
+            n++;
+            double[] before = new double[Drives.N];
+            for (int d = 0; d < Drives.N; d++) {
+                before[d] = x[d] - mean[d];
+                mean[d] += before[d] / n;
+            }
+            for (int i = 0; i < Drives.N; i++) {
+                for (int j = 0; j < Drives.N; j++) {
+                    scatter[i][j] += before[i] * (x[j] - mean[j]);
+                }
+            }
+        }
+
+        double[][] scatterCopy() {
+            double[][] c = new double[Drives.N][];
+            for (int i = 0; i < Drives.N; i++) {
+                c[i] = scatter[i].clone();
+            }
+            return c;
+        }
+    }
+
     private static final class Row {
         final Cell total = new Cell();
         final Map<String, Cell> byContext = new HashMap<>();
+        final Samples samples = new Samples();
+        /** Credit of the execution still receiving it, or null. */
+        double[] open;
     }
 
     private final Map<String, Row> rows = new LinkedHashMap<>();
@@ -58,9 +96,34 @@ public final class CreditTable {
         if (execution) {
             r.total.count++;
             c.count++;
+            close(r);
+            r.open = new double[Drives.N];
+        }
+        if (r.open != null) {
+            for (int d = 0; d < Drives.N; d++) {
+                r.open[d] += weight * delta[d];
+            }
         }
         dirty.add(habit);
         version++;
+    }
+
+    /** The episode ended: no more credit reaches any execution in it, so each one is a sample. */
+    public void closeExecutions() {
+        for (Map.Entry<String, Row> e : rows.entrySet()) {
+            if (e.getValue().open != null) {
+                close(e.getValue());
+                dirty.add(e.getKey());
+                version++;
+            }
+        }
+    }
+
+    private static void close(Row r) {
+        if (r.open != null) {
+            r.samples.add(r.open);
+            r.open = null;
+        }
     }
 
     public CreditSnapshot snapshot(String habit) {
@@ -72,7 +135,8 @@ public final class CreditTable {
         for (Map.Entry<String, Cell> e : r.byContext.entrySet()) {
             ctx.put(e.getKey(), e.getValue().copy());
         }
-        return new CreditSnapshot(r.total.sum.clone(), r.total.count, ctx);
+        return new CreditSnapshot(r.total.sum.clone(), r.total.count, ctx, r.samples.n,
+                r.samples.scatterCopy());
     }
 
     /** Habits whose credit changed since the last call; clears the set. */

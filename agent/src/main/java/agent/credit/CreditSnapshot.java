@@ -23,21 +23,69 @@ public final class CreditSnapshot {
         SUM
     }
 
-    public static final CreditSnapshot EMPTY =
-            new CreditSnapshot(new double[Drives.N], 0, Collections.emptyMap());
+    public static final CreditSnapshot EMPTY = new CreditSnapshot(new double[Drives.N], 0,
+            Collections.emptyMap(), 0, new double[Drives.N][Drives.N]);
 
     private final double[] totalSum;
     private final long totalCount;
     private final Map<String, CreditTable.Cell> byContext;
+    private final long samples;
+    private final double[][] scatter;
 
-    CreditSnapshot(double[] totalSum, long totalCount, Map<String, CreditTable.Cell> byContext) {
+    CreditSnapshot(double[] totalSum, long totalCount, Map<String, CreditTable.Cell> byContext,
+                   long samples, double[][] scatter) {
         this.totalSum = totalSum;
         this.totalCount = totalCount;
         this.byContext = byContext;
+        this.samples = samples;
+        this.scatter = scatter;
     }
 
     public long executions() {
         return totalCount;
+    }
+
+    /** The executions behind {@link #value}: the context's, or the total's where it has no record. */
+    public long count(String context) {
+        CreditTable.Cell c = byContext.get(context);
+        return c != null ? c.count : totalCount;
+    }
+
+    /** Finished executions, each one sample of a single execution's credit. */
+    public long samples() {
+        return samples;
+    }
+
+    /**
+     * The standard deviation of one execution's score sum_d w_d * credit_d, pooled over the habits:
+     * the within-habit covariance of per-execution credit, sum of scatters over sum of (n - 1), read
+     * through the weights. 0 until some habit has two finished executions. One scale for the whole
+     * pool, so a habit with few samples borrows it from the rest.
+     */
+    public static double spread(Iterable<CreditSnapshot> pool, double[] weights) {
+        double[][] s = new double[Drives.N][Drives.N];
+        long dof = 0;
+        for (CreditSnapshot c : pool) {
+            if (c.samples < 2) {
+                continue;
+            }
+            dof += c.samples - 1;
+            for (int i = 0; i < Drives.N; i++) {
+                for (int j = 0; j < Drives.N; j++) {
+                    s[i][j] += c.scatter[i][j];
+                }
+            }
+        }
+        if (dof == 0) {
+            return 0.0;
+        }
+        double v = 0.0;
+        for (int i = 0; i < Drives.N; i++) {
+            for (int j = 0; j < Drives.N; j++) {
+                v += weights[i] * s[i][j] * weights[j];
+            }
+        }
+        return Math.sqrt(Math.max(0.0, v / dof));
     }
 
     public boolean hasContext(String context) {

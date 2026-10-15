@@ -1,6 +1,7 @@
 package agent.codelets;
 
 import agent.Config;
+import agent.credit.CreditSnapshot;
 import agent.credit.CreditTable;
 import agent.habit.HabitIdeas;
 import agent.memory.Goal;
@@ -25,7 +26,8 @@ import java.util.Random;
  * <p>Score, eq. (4.1): E(h) = sum over drives of D_d * c_d(h | g, s), the credit under the current
  * goal and state, or the habit's total credit where it has no record under that pair. Which habit
  * the scores lead to is the {@link Selector} in {@code Config.selector}: greedy as cap4 writes it,
- * uniform random in C6.
+ * uniform random in C6, or UCB or Thompson sampling. Each candidate also carries how many executions
+ * its score rests on and the pooled spread of one execution's score, which those two need.
  *
  * <p>Inputs: HabitPoolMC, GoalMO, SensoryMO, DriveMO, PlanTrackerMO. Output: PlanMO.
  */
@@ -70,11 +72,20 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
         Goal goal = Goal.of(goalMO);
         String context = CreditTable.context(goal.name(), Characterization.key(o));
         double[] levels = Drives.of(driveMO).levels();
-        List<Candidate> candidates = new ArrayList<>();
-        Candidate current = null;
+        List<Idea> habits = new ArrayList<>();
+        List<CreditSnapshot> credit = new ArrayList<>();
         for (Memory m : pool.getAllMemories()) {
             Idea h = (Idea) m.getI();
-            Candidate c = new Candidate(h, score(h, context, levels));
+            habits.add(h);
+            credit.add(HabitIdeas.credit(h));
+        }
+        double spread = CreditSnapshot.spread(credit, levels);
+        List<Candidate> candidates = new ArrayList<>();
+        Candidate current = null;
+        for (int i = 0; i < habits.size(); i++) {
+            Idea h = habits.get(i);
+            Candidate c = new Candidate(h, score(credit.get(i), context, levels),
+                    credit.get(i).count(context), spread);
             if (running && HabitIdeas.id(h).equals(ts.habit())) {
                 current = c;
             }
@@ -87,8 +98,8 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
         }
     }
 
-    double score(Idea habit, String context, double[] levels) {
-        double[] c = HabitIdeas.credit(habit).value(context, cfg.creditRead);
+    double score(CreditSnapshot credit, String context, double[] levels) {
+        double[] c = credit.value(context, cfg.creditRead);
         double e = 0.0;
         for (int d = 0; d < Drives.N; d++) {
             e += levels[d] * c[d];

@@ -72,8 +72,9 @@ public final class Config {
      */
     public CreditSnapshot.Read creditRead = CreditSnapshot.Read.MEAN;
     /**
-     * How the scores become a choice. Swapping the mechanism is this one line; the options are in
-     * Selectors. C6 sets RANDOM.
+     * How the scores become a choice. Swapping the mechanism is this one line: Selectors.GREEDY (cap4
+     * as written), Selectors.ucb(1.0), Selectors.thompson(). C6 sets Selectors.RANDOM. A selector
+     * with state (thompson) belongs to one mind, so it is made here, per Config.
      */
     public Selector selector = Selectors.GREEDY;
 

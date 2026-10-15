@@ -1,43 +1,109 @@
 package agent.selection;
 
+import agent.habit.HabitIdeas;
 import agent.selection.Selector.Candidate;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.function.ToDoubleFunction;
 
-/** The selection mechanisms. Pick one in {@link agent.Config#selector}. */
+/**
+ * The selection mechanisms. Pick one in {@link agent.Config#selector}.
+ *
+ * <p>All but RANDOM share one rule and differ only in the value they rank by: the highest value
+ * starts; the plan in execution is kept unless another habit's value is strictly higher; ties are
+ * broken uniformly at random.
+ */
 public final class Selectors {
 
     private Selectors() {
     }
 
-    /** Scores closer than this are a tie. */
+    /** Values closer than this are a tie. */
     static final double EPS = 1e-12;
 
     /**
-     * cap4 as written: the best score wins. The plan in execution is kept unless another habit scores
-     * strictly higher, and ties are broken uniformly at random -- which is all the exploration there
-     * is, when every credit is zero. Live runs lock in on it (README, "First live runs").
+     * UCB's value for a habit never executed: above any other, and equal among such habits, so they
+     * are tried first, in random order. Finite, so that ties among them still compare equal.
      */
-    public static final Selector GREEDY = (candidates, running, rng) -> {
-        double best = Double.NEGATIVE_INFINITY;
-        List<Candidate> ties = new ArrayList<>();
-        for (Candidate c : candidates) {
-            if (c.score() > best + EPS) {
-                best = c.score();
-                ties.clear();
-                ties.add(c);
-            } else if (Math.abs(c.score() - best) <= EPS) {
-                ties.add(c);
-            }
-        }
-        if (running != null && best <= running.score() + EPS) {
-            return null;
-        }
-        return ties.get(rng.nextInt(ties.size()));
-    };
+    static final double UNTRIED = Double.MAX_VALUE;
+
+    /**
+     * cap4 as written: rank by the score. Untried habits score 0, which is all the exploration there
+     * is. Live runs lock in on it (README, "First live runs").
+     */
+    public static final Selector GREEDY = (candidates, running, rng) ->
+            argmax(candidates, running, rng, Candidate::score);
 
     /** C6: scores ignored; a uniform-random habit each time the plan in execution ends. */
     public static final Selector RANDOM = (candidates, running, rng) ->
             running != null ? null : candidates.get(rng.nextInt(candidates.size()));
+
+    /**
+     * UCB1 (Auer et al. 2002): rank by score + c * spread * sqrt(2 ln N / n), n the habit's executions
+     * behind its score and N the sum of n over the pool. A habit tried less than the rest gets a bonus
+     * that grows slowly while it is passed over, so one unlucky early result is retried rather than
+     * believed forever; a never-executed habit is tried before any other. The noise scale is the
+     * pooled spread, so c = 1 needs no calibration to the units of the drives.
+     */
+    public static Selector ucb(double c) {
+        return (candidates, running, rng) -> {
+            long total = 0;
+            for (Candidate k : candidates) {
+                total += k.count();
+            }
+            double logN = Math.log(Math.max(total, 1));
+            return argmax(candidates, running, rng, k -> k.count() == 0 ? UNTRIED
+                    : k.score() + c * k.spread() * Math.sqrt(2.0 * logN / k.count()));
+        };
+    }
+
+    /**
+     * Gaussian Thompson sampling (Agrawal and Goyal 2013): rank by a draw from each habit's posterior,
+     * score + spread / sqrt(n + 1) * z with z ~ N(0, 1). A habit is chosen with the probability that
+     * it is the best, given how often it was tried; a never-executed one draws around 0 with the full
+     * spread. No parameter.
+     *
+     * <p>One draw per decision: z is drawn for every habit when nothing is running, and held while
+     * the plan runs. Drawing anew every cycle would let some habit's lucky draw preempt the running
+     * plan almost every cycle; held, the plan is preempted only when the scores themselves move.
+     * Stateful: one per mind.
+     */
+    public static Selector thompson() {
+        Map<String, Double> z = new HashMap<>();
+        return (candidates, running, rng) -> {
+            if (running == null) {
+                z.clear();
+            }
+            for (Candidate k : candidates) {
+                z.computeIfAbsent(HabitIdeas.id(k.habit()), id -> rng.nextGaussian());
+            }
+            return argmax(candidates, running, rng, k -> k.score()
+                    + k.spread() / Math.sqrt(k.count() + 1.0) * z.get(HabitIdeas.id(k.habit())));
+        };
+    }
+
+    /** The shared rule: highest value starts, the running plan is kept unless beaten, random ties. */
+    static Candidate argmax(List<Candidate> candidates, Candidate running, Random rng,
+                            ToDoubleFunction<Candidate> value) {
+        double best = Double.NEGATIVE_INFINITY;
+        List<Candidate> ties = new ArrayList<>();
+        for (Candidate c : candidates) {
+            double v = value.applyAsDouble(c);
+            if (v > best + EPS) {
+                best = v;
+                ties.clear();
+                ties.add(c);
+            } else if (Math.abs(v - best) <= EPS) {
+                ties.add(c);
+            }
+        }
+        if (running != null && best <= value.applyAsDouble(running) + EPS) {
+            return null;
+        }
+        return ties.get(rng.nextInt(ties.size()));
+    }
 }

@@ -15,11 +15,21 @@ import java.util.Random;
 @FunctionalInterface
 public interface Selector {
 
-    /** A habit and its score E(h) under the current goal, state and drive levels. */
-    record Candidate(Idea habit, double score) {
+    /**
+     * A habit and what is known about it under the current goal, state and drive levels.
+     *
+     * @param score  E(h), eq. (4.1)
+     * @param count  executions behind that score: under this context, or in total where the habit
+     *               has no record here (the same cell the score comes from)
+     * @param spread standard deviation of one execution's score, the same for every candidate
+     *               ({@link agent.credit.CreditSnapshot#spread}); 0 until it can be estimated
+     */
+    record Candidate(Idea habit, double score, long count, double spread) {
     }
 
     /**
+     * A selector that keeps state between calls belongs to one mind: make a fresh one per Config.
+     *
      * @param candidates every habit in the pool, scored, in pool order; never empty
      * @param running    the candidate whose plan is in execution, or null when nothing runs
      * @param rng        the Behavior Generator's seeded generator: draw only from this one, or a

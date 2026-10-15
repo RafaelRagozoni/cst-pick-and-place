@@ -80,6 +80,7 @@ public final class CreditAssignmentCodelet extends AgentCodelet {
         double[] levels = drives.levels();
         if (o.episodeStart() || prev == null) {
             traces.clear();
+            table.closeExecutions();
             deltas.clear();
         } else {
             double[] delta = new double[Drives.N];
@@ -106,6 +107,7 @@ public final class CreditAssignmentCodelet extends AgentCodelet {
         readSeq = buffer.nextSeq();
         if (o.terminal()) {
             traces.clear();
+            table.closeExecutions();
         }
         creditMO.setI(new CreditUpdate(table, table.drainDirty(), o.cycle()));
     }
