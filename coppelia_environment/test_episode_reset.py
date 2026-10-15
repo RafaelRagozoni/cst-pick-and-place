@@ -130,6 +130,33 @@ def part2_reset():
           % ('PASS' if repeat else 'FAIL', dc, dq))
     ok &= repeat
 
+    # ...and the GRIPPER, after an episode that closed it. The finger motor's target velocity
+    # survives stopSimulation like the arm joints' control mode does; an earlier reset forgot it,
+    # so the episode after a close started 4.6 mm more closed and two conditions never started
+    # episode k alike. The fingers must also be at rest: a reset that hands over a gripper still
+    # opening lets the first steps of every episode see it move on its own.
+    from grasp_rule import set_gripper
+    motor = sim.getObject('/UR5/RG2/openCloseJoint')
+
+    def gripper():
+        return (obs.read()['innerSense']['gripper']['width'], sim.getJointPosition(motor),
+                sim.getJointVelocity(motor))
+
+    ep.reset(7, 11)
+    g1 = gripper()
+    set_gripper(sim, False)
+    for _ in range(60):
+        sim.step()
+    ep.reset(7, 11)
+    g2 = gripper()
+    dg = max(abs(a - b) for a, b in zip(g1, g2))
+    print('  gripper reset after a close   : %s (%.2e)' % ('PASS' if dg < 1e-9 else 'FAIL', dg))
+    ok &= dg < 1e-9
+    at_rest = abs(g1[2]) < 1e-3
+    print('  gripper at rest after reset   : %s (finger motor %.4f m/s)'
+          % ('PASS' if at_rest else 'FAIL', g1[2]))
+    ok &= at_rest
+
     t0 = time.time()
     for i in range(10):
         ep.reset(7, i)

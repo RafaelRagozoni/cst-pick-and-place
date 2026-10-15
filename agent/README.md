@@ -206,11 +206,11 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
   1. *A scene reloaded in the same CoppeliaSim process is not clean*: contact physics then depends
      on earlier sessions (2e-5 apart from the first load). A fresh process reproduces bit for bit,
      headless or with the GUI. Workaround: one CoppeliaSim process per run.
-  2. *Reset does not reset the gripper's motor*: an episode after one that closed the gripper starts
-     4.6 mm more closed at its first step. Deterministic, but episode k's start depends on how k−1
-     ended — so two conditions never start episode k alike.
-  SIM-08 (`test_determinism.py`) demands 1e-9 but runs in one session without closing the gripper,
-  so it sees neither. Until both are fixed, same-seed runs are not paired samples.
+  2. *Reset did not reset the gripper's motor* — **fixed**: the finger motor's target velocity
+     survived the stop, so an episode after one that closed the gripper started 4.6 mm more closed,
+     and every episode began with the fingers still opening. `EpisodeReset` now zeroes it and waits
+     for the fingers to stop (reset 0.34 → 0.46 s); `test_episode_reset.py` checks both.
+  Until 1 is handled (one CoppeliaSim process per run), same-seed runs are not paired samples.
 - Novelty search is O(archive) per cycle; capped at 5000 points.
 - The Fake environment tests the plumbing, not the physics; the live scene is the only physics check.
 
