@@ -210,12 +210,21 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
      alike. Within one process repeated runs are identical. Under **MuJoCo, ODE and Newton** all
      six were identical, the fingers closing in each. `test_fresh_process.py` (SIM-09, five fresh
      processes) fails under Bullet. Switching engine is open: grasping, contacts, joint limits and
-     the expert trajectory were all measured under Bullet.
+     the expert trajectory were all measured under Bullet. A trial of the whole simulation suite
+     under MuJoCo (scene and `pin_physics` switched in a copy, 2026-10-15): SIM-09 passes; reset,
+     determinism, bridge, observations, actions, goals and runner pass; the pilot still solves the
+     task, but in **520 steps against 248** (primitives take ~2× the ticks: the timing constants in
+     `actions.py` were measured under Bullet) — over the 500-step episode limit; the joint-limit
+     guard overshoots by 0.18°; `test_grasp_rule.py` fails (the fingers close through a cube the test
+     teleports mid-simulation — MuJoCo may need `resetDynamicObject` there; the pilot's grasp works).
   2. *Reset did not reset the gripper's motor* — **fixed**: the finger motor's target velocity
      survived the stop, so an episode after one that closed the gripper started 4.6 mm more closed,
      and every episode began with the fingers still opening. `EpisodeReset` now zeroes it and waits
      for the fingers to stop (reset 0.34 → 0.46 s); `test_episode_reset.py` checks both.
-  Until 1 is handled, same-seed runs are not paired samples.
+  What 1 costs: not the paired statistics — conditions are paired on the cube placements, a pure
+  function of (seed, episode), which `pilot.py` already argued and which still holds — but exact
+  replay: a run cannot be re-run to debug it, and a C0–Cx difference in one pair mixes the
+  component's effect with physics noise, so it needs more seeds to show.
 - Novelty search is O(archive) per cycle; capped at 5000 points.
 - The Fake environment tests the plumbing, not the physics; the live scene is the only physics check.
 
