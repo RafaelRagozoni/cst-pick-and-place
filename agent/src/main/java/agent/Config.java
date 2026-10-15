@@ -2,6 +2,8 @@ package agent;
 
 import agent.credit.CreditSnapshot;
 import agent.motivation.Drives;
+import agent.selection.Selector;
+import agent.selection.Selectors;
 
 /**
  * Every tunable of the agent, and the ablation conditions of cap4 4.6.1 as settings of them.
@@ -69,8 +71,11 @@ public final class Config {
      * stored, so this is a reading choice, not a different learner.
      */
     public CreditSnapshot.Read creditRead = CreditSnapshot.Read.MEAN;
-    /** C6: uniform-random choice whenever the plan in execution ends, credit ignored. */
-    public boolean randomSelection = false;
+    /**
+     * How the scores become a choice. Swapping the mechanism is this one line; the options are in
+     * Selectors. C6 sets RANDOM.
+     */
+    public Selector selector = Selectors.GREEDY;
 
     // --- HabitLearner (cap4 4.4) -------------------------------------------------
     /** False in C4 and C6: the pool stays the primitives. Credit is still copied in (C4). */
@@ -105,7 +110,7 @@ public final class Config {
                 k.effortRefineGain = 0.0;
                 break;
             case "C6":                                  // random baseline
-                k.randomSelection = true;
+                k.selector = Selectors.RANDOM;
                 k.creditUpdates = false;
                 k.generation = false;
                 break;

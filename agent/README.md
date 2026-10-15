@@ -7,7 +7,7 @@ moved here (`agent.sim`, `agent.bench`). CST comes from the `../cst` submodule, 
 ## Run
 
 ```
-./gradlew test                       # 33 tests, offline; ParityTest runs python3
+./gradlew test                       # 34 tests, offline; ParityTest runs python3
 # live: CoppeliaSim open (or headless: `sleep infinity | ./coppeliaSim.sh -h`), then
 mkdir -p runs && python3 ../coppelia_environment/bridge.py --log runs/C0_s1.jsonl.gz --condition C0
 ./gradlew liveRun -PagentArgs="--condition C0 --seed 1 --emax 50 --eref 20"
@@ -41,6 +41,12 @@ Lines the cap4 figure may not have yet: **Drive ← GoalMO** (Effort restarts on
 **PlanTracker ← DriveMO** (the Curiosity and Safety goals are met by a drive level), **Credit ←
 SensoryMO** (cycle and episode boundaries). SensoryBuffer is wired into Credit Assignment as in the
 figure, but nothing reads it yet.
+
+The Behavior Generator scores; a `Selector` decides. Selection is one function,
+`(candidates, running, rng) -> habit to start, or null to keep the running plan`, and the mechanism
+in use is one line of `Config`: `selector = Selectors.GREEDY` (cap4 as written; C6 sets
+`Selectors.RANDOM`). A new mechanism is one more constant in `Selectors`. It must draw only from the
+`rng` it is given, or a seed stops reproducing a run.
 
 A habit is an Idea (`HabitIdeas`): `origin`, `parents`, `commands` (one Idea per record of the
 `actions.py` schema), and `credit`, a frozen `CreditSnapshot` the HabitLearner copies in.
@@ -113,7 +119,7 @@ Safety works: after the fix, recovering from a joint limit kept every joint ≥ 
 
 ## Testing
 
-`./gradlew test`: 33 tests, ~1 s, no simulator.
+`./gradlew test`: 34 tests, ~1 s, no simulator.
 
 - `ParityTest` — the Java ports agree with the Python they port, on the recorded expert trajectory:
   task predicates (goals.py), characterization bins (metrics.characterise), step completion
@@ -137,6 +143,8 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
   member-removal operation in CST's `MemoryContainer` (cap4 §4.4.3), which the fork does not have.
 - The macro selection rule (open in cap4 §4.4.2).
 - An exploration mechanism or a credit baseline, if chosen (see First live runs, 1).
+- Choosing the selector on the command line (`--selection ucb`) instead of in `Config`, and logging
+  its name in the run, once there are several to compare live.
 
 ## Risks
 
@@ -158,6 +166,8 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
 | Quality-diversity libraries (pyribs, QDax, Sferes2) for the archive | Tested novelty/MAP-Elites archives | Python/C++; here the archive is ~100 lines inside a codelet, tested in `UnitsTest` |
 | **Homeostatic RL** (Keramati & Gutkin 2014) | Reward = drive reduction | Adopted as the idea behind credit; no library involved |
 | **Q-decomposition / Hybrid Reward Architecture** (Russell & Zimdars 2003; van Seijen et al. 2017) | Per-component values combined only at action selection | This *is* late fusion. Their values bootstrap (TD); this credit is a non-bootstrapped trace-weighted mean — the ladder's next rung |
+| CST's `MemoryContainer` policies (`MAX`, `RANDOM_FLAT`, `RANDOM_PROPORTIONAL`, `*_STABLE`) as the selector | Selection native to CST: set each habit's evaluation, read the container | Its `Random` is unseeded, so a run would not reproduce per seed; `RANDOM_PROPORTIONAL` is a roulette that assumes evaluations ≥ 0, and E(h) is mostly negative; an evaluation lives on the habit's memory while E(h) depends on goal and state, so every evaluation would be rewritten each cycle; no UCB, softmax temperature or ε |
+| Selection as its own codelet (swap by rewiring) | The most CST-shaped plug | A ninth codelet and a new box in the cap4 figure for what one function does |
 | **Exploration for lock-in**: ε-greedy, softmax over E(h), UCB bonus, optimistic initial credit, a per-state baseline subtracted from ΔD (advantage) | Standard fixes for greedy selection on noisy estimates | Not adopted: cap4 claims exploration needs no separate mechanism, and choosing one changes the thesis. The live runs say it is needed; the decision is the author's |
 
 What building our own gains: the habit is a CST Idea end to end, every cap4 component is a codelet

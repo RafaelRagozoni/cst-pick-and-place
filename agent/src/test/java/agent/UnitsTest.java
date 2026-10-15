@@ -6,14 +6,19 @@ import agent.habit.Command;
 import agent.habit.HabitIdeas;
 import agent.memory.ExecutionBuffer;
 import agent.motivation.NoveltyArchive;
+import agent.selection.Selector.Candidate;
+import agent.selection.Selectors;
 import br.unicamp.cst.representation.idea.Idea;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -126,5 +131,19 @@ class UnitsTest {
         b.addGoalMark("grasp", 2, "task", 8, 0);
         b.addGoalMark("transport", 3, "task", 9, 0);
         assertThrows(IllegalStateException.class, () -> b.since(0));
+    }
+
+    // --- selection ---------------------------------------------------------------
+    @Test
+    void selectorsReturnNullToKeepThePlanInExecution() {
+        Candidate a = new Candidate(new Idea("a"), 0.2);
+        Candidate b = new Candidate(new Idea("b"), 0.5);
+        List<Candidate> pool = List.of(a, b);
+        Random rng = new Random(0);
+        assertSame(b, Selectors.GREEDY.select(pool, null, rng));
+        assertSame(b, Selectors.GREEDY.select(pool, a, rng), "a strictly better habit preempts");
+        assertNull(Selectors.GREEDY.select(pool, b, rng), "the best one running is kept");
+        assertNull(Selectors.RANDOM.select(pool, a, rng), "C6 never preempts");
+        assertTrue(pool.contains(Selectors.RANDOM.select(pool, null, rng)));
     }
 }

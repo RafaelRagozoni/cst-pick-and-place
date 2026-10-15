@@ -8,6 +8,8 @@ import agent.memory.Plan;
 import agent.memory.TrackerState;
 import agent.motivation.Characterization;
 import agent.motivation.Drives;
+import agent.selection.Selector;
+import agent.selection.Selector.Candidate;
 import agent.sim.Observation;
 import br.unicamp.cst.core.entities.Memory;
 import br.unicamp.cst.core.entities.MemoryContainer;
@@ -21,18 +23,13 @@ import java.util.Random;
  * Behavior Generator (cap4 4.3.5): scores every habit in the HabitPool and decides what runs.
  *
  * <p>Score, eq. (4.1): E(h) = sum over drives of D_d * c_d(h | g, s), the credit under the current
- * goal and state, or the habit's total credit where it has no record under that pair. The plan in
- * execution is kept unless another habit now scores strictly higher; when nothing is running the best
- * habit starts. Ties are broken uniformly at random -- which is all the exploration there is at
- * first, when every credit is zero.
- *
- * <p>C6 replaces all of this with a uniform-random choice each time the plan in execution ends.
+ * goal and state, or the habit's total credit where it has no record under that pair. Which habit
+ * the scores lead to is the {@link Selector} in {@code Config.selector}: greedy as cap4 writes it,
+ * uniform random in C6.
  *
  * <p>Inputs: HabitPoolMC, GoalMO, SensoryMO, DriveMO, PlanTrackerMO. Output: PlanMO.
  */
 public final class BehaviorGeneratorCodelet extends AgentCodelet {
-
-    private static final double EPS = 1e-12;
 
     private final Config cfg;
     private final Random rng;
@@ -72,39 +69,22 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
         boolean running = ts != null && ts.running();
         Goal goal = Goal.of(goalMO);
         String context = CreditTable.context(goal.name(), Characterization.key(o));
-        List<Memory> members = pool.getAllMemories();
-
-        if (cfg.randomSelection) {
-            if (!running) {
-                Idea pick = (Idea) members.get(rng.nextInt(members.size())).getI();
-                planMO.setI(new Plan(++serial, pick, goal.name(), goal.id(), context, 0.0));
-            }
-            return;
-        }
-
         double[] levels = Drives.of(driveMO).levels();
-        double best = Double.NEGATIVE_INFINITY;
-        double current = Double.NEGATIVE_INFINITY;
-        List<Idea> ties = new ArrayList<>();
-        for (Memory m : members) {
+        List<Candidate> candidates = new ArrayList<>();
+        Candidate current = null;
+        for (Memory m : pool.getAllMemories()) {
             Idea h = (Idea) m.getI();
-            double e = score(h, context, levels);
+            Candidate c = new Candidate(h, score(h, context, levels));
             if (running && HabitIdeas.id(h).equals(ts.habit())) {
-                current = e;
+                current = c;
             }
-            if (e > best + EPS) {
-                best = e;
-                ties.clear();
-                ties.add(h);
-            } else if (Math.abs(e - best) <= EPS) {
-                ties.add(h);
-            }
+            candidates.add(c);
         }
-        if (running && best <= current + EPS) {
-            return;                                         // keep the plan in execution
+        Candidate pick = cfg.selector.select(candidates, current, rng);
+        if (pick != null) {
+            planMO.setI(new Plan(++serial, pick.habit(), goal.name(), goal.id(), context,
+                    pick.score()));
         }
-        Idea pick = ties.get(rng.nextInt(ties.size()));
-        planMO.setI(new Plan(++serial, pick, goal.name(), goal.id(), context, best));
     }
 
     double score(Idea habit, String context, double[] levels) {
