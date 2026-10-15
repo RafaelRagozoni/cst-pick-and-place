@@ -96,7 +96,6 @@ public final class AgentMind {
                 new ExecutionBuffer(cfg.executionBufferSize));
         creditMO = mind.createMemoryObject("CreditMO");
         pool = mind.createMemoryContainer("HabitPoolMC");
-        telemetry = new Telemetry(trackerMO, goalMO, driveMO, pool);
 
         sensory = new SensoryCodelet(link);
         sensory.addOutput(sensoryMO);
@@ -140,6 +139,7 @@ public final class AgentMind {
         behavior.addInput(trackerMO);
         behavior.addOutput(planMO);
 
+        telemetry = new Telemetry(trackerMO, goalMO, driveMO, pool, cfg.selection, behavior::spread);
         motor = new MotorCodelet(link, telemetry);
         motor.addInput(trackerMO);
         motor.addInput(sensoryMO);

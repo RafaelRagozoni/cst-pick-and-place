@@ -11,10 +11,12 @@ import com.google.gson.JsonObject;
 
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.DoubleSupplier;
 
 /**
  * What the agent attaches to each step of the bridge's run log (translog.py's {@code annotate}):
- * the habit in execution, the goal, the drive levels, and the repertoire for metric 4.
+ * the habit in execution, the goal, the drive levels, the selection mechanism and the spread it
+ * used, and the repertoire for metric 4.
  *
  * <p>Instrumentation, not part of the architecture: it reads memories but no codelet reads it, and
  * nothing the agent decides depends on it. Field names avoid the ones the log owns (translog.OWNED).
@@ -25,13 +27,23 @@ public final class Telemetry {
     private final Memory goalMO;
     private final Memory driveMO;
     private final MemoryContainer pool;
+    private final String selection;
+    private final DoubleSupplier spread;
     private String phase = "bootstrap";
 
-    public Telemetry(Memory trackerMO, Memory goalMO, Memory driveMO, MemoryContainer pool) {
+    /**
+     * @param selection the selection mechanism's name
+     * @param spread    the spread the Behavior Generator's last selection used, read from it rather
+     *                  than recomputed, so the log shows what the selector saw
+     */
+    public Telemetry(Memory trackerMO, Memory goalMO, Memory driveMO, MemoryContainer pool,
+                     String selection, DoubleSupplier spread) {
         this.trackerMO = trackerMO;
         this.goalMO = goalMO;
         this.driveMO = driveMO;
         this.pool = pool;
+        this.selection = selection;
+        this.spread = spread;
     }
 
     public void setPhase(String phase) {
@@ -66,6 +78,8 @@ public final class Telemetry {
             a.addProperty("novelty", d.novelty());
         }
         a.addProperty("phase", phase);
+        a.addProperty("selection", selection);
+        a.addProperty("spread", spread.getAsDouble());
         a.add("repertoire", repertoire());
         return a;
     }

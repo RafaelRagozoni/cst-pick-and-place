@@ -2,7 +2,6 @@ package agent;
 
 import agent.credit.CreditSnapshot;
 import agent.motivation.Drives;
-import agent.selection.Selector;
 import agent.selection.Selectors;
 
 /**
@@ -72,11 +71,11 @@ public final class Config {
      */
     public CreditSnapshot.Read creditRead = CreditSnapshot.Read.MEAN;
     /**
-     * How the scores become a choice. Swapping the mechanism is this one line: Selectors.GREEDY (cap4
-     * as written), Selectors.ucb(1.0), Selectors.thompson(). C6 sets Selectors.RANDOM. A selector
-     * with state (thompson) belongs to one mind, so it is made here, per Config.
+     * How the scores become a choice, by name (Selectors.byName). Swapping the mechanism is this one
+     * line, or --selection: "greedy" (cap4 as written), "ucb", "ucb:<c>", "thompson". C6 sets
+     * "random" and takes no other (withSelection).
      */
-    public Selector selector = Selectors.GREEDY;
+    public String selection = "greedy";
 
     // --- HabitLearner (cap4 4.4) -------------------------------------------------
     /** False in C4 and C6: the pool stays the primitives. Credit is still copied in (C4). */
@@ -87,6 +86,17 @@ public final class Config {
     // --- buffers -------------------------------------------------------------------
     public int sensoryBufferSize = 64;
     public int executionBufferSize = 4096;
+
+    /** Set the selection by name, refusing a bad name now rather than at the first cycle. */
+    public Config withSelection(String name) {
+        Selectors.byName(name);
+        if (condition.equals("C6") && !name.equals("random")) {
+            throw new IllegalArgumentException(
+                    "C6 is the random baseline: selection '" + name + "' would make it another run");
+        }
+        selection = name;
+        return this;
+    }
 
     public static Config forCondition(String c) {
         Config k = new Config();
@@ -111,7 +121,7 @@ public final class Config {
                 k.effortRefineGain = 0.0;
                 break;
             case "C6":                                  // random baseline
-                k.selector = Selectors.RANDOM;
+                k.selection = "random";
                 k.creditUpdates = false;
                 k.generation = false;
                 break;

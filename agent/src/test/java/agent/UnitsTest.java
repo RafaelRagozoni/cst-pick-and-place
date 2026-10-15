@@ -168,6 +168,27 @@ class UnitsTest {
     }
 
     @Test
+    void selectionByNameAndC6StaysRandom() {
+        Candidate a = new Candidate(new Idea("a"), -0.1, 1, 0.1);
+        Candidate b = new Candidate(new Idea("b"), 0.0, 50, 0.1);
+        assertSame(a, Selectors.byName("ucb").select(List.of(a, b), null, new Random(0)));
+        assertSame(b, Selectors.byName("ucb:0").select(List.of(a, b), null, new Random(0)),
+                "c = 0 is greedy");
+        assertSame(Selectors.GREEDY, Selectors.byName("greedy"));
+        assertSame(Selectors.RANDOM, Selectors.byName("random"));
+        assertTrue(Selectors.byName("thompson") != Selectors.byName("thompson"), "one per mind");
+        for (String bad : new String[]{"UCB", "ucb:", "ucb:-1", "ucb:x", "softmax"}) {
+            assertThrows(IllegalArgumentException.class, () -> Selectors.byName(bad), bad);
+        }
+        assertEquals("thompson", Config.forCondition("C0").withSelection("thompson").selection);
+        assertEquals("random", Config.forCondition("C6").selection);
+        assertThrows(IllegalArgumentException.class,
+                () -> Config.forCondition("C6").withSelection("ucb"));
+        assertThrows(IllegalArgumentException.class,
+                () -> Config.forCondition("C0").withSelection("nope"));
+    }
+
+    @Test
     void ucbRetriesAHabitWithOneUnluckyResult() {
         Candidate unlucky = new Candidate(new Idea("a"), -0.1, 1, 0.1);
         Candidate tried = new Candidate(new Idea("b"), 0.0, 50, 0.1);

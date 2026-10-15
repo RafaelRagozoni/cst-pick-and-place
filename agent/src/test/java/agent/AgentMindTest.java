@@ -3,7 +3,6 @@ package agent;
 import agent.credit.CreditSnapshot;
 import agent.habit.HabitIdeas;
 import agent.memory.ExecutionBuffer;
-import agent.selection.Selectors;
 import br.unicamp.cst.representation.idea.Idea;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
@@ -122,11 +121,7 @@ class AgentMindTest {
     @ParameterizedTest
     @ValueSource(strings = {"ucb", "thompson"})
     void exploringSelectorsTryEveryHabitAndReproducePerSeed(String name) {
-        java.util.function.Supplier<Config> cfg = () -> {
-            Config c = Config.forCondition("C0");
-            c.selector = name.equals("ucb") ? Selectors.ucb(1.0) : Selectors.thompson();
-            return c;
-        };
+        java.util.function.Supplier<Config> cfg = () -> Config.forCondition("C0").withSelection(name);
         FakeEnvironment env = new FakeEnvironment(150);
         AgentMind m = new AgentMind(cfg.get(), env, 4);
         for (int e = 0; e < 3; e++) {
@@ -138,6 +133,9 @@ class AgentMindTest {
             credit.add(HabitIdeas.credit(h));
         }
         assertTrue(CreditSnapshot.spread(credit, new double[]{1, 1, 1, 1}) > 0, "spread estimated");
+        JsonObject last = env.annotations.get(env.annotations.size() - 1);
+        assertEquals(name, last.get("selection").getAsString(), "the log says which selector ran");
+        assertTrue(last.get("spread").getAsDouble() > 0, "and the spread it used");
         assertEquals(habitsRun(env), habitsRun(run(cfg.get(), 4, 3, 150)));
     }
 

@@ -7,16 +7,18 @@ moved here (`agent.sim`, `agent.bench`). CST comes from the `../cst` submodule, 
 ## Run
 
 ```
-./gradlew test                       # 39 tests, offline; ParityTest runs python3
+./gradlew test                       # 40 tests, offline; ParityTest runs python3
 # live: CoppeliaSim open (or headless: `sleep infinity | ./coppeliaSim.sh -h`), then
-mkdir -p runs && python3 ../coppelia_environment/bridge.py --log runs/C0_s1.jsonl.gz --condition C0
-./gradlew liveRun -PagentArgs="--condition C0 --seed 1 --emax 50 --eref 20"
-python3 ../coppelia_environment/metrics.py runs/C0_s1.jsonl.gz
+mkdir -p runs && python3 ../coppelia_environment/bridge.py --log runs/C0_ucb_s1.jsonl.gz --condition C0
+./gradlew liveRun -PagentArgs="--condition C0 --seed 1 --emax 50 --eref 20 --selection ucb"
+python3 ../coppelia_environment/metrics.py runs/C0_ucb_s1.jsonl.gz
 ```
 
 The agent shuts the bridge down at the end (`--shutdown false` to keep it): the bridge closes the
 gzip log only on shutdown, and an unclosed one cannot be read. It refuses to run if the bridge logs a
-different condition label than the one it runs.
+different condition label than the one it runs. `--selection` (greedy, ucb, ucb:<c>, thompson;
+default greedy) is the selection mechanism. Every logged step records `selection` and the `spread`
+it used, and `metrics.py` reports the selection (two names means two runs went into one log).
 
 ## Goal
 
@@ -44,14 +46,14 @@ figure, but nothing reads it yet.
 
 The Behavior Generator scores; a `Selector` decides. Selection is one function,
 `(candidates, running, rng) -> habit to start, or null to keep the running plan`, and the mechanism
-in use is one line of `Config`:
+in use is one line of `Config` (`selection = "greedy"`) or `--selection` on the command line:
 
-| `selector =` | ranks by | |
+| name | ranks by | |
 |---|---|---|
-| `Selectors.GREEDY` | E(h) | cap4 as written; the default |
-| `Selectors.ucb(1.0)` | E(h) + c·σ·√(2 ln N / n) | UCB1: a habit tried less than the rest gets a bonus, so an unlucky first result is retried |
-| `Selectors.thompson()` | a draw from N(E(h), σ²/(n+1)) | Gaussian Thompson sampling: chosen with the probability it is the best; no parameter |
-| `Selectors.RANDOM` | — | C6 |
+| `greedy` | E(h) | cap4 as written; the default |
+| `ucb`, `ucb:<c>` | E(h) + c·σ·√(2 ln N / n) | UCB1 (c = 1 by default): a habit tried less than the rest gets a bonus, so an unlucky first result is retried; `ucb:0` is greedy |
+| `thompson` | a draw from N(E(h), σ²/(n+1)) | Gaussian Thompson sampling: chosen with the probability it is the best; no parameter |
+| `random` | — | C6, which refuses any other |
 
 All but RANDOM keep the running plan unless beaten. n is the executions behind the score (the
 context's, or the total's where the context has none — the same cell the score reads). σ is the
@@ -59,8 +61,9 @@ spread of one execution's score: `CreditTable` keeps each finished execution's c
 (an execution is finished when the habit runs again or the episode ends — its trace stops
 collecting), and σ pools the within-habit covariance over the pool, read through the drive levels.
 Because σ is in the units of the scores, UCB's c = 1 needs no calibration to the drives. A new
-mechanism is one more entry in `Selectors`; it must draw only from the `rng` it is given, or a seed
-stops reproducing a run.
+mechanism is one more entry in `Selectors` and its name in `Selectors.byName`; it must draw only from
+the `rng` it is given, or a seed stops reproducing a run. The Behavior Generator makes its selector
+from the name, so a stateful one (thompson) is never shared between minds.
 
 A habit is an Idea (`HabitIdeas`): `origin`, `parents`, `commands` (one Idea per record of the
 `actions.py` schema), and `credit`, a frozen `CreditSnapshot` the HabitLearner copies in.
@@ -136,9 +139,22 @@ What they show:
 
 Safety works: after the fix, recovering from a joint limit kept every joint ≥ 7° from it.
 
+### Selectors live (2026-10-15, C0, seed 1, 6 × 500 steps, one run each)
+
+| selection | two most-chosen habits | coverage bins | min eef→cube | goal held by Curiosity |
+|---|---|---|---|---|
+| greedy | 58 % (`grab_open` alone 35 %) | 22 | 0.22 m | 97 % |
+| ucb | 22 % | **37** | **0.12 m** | 96 % |
+| thompson | 22 % | 24 | 0.17 m | 100 % |
+
+Both bandit rules end the lock-in: choices spread over all 14 habits. UCB also explored more of the
+state space (+68 % bins) and came closest to the cube of any run so far. No run reached it
+(5 cm) or succeeded. One seed each: the UCB–Thompson gap may be chance. Curiosity still holds the
+goal nearly always, so Task never drives selection — calibrating Curiosity is now the next lever.
+
 ## Testing
 
-`./gradlew test`: 39 tests, ~1 s, no simulator.
+`./gradlew test`: 40 tests, ~1 s, no simulator.
 
 - `ParityTest` — the Java ports agree with the Python they port, on the recorded expert trajectory:
   task predicates (goals.py), characterization bins (metrics.characterise), step completion
@@ -155,7 +171,7 @@ Safety works: after the fix, recovering from a joint limit kept every joint ≥ 
   cycle and none on the terminal observation, exact reproduction per seed, credit reaching the pool,
   steps never overlapping, no idle cycles, C6 learning nothing, all seven conditions running, the
   refinement phase raising Effort; UCB and Thompson closed-loop trying all 14 habits, reproducing per
-  seed, and with σ > 0 — at σ = 0 both silently rank by score alone, like GREEDY. Mutation-checked:
+  seed, logging their name and σ, and with σ > 0 — at σ = 0 both silently rank by score alone, like GREEDY. Mutation-checked:
   dropping the sample recording fails three tests.
 
 Nothing checks the agent *learns the task*: that is WP3's gate, judged on live runs.
@@ -166,12 +182,10 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
   pool cap. `Config.generation`/`fusion` are wired to conditions but unread. Culling needs a
   member-removal operation in CST's `MemoryContainer` (cap4 §4.4.3), which the fork does not have.
 - The macro selection rule (open in cap4 §4.4.2).
-- Which selector: UCB and Thompson are implemented, not yet run live. On the fake environment
-  (C0, 3 seeds, 6 × 300 steps) the two most-chosen habits take 57–76 % of choices under GREEDY and
-  20–24 % under either — plumbing evidence, not physics.
+- Which selector: UCB and Thompson ran live once each (above); more seeds before choosing. On the
+  fake environment (C0, 3 seeds, 6 × 300 steps) the two most-chosen habits take 57–76 % of choices
+  under GREEDY and 20–24 % under either — plumbing evidence, not physics.
 - A credit baseline (advantage), part of rethinking credit.
-- Choosing the selector on the command line (`--selection ucb`) instead of in `Config`, and logging
-  its name and σ in the run, before comparing them live.
 - Per-habit variance (UCB-V, UCB1-Tuned) once habits have enough samples; a discounted or
   sliding-window UCB if non-stationarity (below) shows up.
 

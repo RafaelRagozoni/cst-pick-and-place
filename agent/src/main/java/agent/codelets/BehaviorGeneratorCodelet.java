@@ -11,6 +11,7 @@ import agent.motivation.Characterization;
 import agent.motivation.Drives;
 import agent.selection.Selector;
 import agent.selection.Selector.Candidate;
+import agent.selection.Selectors;
 import agent.sim.Observation;
 import br.unicamp.cst.core.entities.Memory;
 import br.unicamp.cst.core.entities.MemoryContainer;
@@ -25,7 +26,7 @@ import java.util.Random;
  *
  * <p>Score, eq. (4.1): E(h) = sum over drives of D_d * c_d(h | g, s), the credit under the current
  * goal and state, or the habit's total credit where it has no record under that pair. Which habit
- * the scores lead to is the {@link Selector} in {@code Config.selector}: greedy as cap4 writes it,
+ * the scores lead to is the {@link Selector} named by {@code Config.selection}: greedy as cap4 writes it,
  * uniform random in C6, or UCB or Thompson sampling. Each candidate also carries how many executions
  * its score rests on and the pooled spread of one execution's score, which those two need.
  *
@@ -35,6 +36,8 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
 
     private final Config cfg;
     private final Random rng;
+    private final Selector selector;
+    private double spread;
     private MemoryContainer pool;
     private Memory goalMO;
     private Memory sensoryMO;
@@ -47,6 +50,7 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
         super("BehaviorGenerator");
         this.cfg = cfg;
         this.rng = new Random(seed);
+        this.selector = Selectors.byName(cfg.selection);
     }
 
     @Override
@@ -79,7 +83,7 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
             habits.add(h);
             credit.add(HabitIdeas.credit(h));
         }
-        double spread = CreditSnapshot.spread(credit, levels);
+        spread = CreditSnapshot.spread(credit, levels);
         List<Candidate> candidates = new ArrayList<>();
         Candidate current = null;
         for (int i = 0; i < habits.size(); i++) {
@@ -91,11 +95,16 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
             }
             candidates.add(c);
         }
-        Candidate pick = cfg.selector.select(candidates, current, rng);
+        Candidate pick = selector.select(candidates, current, rng);
         if (pick != null) {
             planMO.setI(new Plan(++serial, pick.habit(), goal.name(), goal.id(), context,
                     pick.score()));
         }
+    }
+
+    /** The spread the last selection used: what the run log records. */
+    public double spread() {
+        return spread;
     }
 
     double score(CreditSnapshot credit, String context, double[] levels) {

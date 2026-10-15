@@ -67,6 +67,9 @@ def reduce_log(records):
 
     goals = Counter(g for s in summaries for g in s.get('goalsReached', []))
 
+    # the agent's selection mechanism; more than one name means runs were mixed into one log
+    selection = sorted(set(r['selection'] for r in records if 'selection' in r))
+
     return {
         'episodes': n,
         'successRate': success_rate,
@@ -74,6 +77,7 @@ def reduce_log(records):
         'stepsPerSuccess': steps_per_success,
         'jointEnergyPerSuccess': energy_per_success,
         'repertoire': repertoire,          # None == not logged (e.g. runner.py, no HabitPool)
+        'selection': selection,            # [] == not logged
         'coverageBins': len(bins),
         'goalStepsReached': dict(goals),
         'totalSteps': sum(s['steps'] for s in summaries),
@@ -82,6 +86,7 @@ def reduce_log(records):
 
 def report(m):
     print('  episodes                 : %d' % m['episodes'])
+    print('  selection                : %s' % (', '.join(m['selection']) or 'not logged'))
     print('  1. success rate          : %.3f' % m['successRate'])
     print('  2. episodes to 1st success: %s' % (m['episodesToFirstSuccess']
                                                 if m['episodesToFirstSuccess'] is not None

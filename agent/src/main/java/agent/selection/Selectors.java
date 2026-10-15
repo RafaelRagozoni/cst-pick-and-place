@@ -11,7 +11,8 @@ import java.util.Random;
 import java.util.function.ToDoubleFunction;
 
 /**
- * The selection mechanisms. Pick one in {@link agent.Config#selector}.
+ * The selection mechanisms, by name in {@link agent.Config#selection} and on the command line
+ * ({@code --selection}): greedy, ucb, ucb:&lt;c&gt;, thompson, random.
  *
  * <p>All but RANDOM share one rule and differ only in the value they rank by: the highest value
  * starts; the plan in execution is kept unless another habit's value is strictly higher; ties are
@@ -20,6 +21,33 @@ import java.util.function.ToDoubleFunction;
 public final class Selectors {
 
     private Selectors() {
+    }
+
+    /**
+     * The selector a name stands for: greedy, ucb (c = 1), ucb:&lt;c&gt;, thompson, random. A fresh
+     * one per call, so a stateful selector (thompson) belongs to the one mind that asked.
+     */
+    public static Selector byName(String name) {
+        if (name.startsWith("ucb:")) {
+            double c;
+            try {
+                c = Double.parseDouble(name.substring(4));
+            } catch (NumberFormatException e) {
+                c = Double.NaN;
+            }
+            if (!(c >= 0) || Double.isInfinite(c)) {
+                throw new IllegalArgumentException("ucb:<c> needs a finite c >= 0, got " + name);
+            }
+            return ucb(c);
+        }
+        return switch (name) {
+            case "greedy" -> GREEDY;
+            case "ucb" -> ucb(1.0);
+            case "thompson" -> thompson();
+            case "random" -> RANDOM;
+            default -> throw new IllegalArgumentException("unknown selection '" + name
+                    + "': greedy, ucb, ucb:<c>, thompson, random");
+        };
     }
 
     /** Values closer than this are a tie. */

@@ -12,7 +12,7 @@ import java.util.Map;
  *
  * <pre>
  *   python3 coppelia_environment/bridge.py --log runs/C0_s1.jsonl.gz --condition C0   # CoppeliaSim open
- *   ./gradlew liveRun -PagentArgs="--condition C0 --seed 1 --emax 50 --eref 20"
+ *   ./gradlew liveRun -PagentArgs="--condition C0 --seed 1 --emax 50 --eref 20 --selection ucb"
  *   python3 coppelia_environment/metrics.py runs/C0_s1.jsonl.gz
  * </pre>
  *
@@ -20,6 +20,10 @@ import java.util.Map;
  * episodes; Phase 2 (refinement) runs {@code eref} more with it raised. A run with no success in
  * Phase 1 has no Phase 2. Episode indices continue across phases, so the bridge's placements -- a
  * function of (seed, episode) -- are the same for every condition.
+ *
+ * <p>{@code --selection} (greedy, ucb, ucb:&lt;c&gt;, thompson; default greedy) picks the selection
+ * mechanism; every logged step records it and the spread it used. C6 is the random baseline and
+ * refuses any other.
  */
 public final class AgentMain {
 
@@ -28,6 +32,9 @@ public final class AgentMain {
         String host = a.getOrDefault("host", "127.0.0.1");
         int port = Integer.parseInt(a.getOrDefault("port", "5555"));
         Config cfg = Config.forCondition(a.getOrDefault("condition", "C0"));
+        if (a.containsKey("selection")) {
+            cfg.withSelection(a.get("selection"));
+        }
         int seed = Integer.parseInt(a.getOrDefault("seed", "1"));
         int emax = Integer.parseInt(a.getOrDefault("emax", "50"));
         int eref = Integer.parseInt(a.getOrDefault("eref", "20"));
@@ -37,9 +44,9 @@ public final class AgentMain {
             JsonObject info = bridge.info();
             checkCondition(info, cfg.condition);
             AgentMind m = new AgentMind(cfg, bridge, seed);
-            System.out.printf("agent %s seed %d: %d habits, step limit %d, log %s%n", cfg.condition,
-                    seed, m.pool.getAllMemories().size(), info.get("stepLimit").getAsInt(),
-                    str(info.get("log")));
+            System.out.printf("agent %s seed %d selection %s: %d habits, step limit %d, log %s%n",
+                    cfg.condition, seed, cfg.selection, m.pool.getAllMemories().size(),
+                    info.get("stepLimit").getAsInt(), str(info.get("log")));
 
             int episode = 0;
             Integer first = null;

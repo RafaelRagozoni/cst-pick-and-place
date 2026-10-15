@@ -9,8 +9,8 @@ import java.util.Random;
  * How the Behavior Generator picks a habit once every habit in the pool is scored (cap4 4.3.5).
  *
  * <p>The Behavior Generator computes the scores; a Selector only decides. The mechanism in use is one
- * line of {@link agent.Config}: {@code selector = Selectors.GREEDY}. Implementations live in
- * {@link Selectors}.
+ * line of {@link agent.Config}: {@code selection = "greedy"}, or {@code --selection} on the command
+ * line. Implementations live in {@link Selectors}, and {@link Selectors#byName} maps the names.
  */
 @FunctionalInterface
 public interface Selector {
@@ -28,8 +28,6 @@ public interface Selector {
     }
 
     /**
-     * A selector that keeps state between calls belongs to one mind: make a fresh one per Config.
-     *
      * @param candidates every habit in the pool, scored, in pool order; never empty
      * @param running    the candidate whose plan is in execution, or null when nothing runs
      * @param rng        the Behavior Generator's seeded generator: draw only from this one, or a
