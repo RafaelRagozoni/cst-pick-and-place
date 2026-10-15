@@ -1,5 +1,10 @@
 package agent.motivation;
 
+import agent.Checkpoint;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,6 +52,35 @@ public final class NoveltyArchive {
 
     public int size() {
         return archive.size();
+    }
+
+    /** What it has seen, for a checkpoint: the points in order, the oldest, the visit counts. */
+    public JsonObject state() {
+        JsonArray points = new JsonArray(archive.size());
+        for (double[] p : archive) {
+            points.add(Checkpoint.array(p));
+        }
+        JsonObject visits = new JsonObject();
+        for (Map.Entry<String, double[]> e : counts.entrySet()) {
+            visits.add(e.getKey(), Checkpoint.array(e.getValue()));
+        }
+        JsonObject s = new JsonObject();
+        s.add("points", points);
+        s.addProperty("oldest", oldest);
+        s.add("visits", visits);
+        return s;
+    }
+
+    public void restore(JsonObject s) {
+        archive.clear();
+        for (JsonElement p : s.getAsJsonArray("points")) {
+            archive.add(Checkpoint.doubles(p));
+        }
+        oldest = s.get("oldest").getAsInt();
+        counts.clear();
+        for (Map.Entry<String, JsonElement> e : s.getAsJsonObject("visits").entrySet()) {
+            counts.put(e.getKey(), Checkpoint.doubles(e.getValue()));
+        }
     }
 
     /** Mean distance from b to its k nearest archive points (fewer while the archive is small). */

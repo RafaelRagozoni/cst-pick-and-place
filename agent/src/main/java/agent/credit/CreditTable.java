@@ -1,6 +1,10 @@
 package agent.credit;
 
+import agent.Checkpoint;
 import agent.motivation.Drives;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -26,6 +30,20 @@ public final class CreditTable {
             Cell c = new Cell();
             System.arraycopy(sum, 0, c.sum, 0, sum.length);
             c.count = count;
+            return c;
+        }
+
+        JsonObject state() {
+            JsonObject s = new JsonObject();
+            s.add("sum", Checkpoint.array(sum));
+            s.addProperty("count", count);
+            return s;
+        }
+
+        static Cell of(JsonObject s) {
+            Cell c = new Cell();
+            System.arraycopy(Checkpoint.doubles(s.get("sum")), 0, c.sum, 0, Drives.N);
+            c.count = s.get("count").getAsLong();
             return c;
         }
     }
@@ -152,5 +170,63 @@ public final class CreditTable {
 
     public Set<String> habits() {
         return rows.keySet();
+    }
+
+    /** Everything, for a checkpoint. Only between episodes: an open execution is mid-credit. */
+    public JsonObject state() {
+        JsonObject out = new JsonObject();
+        for (Map.Entry<String, Row> e : rows.entrySet()) {
+            Row r = e.getValue();
+            if (r.open != null) {
+                throw new IllegalStateException(e.getKey() + " has an execution still receiving "
+                        + "credit: checkpoint between episodes");
+            }
+            JsonObject contexts = new JsonObject();
+            for (Map.Entry<String, Cell> c : r.byContext.entrySet()) {
+                contexts.add(c.getKey(), c.getValue().state());
+            }
+            JsonArray scatter = new JsonArray();
+            for (double[] row : r.samples.scatter) {
+                scatter.add(Checkpoint.array(row));
+            }
+            JsonObject samples = new JsonObject();
+            samples.addProperty("n", r.samples.n);
+            samples.add("mean", Checkpoint.array(r.samples.mean));
+            samples.add("scatter", scatter);
+            JsonObject row = new JsonObject();
+            row.add("total", r.total.state());
+            row.add("contexts", contexts);
+            row.add("samples", samples);
+            out.add(e.getKey(), row);
+        }
+        JsonObject s = new JsonObject();
+        s.addProperty("version", version);
+        s.add("rows", out);
+        return s;
+    }
+
+    public void restore(JsonObject s) {
+        rows.clear();
+        dirty.clear();
+        for (Map.Entry<String, JsonElement> e : s.getAsJsonObject("rows").entrySet()) {
+            JsonObject row = e.getValue().getAsJsonObject();
+            Row r = new Row();
+            Cell total = Cell.of(row.getAsJsonObject("total"));
+            System.arraycopy(total.sum, 0, r.total.sum, 0, Drives.N);
+            r.total.count = total.count;
+            for (Map.Entry<String, JsonElement> c : row.getAsJsonObject("contexts").entrySet()) {
+                r.byContext.put(c.getKey(), Cell.of(c.getValue().getAsJsonObject()));
+            }
+            JsonObject samples = row.getAsJsonObject("samples");
+            r.samples.n = samples.get("n").getAsLong();
+            System.arraycopy(Checkpoint.doubles(samples.get("mean")), 0, r.samples.mean, 0, Drives.N);
+            JsonArray scatter = samples.getAsJsonArray("scatter");
+            for (int i = 0; i < Drives.N; i++) {
+                System.arraycopy(Checkpoint.doubles(scatter.get(i)), 0, r.samples.scatter[i], 0,
+                        Drives.N);
+            }
+            rows.put(e.getKey(), r);
+        }
+        version = s.get("version").getAsLong();
     }
 }

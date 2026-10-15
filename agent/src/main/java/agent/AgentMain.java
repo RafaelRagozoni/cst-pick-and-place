@@ -4,6 +4,11 @@ import agent.sim.BridgeClient;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -24,6 +29,12 @@ import java.util.Map;
  * <p>{@code --selection} (greedy, ucb, ucb:&lt;c&gt;, thompson; default greedy) picks the selection
  * mechanism; every logged step records it and the spread it used. C6 is the random baseline and
  * refuses any other.
+ *
+ * <p>Checkpoints ({@link Checkpoint}): {@code --checkpoint FILE} saves the agent after every
+ * episode, overwriting; {@code --keep-every N} also keeps a copy every N episodes beside it, in
+ * {@code checkpoints/after-epNNNNNN.json.gz}; {@code --resume FILE} continues a run from one, with
+ * the same condition, selection and seed, from the episode after it -- with a larger
+ * {@code --emax}, a run that ended without success goes on looking for one.
  */
 public final class AgentMain {
 
@@ -39,6 +50,9 @@ public final class AgentMain {
         int emax = Integer.parseInt(a.getOrDefault("emax", "50"));
         int eref = Integer.parseInt(a.getOrDefault("eref", "20"));
 
+        Path checkpoint = a.containsKey("checkpoint") ? Path.of(a.get("checkpoint")) : null;
+        int keepEvery = Integer.parseInt(a.getOrDefault("keep-every", "0"));
+
         int status = 0;
         try (BridgeClient bridge = new BridgeClient(host, port, 60000)) {
             JsonObject info = bridge.info();
@@ -48,25 +62,39 @@ public final class AgentMain {
                     cfg.condition, seed, cfg.selection, m.pool.getAllMemories().size(),
                     info.get("stepLimit").getAsInt(), str(info.get("log")));
 
-            int episode = 0;
-            Integer first = null;
-            for (; episode < emax; episode++) {
+            Checkpoint.Progress at = new Checkpoint.Progress(seed, 0, null);
+            if (a.containsKey("resume")) {
+                at = Checkpoint.restore(m, Checkpoint.read(Path.of(a.get("resume"))));
+                if (at.seed() != seed) {
+                    throw new IllegalArgumentException("the checkpoint is of seed " + at.seed()
+                            + ", not " + seed + ": the cube placements would not continue");
+                }
+                System.out.printf("resumed from %s at episode %d, %s%n", a.get("resume"),
+                        at.nextEpisode(), at.firstSuccess() == null ? "bootstrap"
+                                : "refinement (first success at episode " + at.firstSuccess() + ")");
+            }
+
+            int episode = at.nextEpisode();
+            Integer first = at.firstSuccess();
+            boolean refining = first != null;
+            for (; first == null && episode < emax; episode++) {
                 AgentMind.EpisodeResult r = m.runEpisode(seed, episode);
-                print("bootstrap", r);
                 if (r.success()) {
                     first = episode;
-                    episode++;
-                    break;
                 }
+                print("bootstrap", r, save(m, seed, episode, first, checkpoint, keepEvery));
             }
             if (first == null) {
                 System.out.printf("no success within E_max = %d episodes: no refinement phase%n", emax);
             } else {
-                System.out.printf("first success at episode %d; refinement for %d episodes%n", first,
-                        eref);
-                m.enterRefinement();
-                for (int k = 0; k < eref; k++, episode++) {
-                    print("refinement", m.runEpisode(seed, episode));
+                if (!refining) {
+                    System.out.printf("first success at episode %d; refinement for %d episodes%n",
+                            first, eref);
+                    m.enterRefinement();
+                }
+                for (; episode <= first + eref; episode++) {
+                    AgentMind.EpisodeResult r = m.runEpisode(seed, episode);
+                    print("refinement", r, save(m, seed, episode, first, checkpoint, keepEvery));
                 }
             }
             // The bridge finishes the run log only when it shuts down: a gzip left open is
@@ -90,9 +118,32 @@ public final class AgentMain {
         }
     }
 
-    private static void print(String phase, AgentMind.EpisodeResult r) {
-        System.out.printf("  %-10s ep %3d  steps %4d  success %-5s  goals %s  pool %d%n", phase,
-                r.episode(), r.steps(), r.success(), r.goalsMet(), r.poolSize());
+    /** Checkpoint after {@code episode}, if asked; returns the milliseconds it took (-1: none). */
+    private static long save(AgentMind m, int seed, int episode, Integer first, Path checkpoint,
+                             int keepEvery) {
+        if (checkpoint == null) {
+            return -1;
+        }
+        long t0 = System.nanoTime();
+        Checkpoint.write(Checkpoint.of(m, new Checkpoint.Progress(seed, episode + 1, first)),
+                checkpoint);
+        if (keepEvery > 0 && (episode + 1) % keepEvery == 0) {
+            Path kept = checkpoint.resolveSibling("checkpoints")
+                    .resolve(String.format("after-ep%06d.json.gz", episode));
+            try {
+                Files.createDirectories(kept.getParent());
+                Files.copy(checkpoint, kept, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw new UncheckedIOException("cannot keep checkpoint " + kept, e);
+            }
+        }
+        return (System.nanoTime() - t0) / 1_000_000;
+    }
+
+    private static void print(String phase, AgentMind.EpisodeResult r, long checkpointMs) {
+        System.out.printf("  %-10s ep %3d  steps %4d  success %-5s  goals %s  pool %d%s%n", phase,
+                r.episode(), r.steps(), r.success(), r.goalsMet(), r.poolSize(),
+                checkpointMs < 0 ? "" : "  checkpoint " + checkpointMs + " ms");
     }
 
     private static String str(JsonElement e) {

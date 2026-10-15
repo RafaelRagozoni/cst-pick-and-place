@@ -144,6 +144,9 @@ def render(label, meta, head, blocks, moments, totals, block):
             'episode %d' % totals['firstSuccess'] if totals['firstSuccess'] is not None else 'never'),
          'Coverage %d bins. Repertoire %s.' % (totals['bins'], totals['repertoire'] or 'not logged'),
          '']
+    if meta.get('resumes'):
+        L.insert(-1, 'Resumed from its checkpoint at episode %s.' % ', '.join(
+            str(r['fromEpisode']) for r in meta['resumes']))
     if totals['stepsPerSuccess'] is not None:
         L.insert(-1, 'Per success: %.0f steps, %.2f rad joint energy.'
                  % (totals['stepsPerSuccess'], totals['energyPerSuccess']))

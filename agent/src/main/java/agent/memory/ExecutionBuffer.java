@@ -72,6 +72,17 @@ public final class ExecutionBuffer {
         return nextSeq;
     }
 
+    /**
+     * Continue the numbering of a run resumed from a checkpoint. The entries themselves are not
+     * kept: in WP2 nothing reads one after its episode (Credit Assignment reads each once).
+     */
+    public void resumeAt(long seq) {
+        if (!entries.isEmpty()) {
+            throw new IllegalStateException("resume an ExecutionBuffer before anything is added");
+        }
+        nextSeq = seq;
+    }
+
     /** Entries with seq >= {@code seq}, oldest first. */
     public List<Entry> since(long seq) {
         if (!entries.isEmpty() && seq < entries.peekFirst().seq()) {

@@ -58,7 +58,7 @@ class Bridge:
     """Owns the simulator. Plain methods -- no transport in here."""
 
     def __init__(self, sim, simIK=None, mode='fixed', step_limit=500, manipulability=True,
-                 log_path=None, condition=None):
+                 log_path=None, condition=None, log_append=False):
         if log_path and not condition:
             raise ValueError('a logged run needs a condition label')
         self.sim = sim
@@ -77,7 +77,7 @@ class Bridge:
         self.last_obs = None
         self.warmed = False
         self.log_path, self.condition = log_path, condition
-        self.sink = open_log(log_path) if log_path else None
+        self.sink = open_log(log_path, 'at' if log_append else 'wt') if log_path else None
         self.episode = None         # the EpisodeLog of the episode in progress, when logging
 
     # --- operations ------------------------------------------------------
@@ -218,6 +218,8 @@ def main():
     ap.add_argument('--log', help='write the run log here (.jsonl.gz recommended)')
     ap.add_argument('--condition', help='condition label written into the log, e.g. C0')
     ap.add_argument('--no-log', action='store_true', help='run without a log, deliberately')
+    ap.add_argument('--log-append', action='store_true',
+                    help='add to the log instead of replacing it: a resumed run (run_live.py)')
     a = ap.parse_args()
     if bool(a.log) == a.no_log:
         ap.error('give either --log PATH (with --condition) or --no-log')
@@ -243,7 +245,7 @@ def main():
 
         bridge = Bridge(sim, simIK, mode=a.mode, step_limit=a.step_limit,
                         manipulability=not a.no_manipulability, log_path=a.log,
-                        condition=a.condition)
+                        condition=a.condition, log_append=a.log_append)
         try:
             serve(bridge, a.port)
         finally:

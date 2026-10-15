@@ -7,6 +7,7 @@ import agent.memory.ExecutionBuffer;
 import agent.motivation.Drives;
 import agent.sim.Observation;
 import br.unicamp.cst.core.entities.Memory;
+import com.google.gson.JsonObject;
 
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -61,6 +62,19 @@ public final class CreditAssignmentCodelet extends AgentCodelet {
 
     public CreditTable table() {
         return table;
+    }
+
+    /** What outlives an episode, for a checkpoint: the table and how far ExecutionBuffer was read. */
+    public JsonObject state() {
+        JsonObject s = new JsonObject();
+        s.add("table", table.state());
+        s.addProperty("readSeq", readSeq);
+        return s;
+    }
+
+    public void restore(JsonObject s) {
+        table.restore(s.getAsJsonObject("table"));
+        readSeq = s.get("readSeq").getAsLong();
     }
 
     @Override

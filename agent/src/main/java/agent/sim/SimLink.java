@@ -52,6 +52,14 @@ public final class SimLink {
         return cycle;
     }
 
+    /** Continue the numbering of a run resumed from a checkpoint: the next reply is cycle + 1. */
+    public void resumeAt(long cycle) {
+        if (latest != null) {
+            throw new IllegalStateException("resume a run before its first reset, not after");
+        }
+        this.cycle = cycle;
+    }
+
     public int episode() {
         return episode;
     }

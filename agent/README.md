@@ -7,7 +7,7 @@ moved here (`agent.sim`, `agent.bench`). CST comes from the `../cst` submodule, 
 ## Run
 
 ```
-./gradlew test                       # 40 tests, offline; ParityTest runs python3
+./gradlew test                       # 47 tests, offline; ParityTest runs python3
 # live: CoppeliaSim open (or headless: `sleep infinity | ./coppeliaSim.sh -h`), then
 mkdir -p runs && python3 ../coppelia_environment/bridge.py --log runs/C0_ucb_s1.jsonl.gz --condition C0
 ./gradlew liveRun -PagentArgs="--condition C0 --seed 1 --emax 50 --eref 20 --selection ucb"
@@ -19,6 +19,24 @@ gzip log only on shutdown, and an unclosed one cannot be read. It refuses to run
 different condition label than the one it runs. `--selection` (greedy, ucb, ucb:<c>, thompson;
 default greedy) is the selection mechanism. Every logged step records `selection` and the `spread`
 it used, and `metrics.py` reports the selection (two names means two runs went into one log).
+
+Long runs go through `../tools/run_live.py`, which also checkpoints and resumes them (below).
+
+## Checkpoints
+
+`--checkpoint FILE` saves the agent after every episode (`Checkpoint.java`); `--keep-every N` also
+keeps a copy every N episodes in `checkpoints/after-epNNNNNN.json.gz`; `--resume FILE` continues
+from one: same condition, selection and seed, next episode, same phase. It is the training
+checkpoint of ML (YOLO's `last.pt`, PyTorch's model + optimizer + epoch), but with no weights: what
+carries over is the credit table, the novelty archive and visit counts, the random generator
+mid-sequence, the counters that number cycles, goals, plans and ExecutionBuffer entries, and where
+the run stands. Everything else restarts each episode, so a checkpoint is only taken between them.
+
+It refuses a checkpoint saved under another `Config` or with another pool, rather than resume a
+different run. Cost, measured at a pessimistic size (archive full at 5000 points, 50 k visited bins,
+14 × 5000 credit cells): 4.0 MB, ~0.23 s per save (~2.5 %) against ~9 s per 500-step episode; on the first
+live episodes, 1–18 ms. Under Bullet a resumed run is not the run that would have gone on (its
+physics varies per process, see Risks), but it is the same agent, so the same experiment.
 
 ## Goal
 
@@ -154,7 +172,7 @@ goal nearly always, so Task never drives selection — calibrating Curiosity is 
 
 ## Testing
 
-`./gradlew test`: 40 tests, ~1 s, no simulator.
+`./gradlew test`: 47 tests, ~1 s, no simulator.
 
 - `ParityTest` — the Java ports agree with the Python they port, on the recorded expert trajectory:
   task predicates (goals.py), characterization bins (metrics.characterise), step completion
@@ -174,6 +192,15 @@ goal nearly always, so Task never drives selection — calibrating Curiosity is 
   seed, logging their name and σ, and with σ > 0 — at σ = 0 both silently rank by score alone, like GREEDY. Mutation-checked:
   dropping the sample recording fails three tests.
 
+- `CheckpointTest` — a run paused after episode 3, saved to a file and resumed in a new mind is the
+  run that never stopped: every command and every logged decision (habit, goal, drive levels,
+  novelty, σ) of episodes 3–5 equal, and the same state at the end; for GREEDY, UCB, Thompson, C3,
+  C6 and across the refinement switch. A wrong Config, a used mind and a mid-episode save are
+  refused. Mutation-checked: leaving out any one restored piece (archive, generator, credit, the
+  credit copied to the pool, cycle, goal or ExecutionBuffer numbering) fails it. The PlanTracker's
+  last plan and goal numbers were left out because doing so failed nothing: they only compare
+  against numberings that continue.
+
 Nothing checks the agent *learns the task*: that is WP3's gate, judged on live runs.
 
 ## Deferred
@@ -188,6 +215,11 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
 - A credit baseline (advantage), part of rethinking credit.
 - Per-habit variance (UCB-V, UCB1-Tuned) once habits have enough samples; a discounted or
   sliding-window UCB if non-stationarity (below) shows up.
+- Checkpoints of generated habits (WP3): the pool is checked, not saved, so a resume refuses a pool
+  that is not the primary repertoire. ExecutionBuffer entries are not saved either (only their
+  numbering); if WP3's macros read across an episode end, they must be.
+- Using the kept checkpoints: evaluating a frozen agent (no credit updates) at episode 100, 500,
+  1000; starting a new batch from one, e.g. another selector from the same learned state.
 
 ## Risks
 
@@ -225,6 +257,9 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
   function of (seed, episode), which `pilot.py` already argued and which still holds — but exact
   replay: a run cannot be re-run to debug it, and a C0–Cx difference in one pair mixes the
   component's effect with physics noise, so it needs more seeds to show.
+- **A checkpoint is tied to the code that wrote it.** `FORMAT`, the Config check and the pool
+  check refuse the mismatches they can see; a change in what a component means (a field reread
+  differently) they cannot. `run_live.py --resume` therefore runs the batch's own agent snapshot.
 - Novelty search is O(archive) per cycle; capped at 5000 points.
 - The Fake environment tests the plumbing, not the physics; the live scene is the only physics check.
 
@@ -243,6 +278,9 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
 | CST's `MemoryContainer` policies (`MAX`, `RANDOM_FLAT`, `RANDOM_PROPORTIONAL`, `*_STABLE`) as the selector | Selection native to CST: set each habit's evaluation, read the container | Its `Random` is unseeded, so a run would not reproduce per seed; `RANDOM_PROPORTIONAL` is a roulette that assumes evaluations ≥ 0, and E(h) is mostly negative; an evaluation lives on the habit's memory while E(h) depends on goal and state, so every evaluation would be rewritten each cycle; no UCB, softmax temperature or ε |
 | Selection as its own codelet (swap by rewiring) | The most CST-shaped plug | A ninth codelet and a new box in the cap4 figure for what one function does |
 | **Exploration for lock-in** (multi-armed / contextual bandits): ε-greedy, softmax over E(h), UCB, Thompson sampling, optimistic initial credit, a per-state baseline subtracted from ΔD (advantage) | Standard fixes for greedy selection on noisy estimates | UCB and Thompson implemented as selectors, the choice pending live runs. ε-greedy explores blindly; softmax needs a temperature in the units of E(h), which move with the drive levels and gains; optimistic credit helps only habits never run, while the failure is a habit run once. The baseline is a credit change, not a selector. cap4's claim that exploration needs no separate mechanism changes either way |
+| Checkpoint: Java serialization of the whole `AgentMind` | One call, nothing to list by hand | CST's `Mind`, codelets and their `Timer` threads are not serializable; a binary blob breaks on any class change and cannot be read with `zcat \| jq`. Kept for one field: `java.util.Random` has no other public way to its state |
+| Checkpoint: a process snapshot (CRIU) of agent, bridge and CoppeliaSim | Resume anything, mid-episode | Three processes, ZeroMQ sockets and a simulator's GPU/GL state; Linux-only and fragile; and the gain (resume mid-episode) is worth one episode at most |
+| Checkpoint: Gson reflection on the components | No hand-written state()/restore() | Restoring a renamed field leaves its default, silently; the explicit reads fail loudly on a missing key |
 | Bandit libraries: MABWiser (Python), Vowpal Wabbit's contextual-bandit exploration (C++, JNI binding) | Tested rules: UCB1, Thompson, softmax, ε-greedy, LinUCB (MABWiser); ε-greedy, softmax, bagging, cover (VW) | Each learns its own reward estimate; here the estimate is the credit table (per-drive late fusion, eligibility traces), and only the ~20-line ranking rule would be reused. Python or native code inside a CST codelet for that is the worse trade |
 
 What building our own gains: the habit is a CST Idea end to end, every cap4 component is a codelet

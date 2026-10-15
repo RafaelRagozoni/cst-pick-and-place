@@ -1,6 +1,7 @@
 package agent.codelets;
 
 import agent.Config;
+import agent.credit.CreditTable;
 import agent.habit.HabitIdeas;
 import agent.memory.CreditUpdate;
 import br.unicamp.cst.core.entities.Memory;
@@ -70,6 +71,13 @@ public final class HabitLearnerCodelet extends AgentCodelet {
 
     public Map<String, Idea> habits() {
         return Collections.unmodifiableMap(byId);
+    }
+
+    /** Copy every habit's credit from the table: after a checkpoint is restored into it. */
+    public void refreshCredit(CreditTable table) {
+        for (Map.Entry<String, Idea> e : byId.entrySet()) {
+            HabitIdeas.setCredit(e.getValue(), table.snapshot(e.getKey()));
+        }
     }
 
     @Override

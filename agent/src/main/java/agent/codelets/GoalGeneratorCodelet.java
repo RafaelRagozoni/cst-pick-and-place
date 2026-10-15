@@ -6,6 +6,7 @@ import agent.motivation.Drives;
 import agent.sim.Observation;
 import agent.task.TaskStages;
 import br.unicamp.cst.core.entities.Memory;
+import com.google.gson.JsonObject;
 
 /**
  * Goal Generator (cap4 4.3.3): decides what the agent pursues and writes it to GoalMO.
@@ -40,6 +41,17 @@ public final class GoalGeneratorCodelet extends AgentCodelet {
     public GoalGeneratorCodelet(Config cfg) {
         super("GoalGenerator");
         this.cfg = cfg;
+    }
+
+    /** What outlives an episode, for a checkpoint: the goal numbering. The rest restarts per episode. */
+    public JsonObject state() {
+        JsonObject s = new JsonObject();
+        s.addProperty("id", id);
+        return s;
+    }
+
+    public void restore(JsonObject s) {
+        id = s.get("id").getAsLong();
     }
 
     @Override

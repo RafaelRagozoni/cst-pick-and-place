@@ -8,6 +8,7 @@ import agent.motivation.NoveltyArchive;
 import agent.sim.Observation;
 import agent.task.TaskStages;
 import br.unicamp.cst.core.entities.Memory;
+import com.google.gson.JsonObject;
 
 /**
  * Drive Generator (cap4 4.3.2): computes the four drive levels from SensoryMO and writes them,
@@ -57,6 +58,17 @@ public final class DriveGeneratorCodelet extends AgentCodelet {
 
     public NoveltyArchive archive() {
         return archive;
+    }
+
+    /** What outlives an episode, for a checkpoint: the novelty archive. Gains follow the phase. */
+    public JsonObject state() {
+        JsonObject s = new JsonObject();
+        s.add("archive", archive.state());
+        return s;
+    }
+
+    public void restore(JsonObject s) {
+        archive.restore(s.getAsJsonObject("archive"));
     }
 
     @Override

@@ -16,8 +16,17 @@ import agent.sim.Observation;
 import br.unicamp.cst.core.entities.Memory;
 import br.unicamp.cst.core.entities.MemoryContainer;
 import br.unicamp.cst.representation.idea.Idea;
+import com.google.gson.JsonObject;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputFilter;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Random;
 
@@ -35,7 +44,7 @@ import java.util.Random;
 public final class BehaviorGeneratorCodelet extends AgentCodelet {
 
     private final Config cfg;
-    private final Random rng;
+    private Random rng;
     private final Selector selector;
     private double spread;
     private MemoryContainer pool;
@@ -99,6 +108,35 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
         if (pick != null) {
             planMO.setI(new Plan(++serial, pick.habit(), goal.name(), goal.id(), context,
                     pick.score()));
+        }
+    }
+
+    /**
+     * What outlives an episode, for a checkpoint: the plan numbering and the random generator
+     * mid-sequence (Java serialization is the only public way to its state). Selectors keep no state
+     * across episodes: Thompson's draws restart with each decision taken while nothing runs.
+     */
+    public JsonObject state() {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ObjectOutputStream out = new ObjectOutputStream(bytes)) {
+            out.writeObject(rng);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        JsonObject s = new JsonObject();
+        s.addProperty("serial", serial);
+        s.addProperty("rng", Base64.getEncoder().encodeToString(bytes.toByteArray()));
+        return s;
+    }
+
+    public void restore(JsonObject s) {
+        serial = s.get("serial").getAsLong();
+        byte[] bytes = Base64.getDecoder().decode(s.get("rng").getAsString());
+        try (ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
+            in.setObjectInputFilter(ObjectInputFilter.Config.createFilter("java.util.Random;!*"));
+            rng = (Random) in.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            throw new IllegalArgumentException("unreadable random generator state in checkpoint", e);
         }
     }
 
