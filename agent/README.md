@@ -198,6 +198,19 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
   habit's early credit is not what it would earn now; n only grows, so the bonus never comes back
   for a habit whose old credit is stale. Discounted UCB (Garivier and Moulines 2011) is the
   standard fix.
+- **Live runs do not reproduce per seed** (found 2026-10-15). Same-seed agent runs issue identical
+  actions, yet the physics parts at the first contact (the gripper closing on nothing, fingers
+  touching), by ~1e-8 rad; the agent amplifies it and the habit choices part ways within ~1
+  episode. A minimal test without the agent (idle / move the base / close the gripper, 3 runs per
+  bridge session) narrowed it to two causes, neither of them the GUI:
+  1. *A scene reloaded in the same CoppeliaSim process is not clean*: contact physics then depends
+     on earlier sessions (2e-5 apart from the first load). A fresh process reproduces bit for bit,
+     headless or with the GUI. Workaround: one CoppeliaSim process per run.
+  2. *Reset does not reset the gripper's motor*: an episode after one that closed the gripper starts
+     4.6 mm more closed at its first step. Deterministic, but episode k's start depends on how k−1
+     ended — so two conditions never start episode k alike.
+  SIM-08 (`test_determinism.py`) demands 1e-9 but runs in one session without closing the gripper,
+  so it sees neither. Until both are fixed, same-seed runs are not paired samples.
 - Novelty search is O(archive) per cycle; capped at 5000 points.
 - The Fake environment tests the plumbing, not the physics; the live scene is the only physics check.
 
