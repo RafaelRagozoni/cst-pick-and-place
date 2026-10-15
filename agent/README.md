@@ -203,14 +203,19 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
   touching), by ~1e-8 rad; the agent amplifies it and the habit choices part ways within ~1
   episode. A minimal test without the agent (idle / move the base / close the gripper, 3 runs per
   bridge session) narrowed it to two causes, neither of them the GUI:
-  1. *A scene reloaded in the same CoppeliaSim process is not clean*: contact physics then depends
-     on earlier sessions (2e-5 apart from the first load). A fresh process reproduces bit for bit,
-     headless or with the GUI. Workaround: one CoppeliaSim process per run.
+  1. *Bullet's contacts are not deterministic across processes.* At first it looked like a scene
+     reloaded in a long-lived process (a first load matched across processes once). It is not:
+     six fresh processes closing the gripper on nothing gave three different physics, parting at
+     the finger contact by ~3e-5 — with address randomization off and Python's hash seed fixed
+     alike. Within one process repeated runs are identical. Under **MuJoCo, ODE and Newton** all
+     six were identical, the fingers closing in each. `test_fresh_process.py` (SIM-09, five fresh
+     processes) fails under Bullet. Switching engine is open: grasping, contacts, joint limits and
+     the expert trajectory were all measured under Bullet.
   2. *Reset did not reset the gripper's motor* — **fixed**: the finger motor's target velocity
      survived the stop, so an episode after one that closed the gripper started 4.6 mm more closed,
      and every episode began with the fingers still opening. `EpisodeReset` now zeroes it and waits
      for the fingers to stop (reset 0.34 → 0.46 s); `test_episode_reset.py` checks both.
-  Until 1 is handled (one CoppeliaSim process per run), same-seed runs are not paired samples.
+  Until 1 is handled, same-seed runs are not paired samples.
 - Novelty search is O(archive) per cycle; capped at 5000 points.
 - The Fake environment tests the plumbing, not the physics; the live scene is the only physics check.
 

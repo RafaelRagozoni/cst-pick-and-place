@@ -23,8 +23,13 @@ Transport is ZeroMQ REQ/REP with JSON bodies (DEC-03). It is deliberately confin
 the whole request handler is a plain dict-in/dict-out function, so swapping the transport is one
 function, not a redesign.
 
-    python3 bridge.py --log runs/C0_s1.jsonl.gz --condition C0 [--port 5555] [--mode fixed|annulus]
-    python3 bridge.py --no-log                       # driving by hand, smoke tests
+    python3 bridge.py --launch headless --log runs/C0_s1.jsonl.gz --condition C0 [--port 5555]
+    python3 bridge.py --launch gui --log ...         # the same, in a window you can watch
+    python3 bridge.py --no-log                       # attach to an open CoppeliaSim, by hand
+
+`--launch` starts a CoppeliaSim process for this run on free ports and stops it when the bridge
+ends (simprocess.py); without it the bridge attaches to one already open (`--sim-port`, default
+23000). Neither makes Bullet reproducible across runs: its contacts vary per process (simprocess.py).
 """
 import argparse
 import json
@@ -33,6 +38,7 @@ import traceback
 import zmq
 
 import simconfig
+import simprocess
 from actions import Actuator, joint_positions, primitive_repertoire, record_id
 from episode import EpisodeReset
 from goals import GoalTracker, STEPS, succeeded
@@ -200,7 +206,12 @@ def main():
     ap.add_argument('--port', type=int, default=DEFAULT_PORT)
     ap.add_argument('--mode', default='fixed', choices=('fixed', 'annulus'))
     ap.add_argument('--step-limit', type=int, default=500)
-    ap.add_argument('--sim-port', type=int, default=23000)
+    ap.add_argument('--sim-port', type=int,
+                    help='CoppeliaSim remote API port (default: 23000, or a free one with --launch)')
+    ap.add_argument('--launch', choices=('headless', 'gui'),
+                    help='start a fresh CoppeliaSim for this run and stop it at the end')
+    ap.add_argument('--coppelia-root', help='CoppeliaSim install (default: $COPPELIASIM_ROOT, or '
+                                            'the one ~/CoppeliaSim* directory)')
     ap.add_argument('--no-manipulability', action='store_true')
     ap.add_argument('--log', help='write the run log here (.jsonl.gz recommended)')
     ap.add_argument('--condition', help='condition label written into the log, e.g. C0')
@@ -211,20 +222,31 @@ def main():
     if a.log and not a.condition:
         ap.error('--log needs --condition')
 
-    c = RemoteAPIClient(port=a.sim_port)
-    sim, simIK = c.require('sim'), c.require('simIK')
-    sim.stopSimulation()
-    while sim.getSimulationState() != sim.simulation_stopped:
-        pass
-    sim.loadScene(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pick_and_place.ttt'))
-
-    bridge = Bridge(sim, simIK, mode=a.mode, step_limit=a.step_limit,
-                    manipulability=not a.no_manipulability, log_path=a.log, condition=a.condition)
+    proc = None
+    if a.launch:
+        proc = simprocess.SimProcess(a.coppelia_root, gui=a.launch == 'gui', rpc_port=a.sim_port)
+        proc.start()
+        print('launched CoppeliaSim (%s) on port %d' % (a.launch, proc.rpc_port), flush=True)
     try:
-        serve(bridge, a.port)
-    finally:
-        bridge.close()
+        c = RemoteAPIClient(port=proc.rpc_port if proc else (a.sim_port or 23000))
+        sim, simIK = c.require('sim'), c.require('simIK')
         sim.stopSimulation()
+        while sim.getSimulationState() != sim.simulation_stopped:
+            pass
+        sim.loadScene(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   'pick_and_place.ttt'))
+
+        bridge = Bridge(sim, simIK, mode=a.mode, step_limit=a.step_limit,
+                        manipulability=not a.no_manipulability, log_path=a.log,
+                        condition=a.condition)
+        try:
+            serve(bridge, a.port)
+        finally:
+            bridge.close()
+            sim.stopSimulation()
+    finally:
+        if proc:
+            proc.close()
 
 
 if __name__ == '__main__':
