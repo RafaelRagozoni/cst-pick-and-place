@@ -12,6 +12,7 @@ import agent.memory.ExecutionBuffer;
 import agent.memory.Goal;
 import agent.memory.Plan;
 import agent.memory.TrackerState;
+import agent.motivation.Characterization;
 import agent.motivation.Drives;
 import agent.sim.Observation;
 import agent.task.TaskStages;
@@ -314,6 +315,37 @@ class CodeletsTest {
         }
         assertEquals(first, second);
         assertTrue(first.stream().distinct().count() > 1, "ties spread over the pool");
+    }
+
+    /**
+     * UCB weighs what is known about a habit in THIS context. A habit that ran 50 times elsewhere and
+     * never here is untried here and goes first. Counting its 50 instead left it a near-zero bonus
+     * and gave the habit tried here once the largest: the 2026-10-15 baseline repeated a habit that
+     * had already run in the bin in 99% of its choices.
+     */
+    @Test
+    void ucbTriesAHabitNeverRunHereBeforeRepeatingOneThatRan() {
+        MemoryContainer pool = pool("here", "elsewhere");
+        goal(1, Goal.TASK, "reach", 0);
+        drives(0, 0.5, 0.5, 0, 0, 0, false);
+        sensoryMO.setI(at(0, Traj.obs(0).q(), false));
+        trackerMO.setI(TrackerState.idle(0));
+        String here = CreditTable.context("reach", Characterization.key(Observation.of(sensoryMO)));
+        CreditTable t = new CreditTable();
+        t.add("here", here, new double[]{0.1, 0, 0, 0}, 1.0, true);
+        for (int i = 0; i < 50; i++) {                  // results that vary: a spread to weigh
+            t.add("elsewhere", "reach|far", new double[]{i % 2 == 0 ? 0.1 : -0.1, 0, 0, 0}, 1.0,
+                    true);
+        }
+        t.closeExecutions();
+        HabitIdeas.setCredit(habit(pool, "here"), t.snapshot("here"));
+        HabitIdeas.setCredit(habit(pool, "elsewhere"), t.snapshot("elsewhere"));
+
+        behavior(new Config(), pool, 1).notifyCodelet();
+        assertEquals("here", HabitIdeas.id(((Plan) planMO.getI()).habit()), "greedy: the best score");
+        behavior(new Config().withSelection("ucb"), pool, 1).notifyCodelet();
+        assertEquals("elsewhere", HabitIdeas.id(((Plan) planMO.getI()).habit()),
+                "ucb: never run here, so tried here first");
     }
 
     // --- Goal Generator ------------------------------------------------------------------------

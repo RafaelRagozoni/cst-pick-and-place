@@ -45,10 +45,16 @@ public final class CreditSnapshot {
         return totalCount;
     }
 
-    /** The executions behind {@link #value}: the context's, or the total's where it has no record. */
+    /**
+     * Executions under this context: 0 where the habit has no record here, however often it ran
+     * elsewhere. Not the cell {@link #value} reads, which falls back to the total: the score may
+     * borrow the habit's record elsewhere, but how much is known about the habit HERE is what UCB
+     * and Thompson weigh. Returning the total here gave a habit tried once in a bin the largest
+     * bonus there, and the 2026-10-15 baseline repeated such a habit in 99% of its choices.
+     */
     public long count(String context) {
         CreditTable.Cell c = byContext.get(context);
-        return c != null ? c.count : totalCount;
+        return c != null ? c.count : 0;
     }
 
     /** Finished executions, each one sample of a single execution's credit. */

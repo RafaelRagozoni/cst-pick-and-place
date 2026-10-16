@@ -124,6 +124,9 @@ exactly.
   waits 10 observations. The episode ends on the environment's success anyway.
 - **Goal choice**: Safety ≥ 0.5 takes over; otherwise a drive must beat the goal's drive by 0.1; a
   drive whose goal is already met is not a candidate.
+- **UCB and Thompson count executions per context** (goal, state bin): a habit with no record there
+  has n = 0, even though its score then falls back to its total credit. The score may borrow what
+  the habit did elsewhere; how much is known about it *here* may not (see "The bin-count bug").
 - **σ is pooled over the pool**, not per habit: early on most habits have one or two samples, and a
   per-habit variance from two samples is noise. A quiet habit is treated as noisier than it is,
   which only means more exploration.
@@ -159,6 +162,9 @@ Safety works: after the fix, recovering from a joint limit kept every joint ≥ 
 
 ### Selectors live (2026-10-15, C0, seed 1, 6 × 500 steps, one run each)
 
+These ran with the bin-count bug below, which inverts UCB's bonus inside a bin: the UCB and
+Thompson rows are not the rules as designed.
+
 | selection | two most-chosen habits | coverage bins | min eef→cube | goal held by Curiosity |
 |---|---|---|---|---|
 | greedy | 58 % (`grab_open` alone 35 %) | 22 | 0.22 m | 97 % |
@@ -169,6 +175,32 @@ Both bandit rules end the lock-in: choices spread over all 14 habits. UCB also e
 state space (+68 % bins) and came closest to the cube of any run so far. No run reached it
 (5 cm) or succeeded. One seed each: the UCB–Thompson gap may be chance. Curiosity still holds the
 goal nearly always, so Task never drives selection — calibrating Curiosity is now the next lever.
+
+### The bin-count bug (found and fixed 2026-10-16)
+
+`CreditSnapshot.count(context)` returned the habit's *total* executions where it had no record
+under the current (goal, bin). UCB read that as "well known", so a habit never run in the bin got
+a bonus of ~0.002 and the one habit run there once got ~0.25: inside a bin, UCB repeated what it
+had already done. Rebuilt from the 2026-10-15 baseline logs (3 × 1000 episodes), the chosen habit
+had already run in its context in **99 %** of choices, while only ~20 % of the habits had. That is
+the opposite-pair back-and-forth in that batch, and a bonus that large drowned any credit (~0.001).
+Now a habit with no record in the context has n = 0 there and is tried first
+(`ucbTriesAHabitNeverRunHereBeforeRepeatingOneThatRan` fails on the old code).
+
+Live after the fix (C0, UCB, seeds 1–3, the first 30 episodes against the baseline's):
+
+| seed | bins visited, before → after | closest to the cube, before → after |
+|---|---|---|
+| 1 | 122 → 24 | 0.19 → 0.16 m |
+| 2 | 93 → 26 | 0.13 → 0.15 m |
+| 3 | 114 → 26 | 0.12 → 0.21 m |
+
+Coverage fell 4–5×. Trying all 14 one-degree primitives in each bin, one move undoes another, and
+the arm dithers in place; the bug's repetition was what carried it across bins. The bonus
+(σ ≈ 0.045) still outweighs typical credit, so uncertainty, not credit, picks. Repeating an action
+is the known remedy for dithering with small actions (temporally extended exploration: action
+repeat, options, ε-z-greedy, Dabney et al. 2021); here that is a credit large enough to follow,
+a smaller c, or WP3's macros. Open decision.
 
 ## Testing
 
@@ -209,8 +241,8 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
   pool cap. `Config.generation`/`fusion` are wired to conditions but unread. Culling needs a
   member-removal operation in CST's `MemoryContainer` (cap4 §4.4.3), which the fork does not have.
 - The macro selection rule (open in cap4 §4.4.2).
-- Which selector: UCB and Thompson ran live once each (above); more seeds before choosing. On the
-  fake environment (C0, 3 seeds, 6 × 300 steps) the two most-chosen habits take 57–76 % of choices
+- Which selector: UCB and Thompson ran live once each (above), both with the bin-count bug; rerun
+  them before choosing. On the fake environment (C0, 3 seeds, 6 × 300 steps) the two most-chosen habits take 57–76 % of choices
   under GREEDY and 20–24 % under either — plumbing evidence, not physics.
 - A credit baseline (advantage), part of rethinking credit.
 - Per-habit variance (UCB-V, UCB1-Tuned) once habits have enough samples; a discounted or
@@ -226,6 +258,11 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
 - **The silent failure**: credit that looks healthy but is mostly passive boredom drift. Every habit
   gets *some* credit every run, so nothing errors; only per-habit drive-change statistics (as in
   the live-run analysis above) show whether credit tracks what the habit did.
+- **Per-context exploration preempts plans and grows with the pool.** Under UCB a habit never run
+  in the current bin goes before any other, so a running plan is replaced whenever, in the bin it
+  is passing through, it has run before and some other habit has not. Primitives last a cycle or
+  two and barely notice; WP3's macros would be cut short. And every new context costs one try per
+  habit: 14 now, more as the HabitLearner adds habits.
 - **Credit is not stationary**, and UCB and Thompson assume it is. Curiosity habituates, so a
   habit's early credit is not what it would earn now; n only grows, so the bonus never comes back
   for a habit whose old credit is stale. Discounted UCB (Garivier and Moulines 2011) is the

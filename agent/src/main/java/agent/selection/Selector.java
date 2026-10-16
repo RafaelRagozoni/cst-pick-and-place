@@ -19,8 +19,8 @@ public interface Selector {
      * A habit and what is known about it under the current goal, state and drive levels.
      *
      * @param score  E(h), eq. (4.1)
-     * @param count  executions behind that score: under this context, or in total where the habit
-     *               has no record here (the same cell the score comes from)
+     * @param count  executions under this context (goal, state bin); 0 where the habit has no record
+     *               here, even though the score then falls back to its total
      * @param spread standard deviation of one execution's score, the same for every candidate
      *               ({@link agent.credit.CreditSnapshot#spread}); 0 until it can be estimated
      */

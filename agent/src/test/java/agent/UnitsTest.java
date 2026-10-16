@@ -164,7 +164,7 @@ class UnitsTest {
                 1e-12);
         assertEquals(0.0, CreditSnapshot.spread(List.of(s), new double[]{0, 1, 1, 1}), 1e-12);
         assertEquals(2, s.count("ctx"));
-        assertEquals(2, s.count("elsewhere"), "no record here: the total's count, as value() reads");
+        assertEquals(0, s.count("elsewhere"), "no record here: never ran here, whatever ran elsewhere");
     }
 
     @Test

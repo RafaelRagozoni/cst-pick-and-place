@@ -71,11 +71,12 @@ public final class Selectors {
             running != null ? null : candidates.get(rng.nextInt(candidates.size()));
 
     /**
-     * UCB1 (Auer et al. 2002): rank by score + c * spread * sqrt(2 ln N / n), n the habit's executions
-     * behind its score and N the sum of n over the pool. A habit tried less than the rest gets a bonus
-     * that grows slowly while it is passed over, so one unlucky early result is retried rather than
-     * believed forever; a never-executed habit is tried before any other. The noise scale is the
-     * pooled spread, so c = 1 needs no calibration to the units of the drives.
+     * UCB1 (Auer et al. 2002) per context: rank by score + c * spread * sqrt(2 ln N / n), n the
+     * habit's executions under the current goal and state bin and N the sum of n over the pool, the
+     * context's visits. A habit tried less than the rest here gets a bonus that grows slowly while it
+     * is passed over, so one unlucky early result is retried rather than believed forever; a habit
+     * never executed here is tried before any other. The noise scale is the pooled spread, so c = 1
+     * needs no calibration to the units of the drives.
      */
     public static Selector ucb(double c) {
         return (candidates, running, rng) -> {
