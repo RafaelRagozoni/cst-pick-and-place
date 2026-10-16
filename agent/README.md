@@ -242,6 +242,18 @@ Three changes, applied in turn, each run as C0, `ucb:0.1`, seeds 1–3, 30 episo
 Thirty episodes and three seeds: A's effect is large and the same in every seed; B's harm is
 consistent and explained; C is within the noise.
 
+**B with the retreat charged** (`progressChargesRetreat`: moving away costs its plain change; only
+coming back over ground covered in the window earns 0), same protocol: seeds 1–2 like A (107 / 109
+bins, closest 0.10 / 0.06 m); seed 3 never left the home bin in 30 episodes (1 bin, `grab_open`
+chosen 99–100 %). Two causes, read from its checkpoint:
+
+1. *The rule makes moving cost on average.* A retreat is charged, the approach that undoes it earns
+   0, so a move's expected Task credit is negative and doing nothing is the best score. In seed 3
+   eleven of the thirteen habits tried once came out negative on Task; `grab_open` with the gripper
+   already open sat at ~0. The plain change is symmetric and has no such pull.
+2. *UCB's σ collapsed to zero* — a selector bug that A can hit too: see Risks, "σ from one habit".
+
+
 ## Testing
 
 `./gradlew test`: 47 tests, ~1 s, no simulator.
@@ -297,6 +309,13 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
 
 ## Risks
 
+- **σ from one habit** (found 2026-10-16, not fixed): the pooled spread counts only habits with two
+  or more finished executions. When one habit is the only such habit and its results never vary,
+  σ is ~0, UCB's bonus vanishes and selection is greedy for the rest of the run, with nothing
+  erroring. Live (B with the retreat charged, seed 3): every habit tried once in episode 0,
+  `grab_open` — a no-op with the gripper already open — then repeated 4978 times with variance
+  ~5e-11; the other thirteen were never retried in 30 episodes. A prior on σ that the data only
+  pulls down as samples accumulate would close it.
 - **The silent failure**: credit that looks healthy but is mostly passive boredom drift. Every habit
   gets *some* credit every run, so nothing errors; only per-habit drive-change statistics (as in
   the live-run analysis above) show whether credit tracks what the habit did.

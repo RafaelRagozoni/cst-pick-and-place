@@ -73,6 +73,12 @@ public final class Config {
      */
     public int progressWindow = 0;
     /**
+     * With progressWindow on: a cycle that moves away from the target is charged its plain change
+     * (negative), as with progressWindow 0, instead of 0. Only coming back over ground covered in
+     * the window earns nothing. Off: moving away earns 0 too.
+     */
+    public boolean progressChargesRetreat = false;
+    /**
      * A step's drive changes are credited minus what a step in its context (goal, state bin)
      * changes whatever runs there: an exponential running mean per context, this the weight of each
      * new step. It takes out what happens anyway -- Curiosity rising as a bin grows familiar charged

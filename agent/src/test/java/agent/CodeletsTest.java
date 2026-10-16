@@ -239,10 +239,11 @@ class CodeletsTest {
     }
 
     /** One habit per cycle, one-step credit; Task levels as given; each habit's Task credit. */
-    private double[] taskCreditPerStep(int progressWindow, double... levels) {
+    private double[] taskCreditPerStep(int progressWindow, boolean chargeRetreat, double... levels) {
         Config cfg = new Config();
         cfg.lambda = 0.0;
         cfg.progressWindow = progressWindow;
+        cfg.progressChargesRetreat = chargeRetreat;
         cfg.baselineRate = 0.0;
         CreditAssignmentCodelet c = credit(cfg);
         creditCycle(c, 0, levels[0], 0.0, true);
@@ -263,13 +264,26 @@ class CodeletsTest {
     @Test
     void taskCreditIsProgressBeyondTheRecentBest() {
         assertArrayEquals(new double[]{0.1, 0.0, 0.0, 0.1},
-                taskCreditPerStep(20, 0.5, 0.4, 0.5, 0.4, 0.3), 1e-9);
+                taskCreditPerStep(20, false, 0.5, 0.4, 0.5, 0.4, 0.3), 1e-9);
+    }
+
+    /**
+     * With the retreat charged, moving away costs what it costs under the plain change; only coming
+     * back over ground already covered earns nothing. A cycle that comes back and goes beyond the
+     * recent best earns the part beyond it.
+     */
+    @Test
+    void progressWithTheRetreatCharged() {
+        assertArrayEquals(new double[]{0.1, -0.1, 0.0, 0.1},
+                taskCreditPerStep(20, true, 0.5, 0.4, 0.5, 0.4, 0.3), 1e-9);
+        assertArrayEquals(new double[]{0.1, -0.1, 0.05},
+                taskCreditPerStep(20, true, 0.5, 0.4, 0.5, 0.35), 1e-9);
     }
 
     @Test
     void progressWindowZeroIsThePlainChange() {
         assertArrayEquals(new double[]{0.1, -0.1, 0.1, 0.1},
-                taskCreditPerStep(0, 0.5, 0.4, 0.5, 0.4, 0.3), 1e-9);
+                taskCreditPerStep(0, false, 0.5, 0.4, 0.5, 0.4, 0.3), 1e-9);
     }
 
     /** A new stage is a new target: the best of the last one is no reference for it. */

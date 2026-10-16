@@ -136,7 +136,10 @@ public final class CreditAssignmentCodelet extends AgentCodelet {
                 delta[Drives.TASK] = 0.0;
                 recentTask.clear();
             } else if (cfg.progressWindow > 0) {
-                delta[Drives.TASK] = Math.max(0.0, Collections.min(recentTask) - levels[Drives.TASK]);
+                boolean retreat = levels[Drives.TASK] > prev[Drives.TASK];
+                delta[Drives.TASK] = retreat && cfg.progressChargesRetreat
+                        ? prev[Drives.TASK] - levels[Drives.TASK]
+                        : Math.max(0.0, Collections.min(recentTask) - levels[Drives.TASK]);
             }
             deltas.put(o.cycle(), delta);
         }
