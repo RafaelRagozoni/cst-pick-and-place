@@ -202,6 +202,12 @@ is the known remedy for dithering with small actions (temporally extended explor
 repeat, options, ε-z-greedy, Dabney et al. 2021); here that is a credit large enough to follow,
 a smaller c, or WP3's macros. Open decision.
 
+A 10× smaller bonus (`--selection ucb:0.1`), same seeds and episodes: 52 / 55 / 75 bins (against
+24 / 26 / 26 at c = 1), closest 0.13 / 0.17 / 0.09 m, median distance per 10-episode block
+0.16–0.19 m against 0.20–0.29 m; choices still spread (two most-chosen habits ~22 %). With doubt
+weighing less, credit steers the arm to 2–3× more places: it carries some signal, but not enough to
+match the bug's accidental persistence, and no run reached the cube.
+
 ## Testing
 
 `./gradlew test`: 47 tests, ~1 s, no simulator.

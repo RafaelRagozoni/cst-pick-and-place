@@ -202,6 +202,9 @@ def main():
         a.step_limit, seeds = a.step_limit or 500, a.seeds or [1]
         name = '%s_%s_%s%s' % (datetime.datetime.now().strftime('%Y-%m-%d_%H%M'), a.condition,
                                a.selection, '_' + a.tag if a.tag else '')
+        # The agent snapshot's classpath runs through this folder, and ':' splits a classpath:
+        # --selection ucb:0.1 left java unable to find agent.AgentMain.
+        name = name.replace(':', '-')
         batch = os.path.join(ROOT, 'runs', name)
         os.makedirs(batch)
         print('batch %s (code %s)' % (batch, commit), flush=True)
