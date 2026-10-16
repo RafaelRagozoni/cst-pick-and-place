@@ -208,6 +208,40 @@ A 10× smaller bonus (`--selection ucb:0.1`), same seeds and episodes: 52 / 55 /
 weighing less, credit steers the arm to 2–3× more places: it carries some signal, but not enough to
 match the bug's accidental persistence, and no run reached the cube.
 
+### Credit, round 1 (2026-10-16): shorter trace, progress, baseline
+
+What the credit recorded, rebuilt from the `ucb:0.1` logs: a habit's *own* effect on Task, repeated
+in the same bin, kept its sign 81–89 % of the time (chance is 50 %), but the recorded credit only
+67–73 %. Primitives last one cycle and the trace (λ = 0.9 per cycle) shared each execution's credit
+with the ~30 after it: ~60 % of a habit's recorded credit was what the habits after it did. One
+execution moves the hand ~0.2 cm (Task ~0.005). Curiosity rose in ~63 % of cycles whatever ran.
+
+Three changes, applied in turn, each run as C0, `ucb:0.1`, seeds 1–3, 30 episodes:
+
+| run | bins (s1/s2/s3) | closest (m) | median distance, ep. 20–29 (m) | episodes with a reach |
+|---|---|---|---|---|
+| before (λ 0.9) | 52 / 55 / 75 | 0.13 / 0.17 / 0.09 | 0.20 / 0.23 / 0.21 | 0 |
+| **A** λ 0.5 | **116 / 114 / 108** | **0.08 / 0.07 / 0.04** | 0.18 / 0.17 / 0.20 | **1** |
+| A + B progress (window 20) | 82 / 102 / 96 | 0.13 / 0.13 / 0.13 | 0.23 / 0.27 / 0.24 | 0 |
+| A + B + C baseline (0.1) | 102 / 87 / 47 | 0.13 / 0.17 / 0.15 | 0.30 / 0.25 / 0.33 | 0 |
+| A + C | 80 / 99 / 73 | 0.10 / 0.08 / 0.11 | 0.18 / 0.15 / 0.16 | 0 |
+
+- **A (`lambda` 0.9 → 0.5)** doubled coverage and came closest in every seed; the recorded Task
+  credit now keeps its sign in 86–87 % of repeats. The one clear gain.
+- **B (`progressWindow`: credit only progress beyond the recent best)** was worse in every seed. Its
+  cost is the one it was chosen with: moving away earns 0 instead of a charge, and coming back to a
+  point already reached earns 0, so 70 % of executions earn exactly 0 and the gap between the best
+  and the worst habit in a bin falls 4–5× (0.015 → 0.0035). The plain change already nets a
+  back-and-forth to zero across the pair while telling each move apart.
+- **C (`baselineRate`: minus the context's running mean per step)** shows no clear gain. A baseline
+  shared by every habit in a context barely changes their ranking, and UCB ranks within a context;
+  only the order in which habits were first tried, and the spread, can move. Its first version
+  subtracted a per-cycle mean times the step's length and charged 44-cycle grabs for dozens of bin
+  crossings (σ tripled, coverage 23 / 21 / 27): fixed, with a test.
+
+Thirty episodes and three seeds: A's effect is large and the same in every seed; B's harm is
+consistent and explained; C is within the noise.
+
 ## Testing
 
 `./gradlew test`: 47 tests, ~1 s, no simulator.
@@ -248,9 +282,11 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
   member-removal operation in CST's `MemoryContainer` (cap4 §4.4.3), which the fork does not have.
 - The macro selection rule (open in cap4 §4.4.2).
 - Which selector: UCB and Thompson ran live once each (above), both with the bin-count bug; rerun
-  them before choosing. On the fake environment (C0, 3 seeds, 6 × 300 steps) the two most-chosen habits take 57–76 % of choices
-  under GREEDY and 20–24 % under either — plumbing evidence, not physics.
-- A credit baseline (advantage), part of rethinking credit.
+  them before choosing. On the fake environment (C0, 3 seeds, 6 × 300 steps) the two most-chosen
+  habits take 57–76 % of choices under GREEDY and 20–24 % under either — plumbing evidence, not
+  physics.
+- A credit baseline (advantage): tried (`baselineRate`, "Credit, round 1"), no clear gain over 30
+  episodes; a longer run would tell.
 - Per-habit variance (UCB-V, UCB1-Tuned) once habits have enough samples; a discounted or
   sliding-window UCB if non-stationarity (below) shows up.
 - Checkpoints of generated habits (WP3): the pool is checked, not saved, so a resume refuses a pool
@@ -324,6 +360,7 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
 | Checkpoint: Java serialization of the whole `AgentMind` | One call, nothing to list by hand | CST's `Mind`, codelets and their `Timer` threads are not serializable; a binary blob breaks on any class change and cannot be read with `zcat \| jq`. Kept for one field: `java.util.Random` has no other public way to its state |
 | Checkpoint: a process snapshot (CRIU) of agent, bridge and CoppeliaSim | Resume anything, mid-episode | Three processes, ZeroMQ sockets and a simulator's GPU/GL state; Linux-only and fragile; and the gain (resume mid-episode) is worth one episode at most |
 | Checkpoint: Gson reflection on the components | No hand-written state()/restore() | Restoring a renamed field leaves its default, silently; the explicit reads fail loudly on a missing key |
+| **Credit that tells habits apart** (2026-10-16): a shorter eligibility trace (TD(λ)'s λ); credit as progress beyond the recent best, close to the competence progress of SAGG-RIAC (Baranes and Oudeyer 2013); an advantage baseline (REINFORCE with baseline, Sutton and Barto §13.4); larger steps or action repeat (frame skip in Atari agents) | Each is a standard answer to one measured flaw: credit diluted by later habits, back-and-forth, drift every habit is charged, effects too small to see | All three credit changes implemented as `Config` settings and run live ("Credit, round 1"): λ 0.5 kept; progress lost the sign of moving away and was worse; the baseline is near ranking-neutral under per-context UCB. Action repeat changes the primitives, not credit — WP3's mutation of a habit's angle is where it would come from |
 | Bandit libraries: MABWiser (Python), Vowpal Wabbit's contextual-bandit exploration (C++, JNI binding) | Tested rules: UCB1, Thompson, softmax, ε-greedy, LinUCB (MABWiser); ε-greedy, softmax, bagging, cover (VW) | Each learns its own reward estimate; here the estimate is the credit table (per-drive late fusion, eligibility traces), and only the ~20-line ranking rule would be reused. Python or native code inside a CST codelet for that is the worse trade |
 
 What building our own gains: the habit is a CST Idea end to end, every cap4 component is a codelet

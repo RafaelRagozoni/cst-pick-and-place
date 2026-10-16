@@ -24,8 +24,13 @@ class CheckpointTest {
     private static final int STEPS = 120;
     private static final int EPISODES = 6;
 
-    private static Config cfg(String condition, String selection) {
+    /** {@code offCredit}: the credit options that are off by default, on (progress, baseline). */
+    private static Config cfg(String condition, String selection, boolean offCredit) {
         Config c = Config.forCondition(condition);
+        if (offCredit) {
+            c.progressWindow = 20;
+            c.baselineRate = 0.1;       // per-context state that outlives an episode
+        }
         return selection.equals("-") ? c : c.withSelection(selection);
     }
 
@@ -44,24 +49,24 @@ class CheckpointTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"C0, greedy, -1", "C0, ucb, -1", "C0, thompson, -1", "C0, ucb, 1", "C3, ucb, -1",
-            "C6, -, -1"})
+    @CsvSource({"C0, greedy, -1, false", "C0, ucb, -1, false", "C0, thompson, -1, false",
+            "C0, ucb, 1, false", "C3, ucb, -1, false", "C6, -, -1, false", "C0, ucb, -1, true"})
     void aResumedRunIsTheRunThatNeverStopped(String condition, String selection, int refineAfter,
-                                             @TempDir Path dir) {
+                                             boolean offCredit, @TempDir Path dir) {
         int pause = 3;
         FakeEnvironment straightEnv = new FakeEnvironment(STEPS);
-        AgentMind straight = new AgentMind(cfg(condition, selection), straightEnv, SEED);
+        AgentMind straight = new AgentMind(cfg(condition, selection, offCredit), straightEnv, SEED);
         run(straight, 0, EPISODES, refineAfter);
 
         FakeEnvironment beforeEnv = new FakeEnvironment(STEPS);
-        AgentMind before = new AgentMind(cfg(condition, selection), beforeEnv, SEED);
+        AgentMind before = new AgentMind(cfg(condition, selection, offCredit), beforeEnv, SEED);
         run(before, 0, pause, refineAfter);
         Path file = dir.resolve("checkpoint.json.gz");
         Checkpoint.write(Checkpoint.of(before, new Checkpoint.Progress(SEED, pause,
                 first(refineAfter, pause))), file);
 
         FakeEnvironment afterEnv = new FakeEnvironment(STEPS);
-        AgentMind after = new AgentMind(cfg(condition, selection), afterEnv, SEED);
+        AgentMind after = new AgentMind(cfg(condition, selection, offCredit), afterEnv, SEED);
         Checkpoint.Progress p = Checkpoint.restore(after, Checkpoint.read(file));
         assertEquals(pause, p.nextEpisode());
         assertEquals(first(refineAfter, pause), p.firstSuccess());

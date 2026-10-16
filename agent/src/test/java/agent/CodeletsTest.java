@@ -4,6 +4,7 @@ import agent.codelets.BehaviorGeneratorCodelet;
 import agent.codelets.CreditAssignmentCodelet;
 import agent.codelets.GoalGeneratorCodelet;
 import agent.codelets.PlanTrackerCodelet;
+import agent.credit.CreditSnapshot;
 import agent.credit.CreditTable;
 import agent.habit.Command;
 import agent.habit.HabitIdeas;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -234,6 +236,112 @@ class CodeletsTest {
         double[] a = c.table().snapshot("A").value("ctxA", read);
         assertEquals(0.2, a[Drives.TASK], 1e-9);       // nothing from B
         assertEquals(-0.5, a[Drives.EFFORT], 1e-9);    // the rise is charged, the restart is not
+    }
+
+    /** One habit per cycle, one-step credit; Task levels as given; each habit's Task credit. */
+    private double[] taskCreditPerStep(int progressWindow, double... levels) {
+        Config cfg = new Config();
+        cfg.lambda = 0.0;
+        cfg.progressWindow = progressWindow;
+        cfg.baselineRate = 0.0;
+        CreditAssignmentCodelet c = credit(cfg);
+        creditCycle(c, 0, levels[0], 0.0, true);
+        double[] out = new double[levels.length - 1];
+        for (int k = 1; k < levels.length; k++) {
+            buffer().addStep("h" + k, k, 0, 1, List.of(), k - 1, k, "done", "reach", 1, "ctx", 0);
+            creditCycle(c, k, levels[k], 0.0, false);
+            out[k - 1] = c.table().snapshot("h" + k).value("ctx", CreditSnapshot.Read.SUM)[Drives.TASK];
+        }
+        return out;
+    }
+
+    /**
+     * Task credit is progress beyond the closest the arm came in the last progressWindow cycles:
+     * coming back to where it had been earns nothing, and moving away is not charged. Going back and
+     * forth over one degree used to pay each forward move and charge each backward one.
+     */
+    @Test
+    void taskCreditIsProgressBeyondTheRecentBest() {
+        assertArrayEquals(new double[]{0.1, 0.0, 0.0, 0.1},
+                taskCreditPerStep(20, 0.5, 0.4, 0.5, 0.4, 0.3), 1e-9);
+    }
+
+    @Test
+    void progressWindowZeroIsThePlainChange() {
+        assertArrayEquals(new double[]{0.1, -0.1, 0.1, 0.1},
+                taskCreditPerStep(0, 0.5, 0.4, 0.5, 0.4, 0.3), 1e-9);
+    }
+
+    /** A new stage is a new target: the best of the last one is no reference for it. */
+    @Test
+    void theRecentBestRestartsWithTheStage() {
+        Config cfg = new Config();
+        cfg.lambda = 0.0;
+        cfg.progressWindow = 20;
+        cfg.baselineRate = 0.0;
+        CreditAssignmentCodelet c = credit(cfg);
+        sensoryMO.setI(at(0, Traj.obs(0).q(), false));
+        drives(0, 0, 0.3, 0, 0, 0, true);
+        c.notifyCodelet();
+        sensoryMO.setI(at(1, Traj.obs(0).q(), false));
+        drives(1, 0, 0.6, 0, 0, 1, false);              // reached: stage 1, a new target
+        c.notifyCodelet();
+        buffer().addStep("A", 1, 0, 1, List.of(), 1, 2, "done", "grasp", 1, "ctx", 0);
+        sensoryMO.setI(at(2, Traj.obs(0).q(), false));
+        drives(2, 0, 0.5, 0, 0, 1, false);
+        c.notifyCodelet();
+        assertEquals(0.1, c.table().snapshot("A").value("ctx", CreditSnapshot.Read.SUM)[Drives.TASK],
+                1e-9, "measured against stage 1's 0.6, not stage 0's 0.3");
+    }
+
+    /**
+     * A step is credited what it changed beyond what a cycle in its context usually changes: the
+     * second step in context X is measured against the first, the first in Y against nothing.
+     */
+    @Test
+    void creditIsTheChangeBeyondTheContextsBaseline() {
+        Config cfg = new Config();
+        cfg.lambda = 0.0;
+        cfg.progressWindow = 0;
+        cfg.baselineRate = 0.5;
+        CreditAssignmentCodelet c = credit(cfg);
+        creditCycle(c, 0, 1.0, 0.0, true);
+        String[] habit = {"A", "B", "C"};
+        String[] context = {"X", "X", "Y"};
+        for (int k = 1; k <= 3; k++) {
+            buffer().addStep(habit[k - 1], k, 0, 1, List.of(), k - 1, k, "done", "reach", 1,
+                    context[k - 1], 0);
+            creditCycle(c, k, 1.0 - 0.1 * k, 0.0, false);
+        }
+        var read = CreditSnapshot.Read.SUM;
+        assertEquals(0.1, c.table().snapshot("A").value("X", read)[Drives.TASK], 1e-9);
+        assertEquals(0.1 - 0.5 * 0.1, c.table().snapshot("B").value("X", read)[Drives.TASK], 1e-9);
+        assertEquals(0.1, c.table().snapshot("C").value("Y", read)[Drives.TASK], 1e-9);
+    }
+
+    /**
+     * The baseline is per step, not per cycle times the step's length: a drive's change does not grow
+     * with time. Scaled by length, a 44-cycle grab in a bin where one-cycle moves had crossed into
+     * novel bins was charged ~44 such crossings (a live -0.13 recorded as +1.97).
+     */
+    @Test
+    void aLongStepIsMeasuredAgainstAStepNotAgainstItsCycles() {
+        Config cfg = new Config();
+        cfg.lambda = 0.0;
+        cfg.progressWindow = 0;
+        cfg.baselineRate = 0.5;
+        CreditAssignmentCodelet c = credit(cfg);
+        creditCycle(c, 0, 1.0, 0.0, true);
+        buffer().addStep("A", 1, 0, 1, List.of(), 0, 1, "done", "reach", 1, "X", 0);
+        creditCycle(c, 1, 0.9, 0.0, false);                 // one cycle, 0.1
+        for (int k = 2; k <= 11; k++) {                     // ten cycles, 0.1 in all
+            if (k == 11) {
+                buffer().addStep("B", 2, 0, 1, List.of(), 1, 11, "done", "reach", 1, "X", 0);
+            }
+            creditCycle(c, k, 0.9 - 0.01 * (k - 1), 0.0, false);
+        }
+        assertEquals(0.1 - 0.5 * 0.1,
+                c.table().snapshot("B").value("X", CreditSnapshot.Read.SUM)[Drives.TASK], 1e-9);
     }
 
     // --- Behavior Generator ----------------------------------------------------------------

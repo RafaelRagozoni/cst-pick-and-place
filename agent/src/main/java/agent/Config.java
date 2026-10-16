@@ -55,8 +55,33 @@ public final class Config {
     public double safetyGoalMet = 0.2;
 
     // --- Credit Assignment (cap4 4.3.4) ----------------------------------------
-    /** Eligibility trace decay per cycle. C3 sets 0: only the habit that just executed is credited. */
-    public double lambda = 0.9;
+    /**
+     * Eligibility trace decay per cycle. C3 sets 0: only the habit that just executed is credited.
+     * Was 0.9 until 2026-10-16: with primitives that last one cycle, each execution's credit was
+     * shared with the ~30 executions after it, and ~60% of a habit's recorded credit was what the
+     * habits after it did (a habit's own effect on Task kept its sign in 81-89% of repeats in a bin,
+     * its recorded credit in 67-73%). At 0.5 a trace lasts ~7 cycles, ~2 executions' worth of weight.
+     */
+    public double lambda = 0.5;
+    /**
+     * Task credit is progress beyond the closest the arm came in the last this-many cycles of the
+     * current stage: a cycle's Task credit is max(0, lowest recent Task level - this cycle's).
+     * Coming back to where it had been earns nothing and moving away is not charged, so going back
+     * and forth pays nothing. 0 = the plain per-cycle change. Live at 20 (2026-10-16, README
+     * "Credit, round 1") it was worse in every seed: 70% of executions earn exactly 0, and the gap
+     * between the best and worst habit in a bin fell 4-5x. Off.
+     */
+    public int progressWindow = 0;
+    /**
+     * A step's drive changes are credited minus what a step in its context (goal, state bin)
+     * changes whatever runs there: an exponential running mean per context, this the weight of each
+     * new step. It takes out what happens anyway -- Curiosity rising as a bin grows familiar charged
+     * every habit that ran there. Per step, not per cycle times the step's length: scaled by
+     * length, 44-cycle grabs were charged dozens of one-cycle bin crossings. 0 = no baseline. Live
+     * at 0.1 (2026-10-16, README "Credit, round 1") no clear gain: a baseline every habit in a
+     * context shares barely changes their ranking there. Off.
+     */
+    public double baselineRate = 0.0;
     /** Traces below this are dropped. */
     public double traceFloor = 0.01;
     /** False in C6: no credit updates at all. */
