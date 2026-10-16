@@ -107,6 +107,13 @@ public final class Config {
      * "random" and takes no other (withSelection).
      */
     public String selection = "greedy";
+    /**
+     * How many executions' worth of weight the repertoire's reference spread has in each habit's
+     * spread (CreditSnapshot#spread): a habit run once has the reference; after this many more its
+     * own results weigh as much. Before 2026-10-16 one spread was pooled over every execution, and a
+     * no-op repeated thousands of times set it to ~0 for every habit.
+     */
+    public double spreadPriorWeight = 2.0;
 
     // --- HabitLearner (cap4 4.4) -------------------------------------------------
     /** False in C4 and C6: the pool stays the primitives. Credit is still copied in (C4). */

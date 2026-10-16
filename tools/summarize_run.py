@@ -197,8 +197,10 @@ def main():
         out += ['| run | episodes | successes | first success | closest | bins |',
                 '|---|---|---|---|---|---|'] + table + ['']
     out += ['\n\n'.join(parts), '',
-            '_cur / task / safety: share of steps whose goal each drive set. σ: the selector\'s '
-            'spread at the block\'s end (0 means UCB/Thompson act like greedy)._']
+            '_cur / task / safety: share of steps whose goal each drive set. σ: the reference '
+            'spread at the block\'s end, what a habit run once is given; in runs before '
+            '2026-10-16 17:37, one spread pooled over every execution (0 means UCB/Thompson '
+            'act like greedy)._']
     text = '\n'.join(out)
     dest = a.out or os.path.join(a.paths[0] if os.path.isdir(a.paths[0])
                                  else os.path.dirname(a.paths[0]) or '.', 'summary.md')

@@ -159,10 +159,20 @@ class UnitsTest {
         t.closeExecutions();                                        // episode ends: 2.0 is closed
         CreditSnapshot s = t.snapshot("a");
         assertEquals(2, s.samples());
-        // samples 1.5 and 2.0: variance 0.125
-        assertEquals(Math.sqrt(0.125), CreditSnapshot.spread(List.of(s), new double[]{1, 0, 0, 0}),
-                1e-12);
-        assertEquals(0.0, CreditSnapshot.spread(List.of(s), new double[]{0, 1, 1, 1}), 1e-12);
+        // samples 1.5 and 2.0: sample variance 0.125, population variance 0.0625
+        double[] w = {1, 0, 0, 0};
+        assertEquals(Math.sqrt(0.125), s.spread(0.0, w, 0.0), 1e-12, "no prior: its own");
+        assertEquals(Math.sqrt((2 * 0.04 + 0.125) / 3), s.spread(0.2, w, 2.0), 1e-12,
+                "two pseudo-executions of the reference, one degree of freedom of its own");
+        assertEquals(0.25, CreditSnapshot.reference(List.of(s), w), 1e-12, "one habit: its own");
+        assertEquals(0.0, CreditSnapshot.reference(List.of(s), new double[]{0, 1, 1, 1}), 1e-12);
+        CreditTable u = new CreditTable();
+        u.add("b", "ctx", new double[]{3, 0, 0, 0}, 1.0, true);
+        u.closeExecutions();
+        // a at 1.75 +- 0.25, b at 3 once: mixture variance ((1.75-2.375)^2 + (3-2.375)^2) / 2 + 0.0625 / 2
+        assertEquals(Math.sqrt(0.390625 + 0.03125),
+                CreditSnapshot.reference(List.of(s, u.snapshot("b")), w), 1e-12);
+        assertEquals(0.5, u.snapshot("b").spread(0.5, w, 2.0), 1e-12, "run once: the reference");
         assertEquals(2, s.count("ctx"));
         assertEquals(0, s.count("elsewhere"), "no record here: never ran here, whatever ran elsewhere");
     }

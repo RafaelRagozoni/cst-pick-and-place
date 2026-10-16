@@ -154,7 +154,7 @@ public final class CreditTable {
             ctx.put(e.getKey(), e.getValue().copy());
         }
         return new CreditSnapshot(r.total.sum.clone(), r.total.count, ctx, r.samples.n,
-                r.samples.scatterCopy());
+                r.samples.mean.clone(), r.samples.scatterCopy());
     }
 
     /** Habits whose credit changed since the last call; clears the set. */

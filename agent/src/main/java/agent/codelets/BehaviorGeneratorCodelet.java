@@ -37,7 +37,8 @@ import java.util.Random;
  * goal and state, or the habit's total credit where it has no record under that pair. Which habit
  * the scores lead to is the {@link Selector} named by {@code Config.selection}: greedy as cap4 writes it,
  * uniform random in C6, or UCB or Thompson sampling. Each candidate also carries how many executions
- * its score rests on and the pooled spread of one execution's score, which those two need.
+ * its score rests on here and the spread of one of its executions' score, which those two need: the
+ * repertoire's reference spread, shrunk toward the habit's own as its executions accumulate.
  *
  * <p>Inputs: HabitPoolMC, GoalMO, SensoryMO, DriveMO, PlanTrackerMO. Output: PlanMO.
  */
@@ -92,13 +93,14 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
             habits.add(h);
             credit.add(HabitIdeas.credit(h));
         }
-        spread = CreditSnapshot.spread(credit, levels);
+        spread = CreditSnapshot.reference(credit, levels);
         List<Candidate> candidates = new ArrayList<>();
         Candidate current = null;
         for (int i = 0; i < habits.size(); i++) {
             Idea h = habits.get(i);
             Candidate c = new Candidate(h, score(credit.get(i), context, levels),
-                    credit.get(i).count(context), spread);
+                    credit.get(i).count(context),
+                    credit.get(i).spread(spread, levels, cfg.spreadPriorWeight));
             if (running && HabitIdeas.id(h).equals(ts.habit())) {
                 current = c;
             }
@@ -140,7 +142,10 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
         }
     }
 
-    /** The spread the last selection used: what the run log records. */
+    /**
+     * The reference spread the last selection used (CreditSnapshot#reference), what the run log
+     * records: 0 means no habit has a finished execution, or every habit's results are the same.
+     */
     public double spread() {
         return spread;
     }

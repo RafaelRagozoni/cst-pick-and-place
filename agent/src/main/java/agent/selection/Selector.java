@@ -21,8 +21,9 @@ public interface Selector {
      * @param score  E(h), eq. (4.1)
      * @param count  executions under this context (goal, state bin); 0 where the habit has no record
      *               here, even though the score then falls back to its total
-     * @param spread standard deviation of one execution's score, the same for every candidate
-     *               ({@link agent.credit.CreditSnapshot#spread}); 0 until it can be estimated
+     * @param spread standard deviation of one of this habit's executions' score
+     *               ({@link agent.credit.CreditSnapshot#spread}): the repertoire's reference, shrunk
+     *               toward the habit's own as its executions accumulate; 0 until it can be estimated
      */
     record Candidate(Idea habit, double score, long count, double spread) {
     }

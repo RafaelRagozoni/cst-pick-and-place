@@ -24,20 +24,22 @@ public final class CreditSnapshot {
     }
 
     public static final CreditSnapshot EMPTY = new CreditSnapshot(new double[Drives.N], 0,
-            Collections.emptyMap(), 0, new double[Drives.N][Drives.N]);
+            Collections.emptyMap(), 0, new double[Drives.N], new double[Drives.N][Drives.N]);
 
     private final double[] totalSum;
     private final long totalCount;
     private final Map<String, CreditTable.Cell> byContext;
     private final long samples;
+    private final double[] sampleMean;
     private final double[][] scatter;
 
     CreditSnapshot(double[] totalSum, long totalCount, Map<String, CreditTable.Cell> byContext,
-                   long samples, double[][] scatter) {
+                   long samples, double[] sampleMean, double[][] scatter) {
         this.totalSum = totalSum;
         this.totalCount = totalCount;
         this.byContext = byContext;
         this.samples = samples;
+        this.sampleMean = sampleMean;
         this.scatter = scatter;
     }
 
@@ -63,35 +65,64 @@ public final class CreditSnapshot {
     }
 
     /**
-     * The standard deviation of one execution's score sum_d w_d * credit_d, pooled over the habits:
-     * the within-habit covariance of per-execution credit, sum of scatters over sum of (n - 1), read
-     * through the weights. 0 until some habit has two finished executions. One scale for the whole
-     * pool, so a habit with few samples borrows it from the rest.
+     * The spread every habit starts from: how much one execution's score sum_d w_d * credit_d varies
+     * across the repertoire -- the standard deviation of the equal-weight mixture of the habits'
+     * finished executions (each habit's spread around its own mean, plus how far its mean sits from
+     * the others'). Every habit counts once however often it ran, so one habit repeated thousands of
+     * times cannot set the scale for the rest: pooled by executions, a no-op repeated 4978 times set
+     * it to ~0 and UCB stopped retrying the habits tried once (2026-10-16). 0 until some habit has a
+     * finished execution, and while every habit's results are the same.
      */
-    public static double spread(Iterable<CreditSnapshot> pool, double[] weights) {
-        double[][] s = new double[Drives.N][Drives.N];
-        long dof = 0;
+    public static double reference(Iterable<CreditSnapshot> pool, double[] weights) {
+        double sumMean = 0.0;
+        double sumMeanSq = 0.0;
+        double sumWithin = 0.0;
+        int habits = 0;
         for (CreditSnapshot c : pool) {
-            if (c.samples < 2) {
+            if (c.samples < 1) {
                 continue;
             }
-            dof += c.samples - 1;
-            for (int i = 0; i < Drives.N; i++) {
-                for (int j = 0; j < Drives.N; j++) {
-                    s[i][j] += c.scatter[i][j];
-                }
+            double m = 0.0;
+            for (int d = 0; d < Drives.N; d++) {
+                m += weights[d] * c.sampleMean[d];
             }
+            habits++;
+            sumMean += m;
+            sumMeanSq += m * m;
+            sumWithin += quadratic(weights, c.scatter) / c.samples;
         }
-        if (dof == 0) {
+        if (habits == 0) {
             return 0.0;
         }
+        double mean = sumMean / habits;
+        double v = sumMeanSq / habits - mean * mean + sumWithin / habits;
+        return Math.sqrt(Math.max(0.0, v));
+    }
+
+    /**
+     * This habit's spread: its own finished executions' variance, shrunk toward the reference by
+     * {@code priorWeight} pseudo-executions, (priorWeight * reference^2 + scatter) /
+     * (priorWeight + n - 1). Run once, a habit has the reference; a habit whose results never vary
+     * falls toward 0 as its own executions accumulate, and drags no other habit with it.
+     */
+    public double spread(double reference, double[] weights, double priorWeight) {
+        double dof = Math.max(samples - 1, 0);
+        if (priorWeight + dof <= 0) {
+            return reference;
+        }
+        double v = (priorWeight * reference * reference + quadratic(weights, scatter))
+                / (priorWeight + dof);
+        return Math.sqrt(Math.max(0.0, v));
+    }
+
+    private static double quadratic(double[] w, double[][] m) {
         double v = 0.0;
         for (int i = 0; i < Drives.N; i++) {
             for (int j = 0; j < Drives.N; j++) {
-                v += weights[i] * s[i][j] * weights[j];
+                v += w[i] * m[i][j] * w[j];
             }
         }
-        return Math.sqrt(Math.max(0.0, v / dof));
+        return v;
     }
 
     public boolean hasContext(String context) {

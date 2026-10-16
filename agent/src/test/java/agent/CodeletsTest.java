@@ -470,6 +470,36 @@ class CodeletsTest {
                 "ucb: never run here, so tried here first");
     }
 
+    /**
+     * A habit whose results never vary cannot set the spread for the rest. Live (seed 3, 2026-10-16):
+     * every habit tried once, then a no-op repeated 4978 times; the pooled spread came from the
+     * no-op alone, ~0, and UCB never retried the others. Each habit now carries its own spread, the
+     * repertoire's reference until its own executions pull it away.
+     */
+    @Test
+    void aRepeatedNoOpDoesNotSilenceTheBonusOfHabitsTriedOnce() {
+        MemoryContainer pool = pool("noop", "move");
+        goal(1, Goal.TASK, "reach", 0);
+        drives(0, 0.5, 0.5, 0, 0, 0, false);
+        sensoryMO.setI(at(0, Traj.obs(0).q(), false));
+        trackerMO.setI(TrackerState.idle(0));
+        String here = CreditTable.context("reach", Characterization.key(Observation.of(sensoryMO)));
+        CreditTable t = new CreditTable();
+        for (int i = 0; i < 50; i++) {
+            t.add("noop", here, new double[]{0, 0, 0, 0}, 1.0, true);
+        }
+        t.add("move", here, new double[]{-0.001, 0, 0, 0}, 1.0, true);
+        t.closeExecutions();
+        HabitIdeas.setCredit(habit(pool, "noop"), t.snapshot("noop"));
+        HabitIdeas.setCredit(habit(pool, "move"), t.snapshot("move"));
+
+        behavior(new Config(), pool, 1).notifyCodelet();
+        assertEquals("noop", HabitIdeas.id(((Plan) planMO.getI()).habit()), "greedy: the best score");
+        behavior(new Config().withSelection("ucb"), pool, 1).notifyCodelet();
+        assertEquals("move", HabitIdeas.id(((Plan) planMO.getI()).habit()),
+                "ucb: one execution is not enough to give up on a habit");
+    }
+
     // --- Goal Generator ------------------------------------------------------------------------
     @Test
     void goalGeneratorWalksTheTaskStagesOnTheExpertTrajectory() {

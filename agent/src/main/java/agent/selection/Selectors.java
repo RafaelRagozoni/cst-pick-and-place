@@ -75,8 +75,8 @@ public final class Selectors {
      * habit's executions under the current goal and state bin and N the sum of n over the pool, the
      * context's visits. A habit tried less than the rest here gets a bonus that grows slowly while it
      * is passed over, so one unlucky early result is retried rather than believed forever; a habit
-     * never executed here is tried before any other. The noise scale is the pooled spread, so c = 1
-     * needs no calibration to the units of the drives.
+     * never executed here is tried before any other. The noise scale is the habit's spread, in the
+     * units of the score, so c = 1 needs no calibration to the units of the drives.
      */
     public static Selector ucb(double c) {
         return (candidates, running, rng) -> {

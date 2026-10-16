@@ -132,7 +132,7 @@ class AgentMindTest {
         for (Idea h : m.learner.habits().values()) {
             credit.add(HabitIdeas.credit(h));
         }
-        assertTrue(CreditSnapshot.spread(credit, new double[]{1, 1, 1, 1}) > 0, "spread estimated");
+        assertTrue(CreditSnapshot.reference(credit, new double[]{1, 1, 1, 1}) > 0, "spread estimated");
         JsonObject last = env.annotations.get(env.annotations.size() - 1);
         assertEquals(name, last.get("selection").getAsString(), "the log says which selector ran");
         assertTrue(last.get("spread").getAsDouble() > 0, "and the spread it used");

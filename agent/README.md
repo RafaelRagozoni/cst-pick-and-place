@@ -127,9 +127,14 @@ exactly.
 - **UCB and Thompson count executions per context** (goal, state bin): a habit with no record there
   has n = 0, even though its score then falls back to its total credit. The score may borrow what
   the habit did elsewhere; how much is known about it *here* may not (see "The bin-count bug").
-- **σ is pooled over the pool**, not per habit: early on most habits have one or two samples, and a
-  per-habit variance from two samples is noise. A quiet habit is treated as noisier than it is,
-  which only means more exploration.
+- **σ is per habit, shrunk toward a reference** (since 2026-10-16; `CreditSnapshot.spread`,
+  `Config.spreadPriorWeight` = 2): σ_h² = (2 σ₀² + the habit's own scatter) / (2 + n_h − 1). The
+  reference σ₀ is how much one execution's score varies across the repertoire, every habit
+  weighted once (`CreditSnapshot.reference`). A habit run once has σ₀; a habit whose results never
+  vary falls toward 0 as its own executions accumulate, and only its own. Until then one σ was
+  pooled over every execution, so the habit run most set it for all (Risks, "σ from one habit").
+  The prior is the usual normal-inverse-gamma one with pseudo-observations; per-arm variance is
+  what UCB-V and UCB1-Tuned use, with a prior here because most habits have few executions.
 - **Thompson draws once per decision**: z is drawn when nothing is running and held while the plan
   runs. Drawn every cycle, some habit's lucky draw would preempt the running plan nearly every cycle.
 - **Gains enter twice**: DriveMO holds gained levels, Credit differences them and Behavior weights
@@ -299,8 +304,8 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
   physics.
 - A credit baseline (advantage): tried (`baselineRate`, "Credit, round 1"), no clear gain over 30
   episodes; a longer run would tell.
-- Per-habit variance (UCB-V, UCB1-Tuned) once habits have enough samples; a discounted or
-  sliding-window UCB if non-stationarity (below) shows up.
+- A discounted or sliding-window UCB if non-stationarity (below) shows up. (Per-habit variance:
+  done, with a prior.)
 - Checkpoints of generated habits (WP3): the pool is checked, not saved, so a resume refuses a pool
   that is not the primary repertoire. ExecutionBuffer entries are not saved either (only their
   numbering); if WP3's macros read across an episode end, they must be.
@@ -309,13 +314,15 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
 
 ## Risks
 
-- **σ from one habit** (found 2026-10-16, not fixed): the pooled spread counts only habits with two
-  or more finished executions. When one habit is the only such habit and its results never vary,
-  σ is ~0, UCB's bonus vanishes and selection is greedy for the rest of the run, with nothing
-  erroring. Live (B with the retreat charged, seed 3): every habit tried once in episode 0,
-  `grab_open` — a no-op with the gripper already open — then repeated 4978 times with variance
-  ~5e-11; the other thirteen were never retried in 30 episodes. A prior on σ that the data only
-  pulls down as samples accumulate would close it.
+- **σ from one habit** (found and fixed 2026-10-16): the pooled spread counted only habits with
+  two or more finished executions. When one habit was the only such habit and its results never
+  varied, σ was ~0, UCB's bonus vanished and selection was greedy for the rest of the run, with
+  nothing erroring. Live (B with the retreat charged, seed 3): every habit tried once in episode
+  0, `grab_open` — a no-op with the gripper already open — then repeated 4978 times with variance
+  ~5e-11; the other thirteen were never retried in 30 episodes. Each habit now has its own σ
+  shrunk toward a repertoire-wide reference ("Choices"); `aRepeatedNoOpDoesNotSilenceTheBonus...`
+  fails on the pooled version. What is left: σ₀ is 0 while every habit's results are identical,
+  which the log's `spread` column shows.
 - **The silent failure**: credit that looks healthy but is mostly passive boredom drift. Every habit
   gets *some* credit every run, so nothing errors; only per-habit drive-change statistics (as in
   the live-run analysis above) show whether credit tracks what the habit did.
