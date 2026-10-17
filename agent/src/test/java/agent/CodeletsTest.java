@@ -64,6 +64,12 @@ class CodeletsTest {
         driveMO.setI(Drives.toIdea(cycle, v, v, stage, restarted, 0.0));
     }
 
+    /** Curiosity as boredom * yield (gain 1), Task as given, the rest 0. */
+    private void curiosity(long cycle, double boredom, double yield, double task) {
+        double[] v = {boredom * yield, task, 0, 0};
+        driveMO.setI(Drives.toIdea(cycle, v, v, 0, false, 0.0, boredom, yield));
+    }
+
     private void goal(long id, String source, String name, int stage) {
         goalMO.setI(Goal.toIdea(id, source, name, stage, 0, new double[0]));
     }
@@ -236,6 +242,38 @@ class CodeletsTest {
         double[] a = c.table().snapshot("A").value("ctxA", read);
         assertEquals(0.2, a[Drives.TASK], 1e-9);       // nothing from B
         assertEquals(-0.5, a[Drives.EFFORT], 1e-9);    // the rise is charged, the restart is not
+    }
+
+    /**
+     * Curiosity's yield drifts down by itself (CUR-01). Differencing the level would hand that drift
+     * to whatever ran, more to whatever ran longer; measured at the current yield, only boredom's
+     * change is credited.
+     */
+    @Test
+    void curiosityCreditIsBoredomsChangeNotTheYieldsDrift() {
+        Config cfg = new Config();
+        cfg.lambda = 0.0;
+        CreditAssignmentCodelet c = credit(cfg);
+        sensoryMO.setI(at(0, Traj.obs(0).q(), false));
+        curiosity(0, 1.0, 1.0, 0.5);
+        c.notifyCodelet();
+        for (long t = 1; t <= 2; t++) {
+            sensoryMO.setI(at(t, Traj.obs(0).q(), false));
+            curiosity(t, 1.0, 1.0 - 0.1 * t, 0.5);           // bored throughout, yield 1 -> 0.8
+            if (t == 2) {
+                buffer().addStep("A", 1, 0, 1, List.of(), 0, 2, "done", "explore", 1, "ctx", 0);
+            }
+            c.notifyCodelet();
+        }
+        sensoryMO.setI(at(3, Traj.obs(0).q(), false));
+        curiosity(3, 0.5, 0.8, 0.5);                         // novelty found, yield steady
+        buffer().addStep("B", 2, 0, 1, List.of(), 2, 3, "done", "explore", 1, "ctx", 0);
+        c.notifyCodelet();
+        var read = CreditSnapshot.Read.SUM;
+        assertEquals(0.0, c.table().snapshot("A").value("ctx", read)[Drives.CURIOSITY], 1e-12,
+                "the yield fell from 1 to 0.8 by itself: not A's doing");
+        assertEquals(0.8 * 0.5, c.table().snapshot("B").value("ctx", read)[Drives.CURIOSITY], 1e-12,
+                "yield * the fall in boredom");
     }
 
     /** One habit per cycle, one-step credit; Task levels as given; each habit's Task credit. */
@@ -543,5 +581,38 @@ class CodeletsTest {
         drives(1, 0.8, 0.6, 0.6, 0, 0, false);         // a joint near its limit
         g.notifyCodelet();
         assertEquals(Goal.RECOVER, Goal.of(goalMO).name());
+    }
+
+    /**
+     * The hand-over CUR-01 is for. With yield 1, a bored Curiosity (~0.99) keeps the goal: Task,
+     * capped at 1, can never beat it by the hysteresis. Once exploring stops paying, Task takes it --
+     * and Curiosity's goal is not thereby "met": met is novelty found (boredom low), not a low yield,
+     * or ExecutionBuffer would collect goal completions nothing achieved.
+     */
+    @Test
+    void aLowYieldHandsTheGoalToTaskWithoutMeetingCuriositysGoal() {
+        GoalGeneratorCodelet g = new GoalGeneratorCodelet(new Config());
+        g.addInput(sensoryMO);
+        g.addInput(driveMO);
+        g.addOutput(goalMO);
+        sensoryMO.setI(Traj.obs(0).idea());
+        curiosity(0, 0.99, 1.0, 0.6);
+        g.notifyCodelet();
+        assertEquals(Goal.EXPLORE, Goal.of(goalMO).name());
+        sensoryMO.setI(Traj.obs(1).idea());              // past the episode's start, which resets it
+        curiosity(1, 0.99, 1.0, 1.0);
+        g.notifyCodelet();
+        assertEquals(Goal.EXPLORE, Goal.of(goalMO).name(), "Task at its cap still cannot take it");
+        curiosity(2, 0.99, 0.2, 0.6);
+        g.notifyCodelet();
+        assertEquals("reach", Goal.of(goalMO).name());
+
+        Config cfg = new Config();
+        goal(9, Goal.CURIOSITY, Goal.EXPLORE, 0);
+        Observation o = Traj.obs(0);
+        curiosity(3, 0.99, 0.2, 0.6);                    // level 0.198, under curiosityGoalMet
+        assertFalse(Goal.of(goalMO).met(o, Drives.of(driveMO), cfg.curiosityGoalMet, cfg.safetyGoalMet));
+        curiosity(4, 0.2, 1.0, 0.6);                     // novelty found
+        assertTrue(Goal.of(goalMO).met(o, Drives.of(driveMO), cfg.curiosityGoalMet, cfg.safetyGoalMet));
     }
 }

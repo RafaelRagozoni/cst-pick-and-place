@@ -24,7 +24,10 @@ import java.util.Map;
  *
  * <p>Every cycle it records the change in each drive, lowered = positive, as a vector that is never
  * collapsed. Two kinds of change are not the habit's doing and are zeroed: Effort restarting because
- * a new goal was set, and Task jumping because the inferred stage -- its target -- changed. Task's
+ * a new goal was set, and Task jumping because the inferred stage -- its target -- changed. A third
+ * is taken out: Curiosity's yield drifting by itself (CuriosityYield) would credit every habit for
+ * the time it ran, so Curiosity's change is measured at this cycle's yield -- the previous level
+ * rescaled to it -- and only boredom's change counts. Task's
  * change counts only as progress beyond the lowest Task level of the last {@code progressWindow}
  * cycles of the stage: returning to where the arm had been earns nothing and moving away is not
  * charged, so going back and forth pays nothing. The levels come from DriveMO, kept here; reading
@@ -67,6 +70,7 @@ public final class CreditAssignmentCodelet extends AgentCodelet {
     /** Task levels of the last progressWindow cycles of this stage, this episode. */
     private final ArrayDeque<Double> recentTask = new ArrayDeque<>();
     private double[] prev;
+    private double prevYield;
     private int prevStage;
     private long readSeq;
 
@@ -132,6 +136,12 @@ public final class CreditAssignmentCodelet extends AgentCodelet {
             if (drives.effortRestarted()) {
                 delta[Drives.EFFORT] = 0.0;
             }
+            double y = drives.curiosityYield();
+            if (y != prevYield) {
+                // gain * y * (boredom before - boredom now): the yield's own drift is no habit's doing.
+                delta[Drives.CURIOSITY] = prevYield > 0.0
+                        ? prev[Drives.CURIOSITY] * (y / prevYield) - levels[Drives.CURIOSITY] : 0.0;
+            }
             if (drives.taskStage() != prevStage) {
                 delta[Drives.TASK] = 0.0;
                 recentTask.clear();
@@ -150,6 +160,7 @@ public final class CreditAssignmentCodelet extends AgentCodelet {
             }
         }
         prev = levels;
+        prevYield = drives.curiosityYield();
         prevStage = drives.taskStage();
 
         ExecutionBuffer buffer = (ExecutionBuffer) executionMO.getI();

@@ -15,6 +15,8 @@ import br.unicamp.cst.representation.idea.Idea;
  *                      across a stage switch: that is a new target, not the habit's doing)
  *     effortRestarted  Effort restarted this cycle because a new goal was set (likewise ignored)
  *     novelty          the novelty Curiosity was computed from, for inspection
+ *     boredom          Curiosity's first factor, 1 / (1 + novelty / scale): what its goal is met by
+ *     yield            Curiosity's second factor (CuriosityYield); raw curiosity = boredom * yield
  * </pre>
  *
  * Every vector over drives in this package is indexed by the constants below.
@@ -40,8 +42,15 @@ public final class Drives {
         return i instanceof Idea ? new Drives((Idea) i) : null;
     }
 
+    /** With Curiosity all boredom (yield 1), as before CUR-01. */
     public static Idea toIdea(long cycle, double[] gained, double[] raw, int taskStage,
                               boolean effortRestarted, double novelty) {
+        return toIdea(cycle, gained, raw, taskStage, effortRestarted, novelty, raw[CURIOSITY], 1.0);
+    }
+
+    public static Idea toIdea(long cycle, double[] gained, double[] raw, int taskStage,
+                              boolean effortRestarted, double novelty, double boredom,
+                              double curiosityYield) {
         Idea root = new Idea("DriveMO", null, 0);
         root.add(new Idea("cycle", cycle, 1));
         Idea r = new Idea("raw", null, 0);
@@ -53,6 +62,8 @@ public final class Drives {
         root.add(new Idea("taskStage", taskStage, 1));
         root.add(new Idea("effortRestarted", effortRestarted, 1));
         root.add(new Idea("novelty", novelty, 1));
+        root.add(new Idea("boredom", boredom, 1));
+        root.add(new Idea("yield", curiosityYield, 1));
         return root;
     }
 
@@ -91,5 +102,15 @@ public final class Drives {
 
     public double novelty() {
         return ((Number) idea.get("novelty").getValue()).doubleValue();
+    }
+
+    /** Curiosity's boredom, before the yield and the gain: whether its goal is met. */
+    public double boredom() {
+        return ((Number) idea.get("boredom").getValue()).doubleValue();
+    }
+
+    /** Curiosity's yield: 1 under "none". */
+    public double curiosityYield() {
+        return ((Number) idea.get("yield").getValue()).doubleValue();
     }
 }

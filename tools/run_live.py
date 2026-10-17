@@ -1,12 +1,14 @@
 """Run the agent live, headless, one independent run per seed, in parallel.
 
     python3 tools/run_live.py --condition C0 --selection ucb --seeds 1 2 3 --emax 1000
+    python3 tools/run_live.py --selection ucb:0.1 --curiosity count --seeds 1 2 3 --emax 200
     python3 tools/run_live.py --resume runs/<batch> --emax 2000       # continue it to 2000
 
 Each seed gets its own CoppeliaSim (bridge.py --launch headless), its own bridge and its own agent:
 nothing is shared, so the seeds are independent samples. Seeds beyond --jobs wait their turn.
 
-Everything lands in runs/<date>_<condition>_<selection>[_<tag>]/:
+Everything lands in runs/<date>_<condition>_<selection>[_<curiosity>][_<tag>]/ (the curiosity yield
+named only when it is not none):
     agent/                 the compiled agent this batch ran -- a snapshot, so editing or
                            rebuilding the code while a run goes cannot change it halfway
     s<seed>/log.jsonl.gz   the bridge's run log (metrics.py, summarize_run.py, replay.py read it)
@@ -101,7 +103,8 @@ def run_seed(a, seed, batch, agent_bin, commit, lock, resume):
                   flush=True)
     else:
         os.makedirs(d)
-        meta = {'condition': a.condition, 'selection': a.selection, 'seed': seed, 'emax': a.emax,
+        meta = {'condition': a.condition, 'selection': a.selection, 'curiosity': a.curiosity,
+                'seed': seed, 'emax': a.emax,
                 'eref': a.eref, 'stepLimit': a.step_limit, 'commit': commit, 'start': now(),
                 'keepEvery': a.keep_every, 'pid': os.getpid()}
     write_meta(d, meta)                             # rewritten with the end and exits
@@ -118,6 +121,8 @@ def run_seed(a, seed, batch, agent_bin, commit, lock, resume):
             [agent_bin, '--port', str(port), '--condition', meta['condition'], '--seed', str(seed),
              '--emax', str(a.emax), '--eref', str(a.eref), '--selection', meta['selection'],
              '--checkpoint', ckpt, '--keep-every', str(a.keep_every)]
+            # Batches from before --curiosity have no such key, and their agent no such flag.
+            + (['--curiosity', meta['curiosity']] if 'curiosity' in meta else [])
             + (['--resume', ckpt] if resume else []), stdout=aout, stderr=subprocess.STDOUT)
         CHILDREN.append(agent)
         meta['agentExit'] = agent.wait()
@@ -176,6 +181,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--condition', help='default C0')
     ap.add_argument('--selection', help='default ucb')
+    ap.add_argument('--curiosity', help='Curiosity yield: none, count, count:<W>, lp, lp:<W>; '
+                                        'default none (Task cannot take the goal: CUR-01)')
     ap.add_argument('--seeds', type=int, nargs='+', help='default 1; with --resume, every seed')
     ap.add_argument('--emax', type=int, default=1000, help='Phase 1 episodes at most, in total')
     ap.add_argument('--eref', type=int, default=0, help='Phase 2 episodes after a first success')
@@ -190,8 +197,9 @@ def main():
 
     commit = git_commit()
     if a.resume:
-        if a.condition or a.selection or a.step_limit or a.tag:
-            ap.error('--resume continues a batch with its own condition, selection and step limit')
+        if a.condition or a.selection or a.curiosity or a.step_limit or a.tag:
+            ap.error('--resume continues a batch with its own condition, selection, curiosity and '
+                     'step limit')
         batch = os.path.abspath(a.resume)
         agent_bin = os.path.join(batch, 'agent', 'bin', 'agent')
         seeds = resumable(a, batch)
@@ -199,9 +207,11 @@ def main():
               flush=True)
     else:
         a.condition, a.selection = a.condition or 'C0', a.selection or 'ucb'
+        a.curiosity = a.curiosity or 'none'
         a.step_limit, seeds = a.step_limit or 500, a.seeds or [1]
-        name = '%s_%s_%s%s' % (datetime.datetime.now().strftime('%Y-%m-%d_%H%M'), a.condition,
-                               a.selection, '_' + a.tag if a.tag else '')
+        name = '%s_%s_%s%s%s' % (datetime.datetime.now().strftime('%Y-%m-%d_%H%M'), a.condition,
+                                 a.selection, '' if a.curiosity == 'none' else '_' + a.curiosity,
+                                 '_' + a.tag if a.tag else '')
         # The agent snapshot's classpath runs through this folder, and ':' splits a classpath:
         # --selection ucb:0.1 left java unable to find agent.AgentMain.
         name = name.replace(':', '-')

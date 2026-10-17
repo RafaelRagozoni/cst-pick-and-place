@@ -7,7 +7,7 @@ moved here (`agent.sim`, `agent.bench`). CST comes from the `../cst` submodule, 
 ## Run
 
 ```
-./gradlew test                       # 47 tests, offline; ParityTest runs python3
+./gradlew test                       # 67 tests, offline; ParityTest runs python3
 # live: CoppeliaSim open (or headless: `sleep infinity | ./coppeliaSim.sh -h`), then
 mkdir -p runs && python3 ../coppelia_environment/bridge.py --log runs/C0_ucb_s1.jsonl.gz --condition C0
 ./gradlew liveRun -PagentArgs="--condition C0 --seed 1 --emax 50 --eref 20 --selection ucb"
@@ -19,6 +19,8 @@ gzip log only on shutdown, and an unclosed one cannot be read. It refuses to run
 different condition label than the one it runs. `--selection` (greedy, ucb, ucb:<c>, thompson;
 default greedy) is the selection mechanism. Every logged step records `selection` and the `spread`
 it used, and `metrics.py` reports the selection (two names means two runs went into one log).
+`--curiosity` (none, count, count:<W>, lp, lp:<W>; default none) is the Curiosity yield ("Curiosity
+that runs out"); every logged step records `curiosity` and the `yield`.
 
 Long runs go through `../tools/run_live.py`, which also checkpoints and resumes them (below).
 
@@ -49,7 +51,7 @@ is not here yet.
 | cap4 | class | reads | writes |
 |---|---|---|---|
 | Sensory | `SensoryCodelet` | the bridge (`SimLink`) | SensoryMO (Idea), SensoryBuffer |
-| Drive Generator | `DriveGeneratorCodelet` | SensoryMO, GoalMO | DriveMO (Idea) |
+| Drive Generator | `DriveGeneratorCodelet` | SensoryMO, GoalMO, PlanTrackerMO | DriveMO (Idea) |
 | Goal Generator | `GoalGeneratorCodelet` | SensoryMO, DriveMO | GoalMO (Idea) |
 | PlanTracker | `PlanTrackerCodelet` | SensoryMO, GoalMO, DriveMO, PlanMO | PlanTrackerMO, ExecutionBuffer |
 | Credit Assignment | `CreditAssignmentCodelet` | ExecutionBuffer, DriveMO, SensoryMO | CreditMO |
@@ -58,8 +60,9 @@ is not here yet.
 | Motor | `MotorCodelet` | PlanTrackerMO | the bridge |
 
 Lines the cap4 figure may not have yet: **Drive ← GoalMO** (Effort restarts on a new goal),
-**PlanTracker ← DriveMO** (the Curiosity and Safety goals are met by a drive level), **Credit ←
-SensoryMO** (cycle and episode boundaries). SensoryBuffer is wired into Credit Assignment as in the
+**Drive ← PlanTrackerMO** (the habit whose commands produced this observation; only the `lp`
+Curiosity yield reads it), **PlanTracker ← DriveMO** (the Curiosity and Safety goals are met by a
+drive level), **Credit ← SensoryMO** (cycle and episode boundaries). SensoryBuffer is wired into Credit Assignment as in the
 figure, but nothing reads it yet.
 
 The Behavior Generator scores; a `Selector` decides. Selection is one function,
@@ -123,7 +126,8 @@ exactly.
 - **Release termination** is single-observation (released, on the pad, below settle speed); goals.py
   waits 10 observations. The episode ends on the environment's success anyway.
 - **Goal choice**: Safety ≥ 0.5 takes over; otherwise a drive must beat the goal's drive by 0.1; a
-  drive whose goal is already met is not a candidate.
+  drive whose goal is already met is not a candidate. Curiosity's goal is met by its boredom, not
+  its level (since 2026-10-17): a low yield is exploring having stopped paying, not novelty found.
 - **UCB and Thompson count executions per context** (goal, state bin): a habit with no record there
   has n = 0, even though its score then falls back to its total credit. The score may borrow what
   the habit did elsewhere; how much is known about it *here* may not (see "The bin-count bug").
@@ -259,9 +263,48 @@ chosen 99–100 %). Two causes, read from its checkpoint:
 2. *UCB's σ collapsed to zero* — a selector bug that A can hit too: see Risks, "σ from one habit".
 
 
+## Curiosity that runs out (2026-10-17, vault spec CUR-01)
+
+The long batch `runs/2026-10-16_1750_C0_ucb-0.1` (6 seeds × ~660 episodes, commit d8125ec) reached
+the cube in 351 episodes and grasped it in 61 (the baseline batch: 6 and 0), but never transported
+it, and got worse after episode ~200 (median closest 0.08–0.14 → 0.16–0.25 m). Task set the goal in
+~0 % of steps. Not a calibration problem — it cannot, by construction:
+
+- Task = distance / 0.5, capped at **1**; a drive must beat the goal's drive by **0.1**
+  (`goalHysteresis`); Curiosity = 1 / (1 + novelty) sits at **~0.995** (novelty median ~0.006). Task
+  would need > 1.095. Its ~0–1 % came only from moments Curiosity's goal was met.
+- And Curiosity *rises* as the agent explores: the fuller the archive, the lower the novelty. It
+  measures "bored here", never "nothing left to explore".
+
+The fix keeps the boredom and multiplies it by a **yield** y ∈ [0, 1], "is exploring still paying"
+(`CuriosityYield`; `Config.curiosityYield`, `--curiosity`):
+
+| name | x per cycle (y = running mean of x over W cycles, y₀ = 1, W = 2500 by default) | after |
+|---|---|---|
+| `none` | — (y = 1) | cap4 as written; **Task stays blocked**. The default only so old batches compare |
+| `count`, `count:<W>` | 1 / √(times the bin was *entered*, ever) | MBIE-EB, #Exploration |
+| `lp`, `lp:<W>` | the bin's learning progress: how fast the error of predicting a habit's effect (mean Δb per bin and habit) falls, relative, over the last 2 × 10 errors; 1 for a bin with fewer | IAC (Oudeyer et al. 2007) with fixed regions |
+
+Entries, not cycles: crossing a 5 cm bin takes ~25 one-degree executions, so counting cycles would
+make a new bin look familiar on its first crossing. lp's error has a floor (`Yields.LP_FLOOR`,
+0.001 bin): without it a learned effect's errors are rounding noise and their relative fall is
+anywhere in [0, 1]. A learned effect and pure noise both leave lp at ~0, so the "noisy TV" that
+prediction-error curiosity (ICM) gets stuck on — and Bullet's contacts vary per process — is no trap.
+
+Two things y must not do, both tested:
+1. **Earn credit by drifting.** y falls by itself; differenced as a level, that fall would be
+   Curiosity credit for whatever ran, more for whatever ran longer (WP3's macros). Credit measures
+   Curiosity's change at this cycle's yield (the previous level rescaled to it): only boredom's.
+2. **Meet Curiosity's goal.** Met is boredom < `curiosityGoalMet` (novelty found), not the level, or a
+   low yield would fill ExecutionBuffer with goal completions nothing achieved.
+
+With `none` every command and logged decision is the code before this change, bit for bit: checked
+once on the fake environment (C0 ucb:0.1, C0 greedy, C3 thompson, C1 ucb; 8 × 150 steps each) by
+diffing the logs, and held since by every older test passing unchanged. **Not run live yet.**
+
 ## Testing
 
-`./gradlew test`: 47 tests, ~1 s, no simulator.
+`./gradlew test`: 67 tests, ~1 s, no simulator.
 
 - `ParityTest` — the Java ports agree with the Python they port, on the recorded expert trajectory:
   task predicates (goals.py), characterization bins (metrics.characterise), step completion
@@ -271,20 +314,27 @@ chosen 99–100 %). Two causes, read from its checkpoint:
   completion closing a plan, eligibility-trace arithmetic, λ = 0, the Effort restart not credited,
   keep-unless-beaten, seeded ties, the Goal Generator walking reach → grasp → transport → release →
   done on the expert trajectory, Safety override, hysteresis.
+- `UnitsTest` pins the Curiosity yields: names refused, `none` = 1; `count` counts entries, not
+  cycles in a bin, never forgets, and averages over W; `lp` is 1 until a bin has 2K errors, falls to
+  0 when the effect is learned, stays < 0.1 on pure noise, rises again when the effect changes, and
+  ignores resets and idle cycles. `CodeletsTest` holds the two safeguards: a yield drifting from 1 to
+  0.8 credits nothing, boredom's fall is credited at the current yield; a bored Curiosity keeps the
+  goal from a Task at its cap, a low yield hands it over, and that does not meet Curiosity's goal.
 - `UnitsTest` also pins the selectors: an execution becomes one credit sample only when its credit
   stops arriving, σ from hand-computed samples, UCB retrying a habit with one bad result that GREEDY
   abandons, Thompson holding its draws (no preemption on noise) and reproducing per seed.
 - `AgentMindTest` — the whole mind against `FakeEnvironment` (a kinematic stand-in): one sim step per
   cycle and none on the terminal observation, exact reproduction per seed, credit reaching the pool,
   steps never overlapping, no idle cycles, C6 learning nothing, all seven conditions running, the
-  refinement phase raising Effort; UCB and Thompson closed-loop trying all 14 habits, reproducing per
+  refinement phase raising Effort; each Curiosity yield closed-loop, logged, in [0, 1], with
+  `count:200` and `lp:200` falling under 0.9 in the small fake world; UCB and Thompson closed-loop trying all 14 habits, reproducing per
   seed, logging their name and σ, and with σ > 0 — at σ = 0 both silently rank by score alone, like GREEDY. Mutation-checked:
   dropping the sample recording fails three tests.
 
 - `CheckpointTest` — a run paused after episode 3, saved to a file and resumed in a new mind is the
   run that never stopped: every command and every logged decision (habit, goal, drive levels,
-  novelty, σ) of episodes 3–5 equal, and the same state at the end; for GREEDY, UCB, Thompson, C3,
-  C6 and across the refinement switch. A wrong Config, a used mind and a mid-episode save are
+  novelty, σ, yield) of episodes 3–5 equal, and the same state at the end; for GREEDY, UCB,
+  Thompson, C3, C6, across the refinement switch, and with the `count` and `lp` yields. A wrong Config, a used mind and a mid-episode save are
   refused. Mutation-checked: leaving out any one restored piece (archive, generator, credit, the
   credit copied to the pool, cycle, goal or ExecutionBuffer numbering) fails it. The PlanTracker's
   last plan and goal numbers were left out because doing so failed nothing: they only compare
@@ -309,6 +359,12 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
 - Checkpoints of generated habits (WP3): the pool is checked, not saved, so a resume refuses a pool
   that is not the primary repertoire. ExecutionBuffer entries are not saved either (only their
   numbering); if WP3's macros read across an episode end, they must be.
+- **Curiosity yields not built** (CUR-01): RND / ICM (counts are exact over the bins, and no ML
+  library here); learning progress as competence on Curiosity's own goals (SAGG-RIAC; those goals
+  are probably almost never met — boredom < 0.3 needs novelty ~35× its 90th percentile — not
+  measured); adaptive regions (R-IAC) instead of fixed bins; lp's effect model for WP3's macros.
+- **Curiosity coming back when Task is stuck** (grasped, never transported): no yield does that; it
+  would be a mechanism of its own (Task's progress, or Effort).
 - Using the kept checkpoints: evaluating a frozen agent (no credit updates) at episode 100, 500,
   1000; starting a new batch from one, e.g. another selector from the same learned state.
 
@@ -365,6 +421,16 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
 - **A checkpoint is tied to the code that wrote it.** `FORMAT`, the Config check and the pool
   check refuse the mismatches they can see; a change in what a component means (a field reread
   differently) they cannot. `run_live.py --resume` therefore runs the batch's own agent snapshot.
+- **Task's contexts are empty** when the yield first hands it the goal: Task held the goal ~0 % of
+  every run so far, so credit under (Task stage, bin) has almost no records, and UCB starts from
+  scratch there. "Task took over and things got worse" can be that, not the yield.
+- **The yield that never falls** (the silent failure of CUR-01): if the bins keep multiplying (a
+  pushed cube makes every cube × hand bin new), coverage grows and everything looks healthy while
+  Task stays blocked. The summary's `y` column is there to show it; the yields' W, lp's K and floor
+  are uncalibrated.
+- **Curiosity taking the goal back mid-transport**: carrying the cube makes new bins (count) and new
+  effects (lp), so y rises just when Task makes progress. The hysteresis damps it; the goal column
+  shows it.
 - Novelty search is O(archive) per cycle; capped at 5000 points.
 - The Fake environment tests the plumbing, not the physics; the live scene is the only physics check.
 
@@ -387,6 +453,7 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
 | Checkpoint: a process snapshot (CRIU) of agent, bridge and CoppeliaSim | Resume anything, mid-episode | Three processes, ZeroMQ sockets and a simulator's GPU/GL state; Linux-only and fragile; and the gain (resume mid-episode) is worth one episode at most |
 | Checkpoint: Gson reflection on the components | No hand-written state()/restore() | Restoring a renamed field leaves its default, silently; the explicit reads fail loudly on a missing key |
 | **Credit that tells habits apart** (2026-10-16): a shorter eligibility trace (TD(λ)'s λ); credit as progress beyond the recent best, close to the competence progress of SAGG-RIAC (Baranes and Oudeyer 2013); an advantage baseline (REINFORCE with baseline, Sutton and Barto §13.4); larger steps or action repeat (frame skip in Atari agents) | Each is a standard answer to one measured flaw: credit diluted by later habits, back-and-forth, drift every habit is charged, effects too small to see | All three credit changes implemented as `Config` settings and run live ("Credit, round 1"): λ 0.5 kept; progress lost the sign of moving away and was worse; the baseline is near ranking-neutral under per-context UCB. Action repeat changes the primitives, not credit — WP3's mutation of a habit's angle is where it would come from |
+| **Curiosity that runs out** (2026-10-17, vault spec CUR-01): count-based bonuses (MBIE-EB, Strehl and Littman 2008; pseudo-counts, Bellemare et al. 2016; #Exploration, Tang et al. 2017); learning progress (IAC, Oudeyer, Kaplan and Hafner 2007; R-IAC, Baranes and Oudeyer 2009); RND (Burda et al. 2018), ICM (Pathak et al. 2017); an annealed intrinsic weight, or Agent57's bandit over it (Badia et al. 2020); RLeXplore (rllte, 2024), a library of eight intrinsic rewards | Ways for exploration to stop paying once the world is known | Count and learning progress built, as `count` and `lp` yields. RND/ICM exist for spaces that cannot be counted, and these bins can; ICM also chases noise, and Bullet's contacts are noise. Annealing hands over by the clock, not by exploration; Agent57 needs task return to tune it, and there are no successes. RLeXplore is Python/PyTorch, per-step rewards for an RL learner, no learning progress. What ours loses against the strongest (a count bonus added to the reward, as published): the evidence is for that form; a running mean used as a drive's urgency is our adaptation, untested, with one more parameter (W) |
 | Bandit libraries: MABWiser (Python), Vowpal Wabbit's contextual-bandit exploration (C++, JNI binding) | Tested rules: UCB1, Thompson, softmax, ε-greedy, LinUCB (MABWiser); ε-greedy, softmax, bagging, cover (VW) | Each learns its own reward estimate; here the estimate is the credit table (per-drive late fusion, eligibility traces), and only the ~20-line ranking rule would be reused. Python or native code inside a CST codelet for that is the worse trade |
 
 What building our own gains: the habit is a CST Idea end to end, every cap4 component is a codelet

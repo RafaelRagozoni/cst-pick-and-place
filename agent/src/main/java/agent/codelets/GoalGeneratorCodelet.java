@@ -97,7 +97,7 @@ public final class GoalGeneratorCodelet extends AgentCodelet {
     private String chooseSource(Drives d) {
         boolean safetyOk = d.raw(Drives.SAFETY) >= cfg.safetyGoalMet;
         boolean taskOk = stage < TaskStages.DONE;
-        boolean curiosityOk = d.raw(Drives.CURIOSITY) >= cfg.curiosityGoalMet;
+        boolean curiosityOk = d.boredom() >= cfg.curiosityGoalMet;
         if (safetyOk && d.level(Drives.SAFETY) >= cfg.safetyOverride) {
             return Goal.SAFETY;
         }

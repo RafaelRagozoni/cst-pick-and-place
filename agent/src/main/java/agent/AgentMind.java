@@ -104,6 +104,7 @@ public final class AgentMind {
         drive = new DriveGeneratorCodelet(cfg);
         drive.addInput(sensoryMO);
         drive.addInput(goalMO);
+        drive.addInput(trackerMO);
         drive.addOutput(driveMO);
 
         goal = new GoalGeneratorCodelet(cfg);
@@ -139,7 +140,8 @@ public final class AgentMind {
         behavior.addInput(trackerMO);
         behavior.addOutput(planMO);
 
-        telemetry = new Telemetry(trackerMO, goalMO, driveMO, pool, cfg.selection, behavior::spread);
+        telemetry = new Telemetry(trackerMO, goalMO, driveMO, pool, cfg.selection, cfg.curiosityYield,
+                behavior::spread);
         motor = new MotorCodelet(link, telemetry);
         motor.addInput(trackerMO);
         motor.addInput(sensoryMO);

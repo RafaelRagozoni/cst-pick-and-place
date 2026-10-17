@@ -15,8 +15,8 @@ import java.util.function.DoubleSupplier;
 
 /**
  * What the agent attaches to each step of the bridge's run log (translog.py's {@code annotate}):
- * the habit in execution, the goal, the drive levels, the selection mechanism and the spread it
- * used, and the repertoire for metric 4.
+ * the habit in execution, the goal, the drive levels, Curiosity's yield, the selection mechanism and
+ * the spread it used, the Curiosity yield's name, and the repertoire for metric 4.
  *
  * <p>Instrumentation, not part of the architecture: it reads memories but no codelet reads it, and
  * nothing the agent decides depends on it. Field names avoid the ones the log owns (translog.OWNED).
@@ -28,21 +28,24 @@ public final class Telemetry {
     private final Memory driveMO;
     private final MemoryContainer pool;
     private final String selection;
+    private final String curiosity;
     private final DoubleSupplier spread;
     private String phase = "bootstrap";
 
     /**
      * @param selection the selection mechanism's name
+     * @param curiosity the Curiosity yield's name
      * @param spread    the spread the Behavior Generator's last selection used, read from it rather
      *                  than recomputed, so the log shows what the selector saw
      */
     public Telemetry(Memory trackerMO, Memory goalMO, Memory driveMO, MemoryContainer pool,
-                     String selection, DoubleSupplier spread) {
+                     String selection, String curiosity, DoubleSupplier spread) {
         this.trackerMO = trackerMO;
         this.goalMO = goalMO;
         this.driveMO = driveMO;
         this.pool = pool;
         this.selection = selection;
+        this.curiosity = curiosity;
         this.spread = spread;
     }
 
@@ -76,9 +79,11 @@ public final class Telemetry {
             }
             a.add("drives", dj);
             a.addProperty("novelty", d.novelty());
+            a.addProperty("yield", d.curiosityYield());
         }
         a.addProperty("phase", phase);
         a.addProperty("selection", selection);
+        a.addProperty("curiosity", curiosity);
         a.addProperty("spread", spread.getAsDouble());
         a.add("repertoire", repertoire());
         return a;

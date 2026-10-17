@@ -38,6 +38,7 @@ class Block:
         self.sources = Counter()                # steps by who set the goal
         self.habits = Counter()                 # plans started, by habit
         self.spread = None
+        self.yld = None                         # Curiosity's yield at the block's end
 
     def merge(self, o):
         self.episodes += o.episodes
@@ -50,6 +51,7 @@ class Block:
         self.sources += o.sources
         self.habits += o.habits
         self.spread = o.spread if o.spread is not None else self.spread
+        self.yld = o.yld if o.yld is not None else self.yld
         return self
 
 
@@ -61,7 +63,7 @@ def scan(log, block):
     energy_ok, steps_ok = [], []
     for ep, recs, summ in runlog.episodes(log):
         if not head:
-            head = {k: recs[0].get(k) for k in ('condition', 'seed', 'selection')}
+            head = {k: recs[0].get(k) for k in ('condition', 'seed', 'selection', 'curiosity')}
         dmin, plan, nb = math.inf, None, 0
         for r in recs:
             o = r.get('obs')
@@ -81,6 +83,8 @@ def scan(log, block):
                 cur.habits[r['habit_id']] += 1
             if r.get('spread') is not None:
                 cur.spread = r['spread']
+            if r.get('yield') is not None:
+                cur.yld = r['yield']
             if r.get('repertoire'):
                 last_rep = r['repertoire']
             g = r.get('goal_fired')
@@ -135,6 +139,9 @@ def render(label, meta, head, blocks, moments, totals, block):
     steps = sum(b.steps for b in blocks)
     succ = sum(b.successes for b in blocks)
     sel = head.get('selection') or meta.get('selection') or '?'
+    cur = head.get('curiosity') or meta.get('curiosity')
+    if cur:
+        sel += ', curiosity %s' % cur
     status = 'finished' if meta.get('end') else 'in progress or interrupted'
     L = ['## %s — %s, %s, seed %s' % (label, head.get('condition') or meta.get('condition'), sel,
                                        head.get('seed') or meta.get('seed')),
@@ -151,18 +158,19 @@ def render(label, meta, head, blocks, moments, totals, block):
         L.insert(-1, 'Per success: %.0f steps, %.2f rad joint energy.'
                  % (totals['stepsPerSuccess'], totals['energyPerSuccess']))
     L += ['| episodes | success | reach / grasp / transp. / release | closest (best · median) '
-          '| new bins | goal set by cur / task / safety | most chosen habits | σ |',
-          '|---|---|---|---|---|---|---|---|']
+          '| new bins | goal set by cur / task / safety | most chosen habits | σ | y |',
+          '|---|---|---|---|---|---|---|---|---|']
     for a, z, b in rows(blocks, block):
         src = sum(b.sources.values())
         hab = sum(b.habits.values())
         top = ', '.join('%s %s' % (h, pct(c, hab)) for h, c in b.habits.most_common(2))
-        L.append('| %d–%d | %s | %s | %.2f · %.2f m | %d | %s | %s | %s |' % (
+        L.append('| %d–%d | %s | %s | %.2f · %.2f m | %d | %s | %s | %s | %s |' % (
             a, z, pct(b.successes, b.episodes),
             ' / '.join(str(b.stages[s]) for s in STAGES),
             b.best, statistics.median(b.mins), b.new_bins,
             ' / '.join(pct(b.sources[s], src) for s in SOURCES), top,
-            '%.3f' % b.spread if b.spread is not None else '–'))
+            '%.3f' % b.spread if b.spread is not None else '–',
+            '%.2f' % b.yld if b.yld is not None else '–'))
     L += ['', '**Key moments**' if moments else '**Key moments:** none yet (no stage reached, '
           'no approach under %.2f m).' % DIST_MARKS[0]]
     for ep, step, what in moments[:15]:
@@ -200,7 +208,9 @@ def main():
             '_cur / task / safety: share of steps whose goal each drive set. σ: the reference '
             'spread at the block\'s end, what a habit run once is given; in runs before '
             '2026-10-16 17:37, one spread pooled over every execution (0 means UCB/Thompson '
-            'act like greedy)._']
+            'act like greedy). y: Curiosity\'s yield at the block\'s end (1 under curiosity none; '
+            '– before it was logged, 2026-10-17). Task, capped at 1, takes the goal from Curiosity only by '
+            '0.1 or more, so only once y < ~0.9._']
     text = '\n'.join(out)
     dest = a.out or os.path.join(a.paths[0] if os.path.isdir(a.paths[0])
                                  else os.path.dirname(a.paths[0]) or '.', 'summary.md')

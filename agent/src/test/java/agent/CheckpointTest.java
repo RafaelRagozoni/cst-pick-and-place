@@ -24,9 +24,13 @@ class CheckpointTest {
     private static final int STEPS = 120;
     private static final int EPISODES = 6;
 
-    /** {@code offCredit}: the credit options that are off by default, on (progress, baseline). */
-    private static Config cfg(String condition, String selection, boolean offCredit) {
-        Config c = Config.forCondition(condition);
+    /**
+     * {@code offCredit}: the credit options that are off by default, on (progress, baseline).
+     * {@code curiosity}: the Curiosity yield, whose history (entry counts; effect model and errors)
+     * outlives an episode.
+     */
+    private static Config cfg(String condition, String selection, boolean offCredit, String curiosity) {
+        Config c = Config.forCondition(condition).withCuriosity(curiosity);
         if (offCredit) {
             c.progressWindow = 20;
             c.baselineRate = 0.1;       // per-context state that outlives an episode
@@ -49,24 +53,26 @@ class CheckpointTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"C0, greedy, -1, false", "C0, ucb, -1, false", "C0, thompson, -1, false",
-            "C0, ucb, 1, false", "C3, ucb, -1, false", "C6, -, -1, false", "C0, ucb, -1, true"})
+    @CsvSource({"C0, greedy, -1, false, none", "C0, ucb, -1, false, none",
+            "C0, thompson, -1, false, none", "C0, ucb, 1, false, none", "C3, ucb, -1, false, none",
+            "C6, -, -1, false, none", "C0, ucb, -1, true, none", "C0, ucb, -1, false, count:50",
+            "C0, ucb, 1, false, lp:50"})
     void aResumedRunIsTheRunThatNeverStopped(String condition, String selection, int refineAfter,
-                                             boolean offCredit, @TempDir Path dir) {
+                                             boolean offCredit, String curiosity, @TempDir Path dir) {
         int pause = 3;
         FakeEnvironment straightEnv = new FakeEnvironment(STEPS);
-        AgentMind straight = new AgentMind(cfg(condition, selection, offCredit), straightEnv, SEED);
+        AgentMind straight = new AgentMind(cfg(condition, selection, offCredit, curiosity), straightEnv, SEED);
         run(straight, 0, EPISODES, refineAfter);
 
         FakeEnvironment beforeEnv = new FakeEnvironment(STEPS);
-        AgentMind before = new AgentMind(cfg(condition, selection, offCredit), beforeEnv, SEED);
+        AgentMind before = new AgentMind(cfg(condition, selection, offCredit, curiosity), beforeEnv, SEED);
         run(before, 0, pause, refineAfter);
         Path file = dir.resolve("checkpoint.json.gz");
         Checkpoint.write(Checkpoint.of(before, new Checkpoint.Progress(SEED, pause,
                 first(refineAfter, pause))), file);
 
         FakeEnvironment afterEnv = new FakeEnvironment(STEPS);
-        AgentMind after = new AgentMind(cfg(condition, selection, offCredit), afterEnv, SEED);
+        AgentMind after = new AgentMind(cfg(condition, selection, offCredit, curiosity), afterEnv, SEED);
         Checkpoint.Progress p = Checkpoint.restore(after, Checkpoint.read(file));
         assertEquals(pause, p.nextEpisode());
         assertEquals(first(refineAfter, pause), p.firstSuccess());

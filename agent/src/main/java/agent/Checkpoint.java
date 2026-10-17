@@ -34,7 +34,8 @@ import java.util.zip.GZIPOutputStream;
  * last.pt). There are no weights here; what the agent has learned is
  * <ul>
  *   <li>the credit table (Credit Assignment), and the credit copied from it into the pool;</li>
- *   <li>the novelty archive and the decaying visit counts (Curiosity);</li>
+ *   <li>the novelty archive and the decaying visit counts, and the yield's history -- entry counts,
+ *       or effect model and errors (Curiosity);</li>
  *   <li>the Behavior Generator's random generator, mid-sequence;</li>
  *   <li>the counters that number things across the run: cycles, goals, plans, ExecutionBuffer
  *       entries;</li>

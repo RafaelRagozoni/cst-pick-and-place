@@ -5,10 +5,13 @@ import agent.credit.CreditTable;
 import agent.habit.Command;
 import agent.habit.HabitIdeas;
 import agent.memory.ExecutionBuffer;
+import agent.motivation.CuriosityYield;
 import agent.motivation.NoveltyArchive;
+import agent.motivation.Yields;
 import agent.selection.Selector;
 import agent.selection.Selector.Candidate;
 import agent.selection.Selectors;
+import agent.sim.Observation;
 import br.unicamp.cst.representation.idea.Idea;
 import org.junit.jupiter.api.Test;
 
@@ -72,6 +75,132 @@ class UnitsTest {
         double later = a.visit(far, "far", 2000);
         assertTrue(later > second, "a bin left alone pays again");
         assertEquals(1.0, a.count("never", 5) + 1.0);
+    }
+
+    // --- Curiosity yields (vault spec CUR-01) ------------------------------------------
+    /** An observation at {@code cycle}; the yields read only whether it starts an episode. */
+    private static Observation obs(long cycle, boolean episodeStart) {
+        return new Observation(Observation.toIdea(Traj.copy(0), cycle, 0, episodeStart, false));
+    }
+
+    private static final double[] B = new double[9];
+
+    @Test
+    void yieldsByNameAndNoneIsCuriosityAsBefore() {
+        CuriosityYield none = Yields.byName("none");
+        assertEquals(1.0, none.observe(obs(0, true), "A", B, null));
+        assertEquals(1.0, none.observe(obs(1, false), "B", B, "h"));
+        for (String bad : new String[]{"count:0.5", "count:", "lp:x", "lp:Infinity", "none:5", "rnd"}) {
+            assertThrows(IllegalArgumentException.class, () -> Yields.byName(bad), bad);
+        }
+        assertThrows(IllegalArgumentException.class, () -> new Config().withCuriosity("counts"));
+        assertEquals("lp:500", new Config().withCuriosity("lp:500").curiosityYield);
+    }
+
+    /**
+     * count pays 1 / sqrt(entries into the bin): crossing a bin takes ~25 cycles, so counting cycles
+     * would make a bin never seen before look familiar on its first crossing. Entries never decay.
+     */
+    @Test
+    void countPaysEntriesIntoABinNotCyclesSpentInIt() {
+        CuriosityYield c = Yields.byName("count:1");     // W = 1: y is this cycle's signal itself
+        assertEquals(1.0, c.observe(obs(0, true), "A", B, null));
+        assertEquals(1.0, c.observe(obs(1, false), "A", B, "h"), "staying is not entering");
+        assertEquals(1.0, c.observe(obs(2, false), "B", B, "h"));
+        assertEquals(1 / Math.sqrt(2), c.observe(obs(3, false), "A", B, "h"), 1e-12);
+        c.observe(obs(4, false), "B", B, "h");
+        assertEquals(1 / Math.sqrt(3), c.observe(obs(5, false), "A", B, "h"), 1e-12);
+        assertEquals(0.5, c.observe(obs(6, true), "A", B, null), 1e-12, "a reset into A enters it");
+        for (long t = 7; t < 20007; t++) {
+            c.observe(obs(t, false), "C", B, "h");
+        }
+        assertEquals(1 / Math.sqrt(5), c.observe(obs(20007, false), "A", B, "h"), 1e-12,
+                "20000 cycles away: still remembered");
+
+        CuriosityYield m = Yields.byName("count:4");
+        double y = m.observe(obs(0, true), "A", B, null);
+        assertEquals(1.0, y, "starts at 1: nothing is known");
+        for (int t = 1; t <= 6; t++) {                      // A entered 4 times in all
+            y = m.observe(obs(t, false), t % 2 == 0 ? "A" : "B", B, "h");
+        }
+        double before = y;
+        y = m.observe(obs(7, false), "A", B, "h");          // x = 1/sqrt(4) while it stays
+        assertEquals(before + (0.5 - before) / 4, y, 1e-12, "a running mean over W = 4 cycles");
+        for (int t = 8; t < 200; t++) {
+            y = m.observe(obs(t, false), "A", B, "h");
+        }
+        assertEquals(0.5, y, 1e-9);
+    }
+
+    /** lp, W = 1, from bin S with habit h: the y of each of n cycles moving b by step(t). */
+    private static double[] lpRun(CuriosityYield lp, int n, java.util.function.IntFunction<double[]> step) {
+        double[] b = new double[9];
+        lp.observe(obs(0, true), "S", b.clone(), null);
+        double[] ys = new double[n + 1];
+        for (int t = 1; t <= n; t++) {
+            double[] d = step.apply(t);
+            for (int i = 0; i < 9; i++) {
+                b[i] += d[i];
+            }
+            ys[t] = lp.observe(obs(t, false), "S", b.clone(), "h");
+        }
+        return ys;
+    }
+
+    /**
+     * lp is high while a bin's effects are being learned and 0 once the error stops falling --
+     * whether because the effect is learned or because it cannot be (noise: the "noisy TV" that
+     * prediction-error curiosity gets stuck on).
+     */
+    @Test
+    void learningProgressFallsWhenLearnedAndStaysLowOnNoise() {
+        int k = Yields.LP_HISTORY;
+        double[] same = {0.04, 0, 0, 0, 0, 0, 0, 0, 0};
+        double[] ys = lpRun(Yields.byName("lp:1"), 3 * k, t -> same);
+        for (int t = 1; t < 2 * k; t++) {
+            assertEquals(1.0, ys[t], "fewer than 2K errors: not judged yet, worth going to");
+        }
+        assertEquals(0.04 / (0.04 / k + Yields.LP_FLOOR) / k, ys[2 * k], 1e-9, "the first miss, gone");
+        for (int t = 2 * k + 1; t <= 3 * k; t++) {
+            assertEquals(0.0, ys[t], 1e-9, "learned: errors are rounding noise, under the floor");
+        }
+
+        Random rng = new Random(1);
+        double[] noisy = lpRun(Yields.byName("lp:1"), 2000, t -> {
+            double[] d = new double[9];
+            for (int i = 0; i < 9; i++) {
+                d[i] = rng.nextGaussian();
+            }
+            return d;
+        });
+        double mean = 0;
+        for (int t = 1001; t <= 2000; t++) {
+            mean += noisy[t] / 1000;
+        }
+        assertTrue(mean < 0.1, "pure noise is no progress: " + mean);
+
+        double[] other = {0, 0.04, 0, 0, 0, 0, 0, 0, 0};
+        double[] changed = lpRun(Yields.byName("lp:1"), 200, t -> t <= 100 ? same : other);
+        assertEquals(0.0, changed[100], 1e-9);
+        double after = 0;
+        for (int t = 101 + 2 * k; t <= 200; t++) {
+            after += changed[t];
+        }
+        assertTrue(after > 0, "an effect that changed is being learned again");
+    }
+
+    @Test
+    void learningProgressIgnoresResetsAndCyclesWithNoHabit() {
+        CuriosityYield lp = Yields.byName("lp:1");
+        double[] same = {0.04, 0, 0, 0, 0, 0, 0, 0, 0};
+        double[] ys = lpRun(lp, 3 * Yields.LP_HISTORY, t -> same);
+        double learned = ys[ys.length - 1];
+        assertEquals(0.0, learned, 1e-9);
+        double[] jump = new double[9];
+        jump[2] = 50;
+        assertEquals(learned, lp.observe(obs(100, true), "S", jump.clone(), "h"), "a reset is no effect");
+        jump[2] = 90;
+        assertEquals(learned, lp.observe(obs(101, false), "S", jump.clone(), null), "nor is idling");
     }
 
     @Test

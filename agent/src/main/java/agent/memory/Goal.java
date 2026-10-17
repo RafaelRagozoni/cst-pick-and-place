@@ -75,7 +75,7 @@ public final class Goal {
             case TASK:
                 return stage() < TaskStages.DONE && TaskStages.termination(stage(), o);
             case CURIOSITY:
-                return drives != null && drives.raw(Drives.CURIOSITY) < curiosityMet;
+                return drives != null && drives.boredom() < curiosityMet;
             case SAFETY:
                 return drives != null && drives.raw(Drives.SAFETY) < safetyMet;
             default:

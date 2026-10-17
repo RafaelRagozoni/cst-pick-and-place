@@ -139,6 +139,29 @@ class AgentMindTest {
         assertEquals(habitsRun(env), habitsRun(run(cfg.get(), 4, 3, 150)));
     }
 
+    /**
+     * The yields closed-loop. The fake world is small, so a count or lp with a short window falls
+     * within a few episodes; none stays 1, Curiosity as cap4 wrote it. The log says which ran.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"none", "count:200", "lp:200"})
+    void curiosityYieldsRunClosedLoopAndAreLogged(String name) {
+        FakeEnvironment env = run(Config.forCondition("C0").withSelection("ucb").withCuriosity(name),
+                3, 4, 150);
+        double low = 1.0;
+        for (JsonObject a : env.annotations) {
+            double y = a.get("yield").getAsDouble();
+            assertTrue(y >= 0.0 && y <= 1.0, "y in [0, 1]: " + y);
+            low = Math.min(low, y);
+            assertEquals(name, a.get("curiosity").getAsString());
+        }
+        if (name.equals("none")) {
+            assertEquals(1.0, low);
+        } else {
+            assertTrue(low < 0.9, name + " fell to " + low);
+        }
+    }
+
     @Test
     void refinementRaisesEffortsGain() {
         FakeEnvironment env = new FakeEnvironment(30);

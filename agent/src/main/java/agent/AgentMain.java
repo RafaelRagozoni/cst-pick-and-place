@@ -28,7 +28,8 @@ import java.util.Map;
  *
  * <p>{@code --selection} (greedy, ucb, ucb:&lt;c&gt;, thompson; default greedy) picks the selection
  * mechanism; every logged step records it and the spread it used. C6 is the random baseline and
- * refuses any other.
+ * refuses any other. {@code --curiosity} (none, count, count:&lt;W&gt;, lp, lp:&lt;W&gt;; default none)
+ * picks the Curiosity yield; every logged step records it and the yield's value.
  *
  * <p>Checkpoints ({@link Checkpoint}): {@code --checkpoint FILE} saves the agent after every
  * episode, overwriting; {@code --keep-every N} also keeps a copy every N episodes beside it, in
@@ -46,6 +47,9 @@ public final class AgentMain {
         if (a.containsKey("selection")) {
             cfg.withSelection(a.get("selection"));
         }
+        if (a.containsKey("curiosity")) {
+            cfg.withCuriosity(a.get("curiosity"));
+        }
         int seed = Integer.parseInt(a.getOrDefault("seed", "1"));
         int emax = Integer.parseInt(a.getOrDefault("emax", "50"));
         int eref = Integer.parseInt(a.getOrDefault("eref", "20"));
@@ -58,8 +62,9 @@ public final class AgentMain {
             JsonObject info = bridge.info();
             checkCondition(info, cfg.condition);
             AgentMind m = new AgentMind(cfg, bridge, seed);
-            System.out.printf("agent %s seed %d selection %s: %d habits, step limit %d, log %s%n",
-                    cfg.condition, seed, cfg.selection, m.pool.getAllMemories().size(),
+            System.out.printf("agent %s seed %d selection %s curiosity %s: %d habits, step limit %d, "
+                    + "log %s%n", cfg.condition, seed, cfg.selection, cfg.curiosityYield,
+                    m.pool.getAllMemories().size(),
                     info.get("stepLimit").getAsInt(), str(info.get("log")));
 
             Checkpoint.Progress at = new Checkpoint.Progress(seed, 0, null);

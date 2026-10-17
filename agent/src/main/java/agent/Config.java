@@ -2,6 +2,7 @@ package agent;
 
 import agent.credit.CreditSnapshot;
 import agent.motivation.Drives;
+import agent.motivation.Yields;
 import agent.selection.Selectors;
 
 /**
@@ -43,13 +44,25 @@ public final class Config {
     public double visitDecay = 0.9997;
     /** Weight of the holding and contact events in the characterization, in bins. */
     public double salience = 3.0;
+    /**
+     * Curiosity = boredom * yield, the yield by name (Yields.byName), or --curiosity: "none" (yield
+     * 1, cap4 as written), "count", "count:<W>", "lp", "lp:<W>"; W the cycles of its running mean.
+     * "none" is NOT a safe default but the old behavior, kept to compare with earlier batches: with
+     * it Task cannot take the goal from Curiosity at all (Task is capped at 1, it must beat Curiosity
+     * by goalHysteresis, and boredom sits at ~0.995). Vault spec CUR-01; README, "Curiosity that runs
+     * out".
+     */
+    public String curiosityYield = "none";
 
     // --- Goal Generator (cap4 4.3.3) -------------------------------------------
     /** A drive must exceed the one that set the current goal by this much to replace it. */
     public double goalHysteresis = 0.1;
     /** Safety at or above this (after gain) sets the goal regardless of the others (subsumption). */
     public double safetyOverride = 0.5;
-    /** Curiosity's goal is met when the raw Curiosity level falls below this. */
+    /**
+     * Curiosity's goal is met when its boredom falls below this -- boredom, not the level: a low
+     * yield is exploring having stopped paying, not novelty found.
+     */
     public double curiosityGoalMet = 0.3;
     /** Safety's goal is met when the raw Safety level falls below this. */
     public double safetyGoalMet = 0.2;
@@ -124,6 +137,13 @@ public final class Config {
     // --- buffers -------------------------------------------------------------------
     public int sensoryBufferSize = 64;
     public int executionBufferSize = 4096;
+
+    /** Set the Curiosity yield by name, refusing a bad name now rather than at the first cycle. */
+    public Config withCuriosity(String name) {
+        Yields.byName(name);
+        curiosityYield = name;
+        return this;
+    }
 
     /** Set the selection by name, refusing a bad name now rather than at the first cycle. */
     public Config withSelection(String name) {
