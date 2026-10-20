@@ -65,6 +65,11 @@ public final class Checkpoint {
     public record Progress(int seed, int nextEpisode, Integer firstSuccess) {
     }
 
+    /** The effective Config, every field: what a checkpoint saves and AgentMain --describe writes. */
+    public static JsonObject config(Config cfg) {
+        return GSON.toJsonTree(cfg).getAsJsonObject();
+    }
+
     /** The mind's state after {@code p.nextEpisode() - 1} episodes. Only between episodes. */
     public static JsonObject of(AgentMind m, Progress p) {
         if (!m.link.done()) {
@@ -75,7 +80,7 @@ public final class Checkpoint {
         c.addProperty("seed", p.seed());
         c.addProperty("nextEpisode", p.nextEpisode());
         c.addProperty("firstSuccess", p.firstSuccess());
-        c.add("config", GSON.toJsonTree(m.cfg));
+        c.add("config", config(m.cfg));
         JsonArray pool = new JsonArray();
         for (String id : m.learner.habits().keySet()) {
             pool.add(id);
@@ -101,7 +106,7 @@ public final class Checkpoint {
                     + FORMAT);
         }
         JsonObject saved = c.getAsJsonObject("config");
-        JsonObject now = GSON.toJsonTree(m.cfg).getAsJsonObject();
+        JsonObject now = config(m.cfg);
         if (!saved.equals(now)) {
             List<String> diff = new ArrayList<>();
             Set<String> keys = new TreeSet<>(now.keySet());

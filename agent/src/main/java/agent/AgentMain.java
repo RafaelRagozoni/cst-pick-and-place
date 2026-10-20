@@ -1,6 +1,7 @@
 package agent;
 
 import agent.sim.BridgeClient;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
@@ -36,6 +37,10 @@ import java.util.Map;
  * {@code checkpoints/after-epNNNNNN.json.gz}; {@code --resume FILE} continues a run from one, with
  * the same condition, selection and seed, from the episode after it -- with a larger
  * {@code --emax}, a run that ended without success goes on looking for one.
+ *
+ * <p>{@code --describe FILE} writes what the run is, before its first episode: the effective Config,
+ * every field and not only the ones given, and the bridge's handshake (success test, physics,
+ * primitives, step limit). tools/run_live.py keeps it as agent.json beside the run's fingerprint.
  */
 public final class AgentMain {
 
@@ -61,6 +66,9 @@ public final class AgentMain {
         try (BridgeClient bridge = new BridgeClient(host, port, 60000)) {
             JsonObject info = bridge.info();
             checkCondition(info, cfg.condition);
+            if (a.containsKey("describe")) {
+                write(Path.of(a.get("describe")), describe(cfg, info));
+            }
             AgentMind m = new AgentMind(cfg, bridge, seed);
             System.out.printf("agent %s seed %d selection %s curiosity %s: %d habits, step limit %d, "
                     + "log %s%n", cfg.condition, seed, cfg.selection, cfg.curiosityYield,
@@ -113,6 +121,23 @@ public final class AgentMain {
         }
         // CST codelets each own a java.util.Timer thread, which keeps the JVM alive.
         System.exit(status);
+    }
+
+    /** The run's effective Config and the bridge's handshake, as --describe writes them. */
+    static JsonObject describe(Config cfg, JsonObject info) {
+        JsonObject d = new JsonObject();
+        d.add("config", Checkpoint.config(cfg));
+        d.add("bridge", info);
+        return d;
+    }
+
+    private static void write(Path file, JsonObject json) {
+        try {
+            Files.writeString(file, new GsonBuilder().setPrettyPrinting().serializeNulls()
+                    .serializeSpecialFloatingPointValues().create().toJson(json));
+        } catch (IOException e) {
+            throw new UncheckedIOException("cannot write " + file, e);
+        }
     }
 
     private static void checkCondition(JsonObject info, String condition) {

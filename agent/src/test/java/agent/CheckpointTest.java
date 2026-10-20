@@ -91,6 +91,21 @@ class CheckpointTest {
         assertEquals(Checkpoint.of(straight, end), Checkpoint.of(after, end), "same state at the end");
     }
 
+    /** --describe: every Config field, the defaults too, and the bridge's handshake as it came. */
+    @Test
+    void describeHasEveryConfigFieldAndTheHandshake() {
+        Config cfg = Config.forCondition("C4").withCuriosity("lp");
+        JsonObject info = new FakeEnvironment(5).info();
+        JsonObject d = AgentMain.describe(cfg, info);
+        JsonObject saved = d.getAsJsonObject("config");
+        for (java.lang.reflect.Field f : Config.class.getFields()) {
+            assertTrue(saved.has(f.getName()), "agent.json has no " + f.getName());
+        }
+        assertEquals("lp", saved.get("curiosityYield").getAsString());
+        assertEquals(Checkpoint.config(cfg), saved, "the Config a checkpoint saves");
+        assertEquals(info, d.getAsJsonObject("bridge"));
+    }
+
     @Test
     void refusesACheckpointFromAnotherConfigOrMidEpisode() {
         AgentMind m = new AgentMind(Config.forCondition("C0").withSelection("ucb"),
