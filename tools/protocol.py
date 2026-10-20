@@ -23,9 +23,11 @@ ENV = os.path.join(ROOT, 'coppelia_environment')
 SCENE = os.path.join('coppelia_environment', 'pick_and_place.ttt')
 LIBS = ('libcoppeliaSim.so', 'libcoppeliaSimHeadless.so')
 
-# What a protocol file holds; every key is required. 'note' is the one optional key.
+# What a protocol file holds; every key is required. Optional: 'note', and 'theta', the success
+# rate M2's time to threshold counts to (bench.py; P1 fixes it from the pilot).
 KEYS = ('protocol', 'successTest', 'conditions', 'selection', 'curiosity', 'seeds', 'emax', 'eref',
         'stepLimit')
+OPTIONAL = ('note', 'theta')
 # run_live.py arguments a protocol fixes: given on the command line, they are refused.
 FIXED = ('selection', 'curiosity', 'seeds', 'emax', 'eref', 'step_limit')
 
@@ -124,7 +126,7 @@ def read_protocol(path):
     with open(path) as f:
         p = json.load(f)
     missing = [k for k in KEYS if k not in p]
-    unknown = [k for k in p if k not in KEYS + ('note',)]
+    unknown = [k for k in p if k not in KEYS + OPTIONAL]
     if missing or unknown:
         raise Refused('%s: %s%s' % (path, 'missing ' + ', '.join(missing) if missing else '',
                                     ('; ' if missing and unknown else '')

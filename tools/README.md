@@ -6,6 +6,8 @@ python3 tools/summarize_run.py runs/<batch>                 # also mid-run
 python3 tools/replay.py runs/<batch>/s1 --every 100 --speed 4
 python3 tools/run_live.py --resume runs/<batch> --emax 2000 # 1000 more, from the checkpoints
 python3 tools/run_live.py --protocol bench/P1.json --condition C4   # a baseline batch (BAS-01)
+python3 tools/bench.py score runs/<batch>                   # its scorecard; also mid-run
+python3 tools/bench.py compare runs/<A> runs/<B>            # C0 against C4, or the track
 ```
 
 | script | does |
@@ -14,6 +16,7 @@ python3 tools/run_live.py --protocol bench/P1.json --condition C4   # a baseline
 | `summarize_run.py` | A Markdown summary of fixed size (≤ 20 rows, ~1–2 k tokens) whatever the run length: per block of episodes, success, task stages reached, closest approach, new coverage bins, which drive set the goal, most chosen habits, σ; then the key moments (first time each stage fired, distance records, first success). Reads a run still going, up to its last finished episode. |
 | `replay.py` | Shows chosen episodes (`--ep 5`, `--ep 100-119`, `--every 1000`) in the CoppeliaSim window at 1× = real time or faster, with a panel: episode, step, habit, goal, drives. Kinematic: it puts things where the log says, so it shows what happened even though Bullet would not repeat it. |
 | `runlog.py` | Shared log reading (tolerates an unfinished log); cuts a log back to a checkpoint. `test_runlog.py` checks both, offline. |
+| `bench.py` | The scorecard of a batch (BAS-01's M1–M5 and its sanity checks) as `scorecard.md` and `.json` in the batch; `table` prints the track, `bench/ledger.csv`, one line per finished protocol batch; `compare` tests two batches and refuses what BAS-01's rules 5 and 6 refuse. Needs SciPy (`requirements-tools.txt`). `test_bench.py` checks it offline on fake batches. |
 | `protocol.py` | Protocol batches (vault spec BAS-01): the fingerprint every `run.json` records, the protocol file, and the refusals (below). `test_protocol.py` checks the refusals offline, on throwaway repositories. |
 
 Batches go to `runs/` (git-ignored): `runs/<date>_<cond>_<sel>[_tag]/{agent/, [protocol.json], s<seed>/{log.jsonl.gz, checkpoint.json.gz, checkpoints/, agent.out, bridge.out, run.json, agent.json, summary.md}}`.
@@ -38,6 +41,23 @@ and the success test it was written for. Refused, each with what to change:
   which also keeps a resume from running a newer bridge, since the bridge is not snapshotted.
 
 Without `--protocol`, nothing is refused and the fingerprint is recorded all the same.
+
+## Scorecard and track (`bench.py`, since 2026-10-20)
+
+`score` reads every seed's log in parallel (~7 s for 6 × 170 episodes) and writes the scorecard. M1
+is episodes to the first success, Kaplan–Meier, a seed without one censored at E_max — or, while it
+runs, at the episodes it has run, so a scorecard mid-run says "in progress", not "invalid". M1b is
+the same per task stage, M2 Phase 2's jumpstart, time to θ and final rate, M2b whether the last 100
+still differ from the 100 before, M3 steps and energy per Phase 2 success, M4 coverage bins, M5 the
+repertoire. A batch with a failing sanity check is invalid: a seed that did not end where the
+protocol ends it, Effort not 0 in Phase 1 or 0 in Phase 2, C4 or C6 off the 14 primitives, two
+fingerprints in one batch, a success without the four stages in order. A finished protocol batch
+writes its line into `bench/ledger.csv`, replacing an older one of the same batch.
+
+`compare A B` tests M1 (censored seeds tied at E_max, with log-rank beside it as the check), M2's
+final rate, M3's steps and M4's bins by Mann–Whitney, with rank-biserial and Holm. It refuses two
+protocol versions, C0 against C4 on different fingerprints, and batches without a protocol unless
+`--exploratory`, which says so at the top and the bottom.
 
 ## Resume
 
@@ -73,6 +93,7 @@ Log: ~0.2 MB per 500-step episode (gzip), so ~200 MB per 1000 episodes. `summari
 | Re-running an episode's actions in the simulator | Bullet does not repeat contacts across processes: the re-run would drift from what happened. |
 | CoppeliaSim's video recorder | Needs the GUI during the run (same cost as a live view). |
 | Sacred (`--enforce_clean`), MLflow, W&B for the fingerprint and refusals | They record a run's commit, and Sacred refuses a dirty tree; none knows the `cst` submodule, the scene or the CoppeliaSim install, and none refuses a resume on other code or a budget that differs from a protocol file. ~150 lines here; vault spec BAS-01 weighs them. |
+| `lifelines` for Kaplan–Meier; `statsmodels` for Holm | SciPy alone gives Kaplan–Meier with its band, log-rank, Mann–Whitney and the bootstrap; lifelines would be a second dependency for one of those, and Holm is six lines against statsmodels' size. What it loses: lifelines' median CI is built in; here it is read off SciPy's log-log band, tested on a case worked by hand. |
 | Resume as a new batch (a second log beside the first) | No log rewrite on resume, ever. But `metrics.py`, `summarize_run.py` and `replay.py` would each have to learn to stitch segments; one file keeps every reader as it is, and the rewrite only happens after a stop mid-episode. |
 
 What the own scripts lose against the strongest alternative (a TensorBoard dashboard): no interactive plots. What they gain: nothing new to run or install, and a summary Claude can read cheaply.
