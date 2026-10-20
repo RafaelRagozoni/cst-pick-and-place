@@ -22,11 +22,16 @@ import com.google.gson.JsonObject;
  *               jointLimitMargin, selfCollision, envCollision, manipulability
  *     external  cubePos, cubeVel, padPos
  *     derived   eefToCube, cubeToPadXY, cubeHeight, cubeDisplacement
+ *     carry     carried, placing, still
  * </pre>
  *
  * Vectors are stored as {@code double[]} Idea values. {@code cycle} counts control cycles over the
  * whole run, across episodes; {@code terminal} marks the observation an episode ended on, which the
  * agent perceives and learns from but no longer acts on.
+ *
+ * <p>{@code carry} is the one group the bridge does not send: what the agent remembers of the carry
+ * ({@link agent.task.Carry}), written by the Sensory codelet. {@link #toIdea} alone has no history to
+ * remember, so it writes no carry.
  */
 public final class Observation {
 
@@ -97,7 +102,20 @@ public final class Observation {
         der.add(prop("cubeHeight", derived.get("cubeHeightAboveTable").getAsDouble()));
         der.add(prop("cubeDisplacement", derived.get("cubeDisplacement").getAsDouble()));
         root.add(der);
+
+        Idea carry = new Idea("carry", null, 0);
+        carry.add(prop("carried", false));
+        carry.add(prop("placing", false));
+        carry.add(prop("still", 0));
+        root.add(carry);
         return root;
+    }
+
+    /** Write the carry into an observation built by {@link #toIdea}. */
+    public static void setCarry(Idea observation, boolean carried, boolean placing, int still) {
+        observation.get("carry.carried").setValue(carried);
+        observation.get("carry.placing").setValue(placing);
+        observation.get("carry.still").setValue(still);
     }
 
     private static Idea prop(String name, Object value) {
@@ -223,5 +241,17 @@ public final class Observation {
 
     public double cubeDisplacement() {
         return d("derived.cubeDisplacement");
+    }
+
+    public boolean carried() {
+        return b("carry.carried");
+    }
+
+    public boolean placing() {
+        return b("carry.placing");
+    }
+
+    public int still() {
+        return ((Number) v("carry.still")).intValue();
     }
 }

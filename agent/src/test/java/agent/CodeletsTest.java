@@ -4,6 +4,7 @@ import agent.codelets.BehaviorGeneratorCodelet;
 import agent.codelets.CreditAssignmentCodelet;
 import agent.codelets.GoalGeneratorCodelet;
 import agent.codelets.PlanTrackerCodelet;
+import agent.codelets.SensoryCodelet;
 import agent.credit.CreditSnapshot;
 import agent.credit.CreditTable;
 import agent.habit.Command;
@@ -12,10 +13,14 @@ import agent.memory.CreditUpdate;
 import agent.memory.ExecutionBuffer;
 import agent.memory.Goal;
 import agent.memory.Plan;
+import agent.memory.SensoryBuffer;
 import agent.memory.TrackerState;
 import agent.motivation.Characterization;
 import agent.motivation.Drives;
+import agent.sim.Environment;
 import agent.sim.Observation;
+import agent.sim.SimLink;
+import agent.task.Carry;
 import agent.task.TaskStages;
 import br.unicamp.cst.core.entities.MemoryContainer;
 import br.unicamp.cst.core.entities.MemoryObject;
@@ -536,6 +541,72 @@ class CodeletsTest {
         behavior(new Config().withSelection("ucb"), pool, 1).notifyCodelet();
         assertEquals("move", HabitIdeas.id(((Plan) planMO.getI()).habit()),
                 "ucb: one execution is not enough to give up on a habit");
+    }
+
+    // --- Sensory -------------------------------------------------------------------------------
+    /** The bridge replaying the expert trajectory, one recorded observation per step. */
+    private static final class Replay implements Environment {
+        private int step;
+
+        @Override
+        public JsonObject info() {
+            return new JsonObject();
+        }
+
+        @Override
+        public JsonObject reset(int seed, int episode) {
+            step = 0;
+            return reply();
+        }
+
+        @Override
+        public JsonObject step(JsonArray records, JsonObject annotate) {
+            step++;
+            return reply();
+        }
+
+        private JsonObject reply() {
+            JsonObject r = new JsonObject();
+            r.add("obs", Traj.json().get(step));
+            r.addProperty("step", step);
+            r.addProperty("done", false);
+            r.addProperty("success", false);
+            return r;
+        }
+    }
+
+    @Test
+    void sensoryRemembersTheCarryAndForgetsItWhenAnEpisodeStarts() {
+        SimLink link = new SimLink(new Replay());
+        SensoryCodelet s = new SensoryCodelet(link);
+        s.addOutput(sensoryMO);
+        s.addOutput(sensoryBufferMO);
+        sensoryBufferMO.setI(new SensoryBuffer(5));
+        link.reset(1, 0);
+        s.notifyCodelet();
+        for (int i = 1; i < Traj.json().size(); i++) {
+            link.step(new JsonArray(), null);
+            s.notifyCodelet();
+        }
+        assertTrue(TaskStages.settled(Observation.of(sensoryMO)), "the expert's carry ends in S2");
+        link.reset(1, 1);
+        s.notifyCodelet();
+        Observation o = Observation.of(sensoryMO);
+        assertFalse(o.carried() || o.placing() || o.still() > 0, "a new episode starts with no carry");
+    }
+
+    /** The expert's cube, resting on the pad, but perceived with no carry before it: pushed in. */
+    @Test
+    void aCubePushedOntoThePadIsNotTheTaskDone() {
+        Idea idea = Observation.toIdea(Traj.copy(Traj.json().size() - 1), 0, 0, true, false);
+        new Carry().observe(idea);
+        Observation o = new Observation(idea);
+        assertTrue(TaskStages.placed(o));
+        assertFalse(TaskStages.settled(o));
+        int stage = TaskStages.infer(o);
+        assertNotEquals(TaskStages.DONE, stage);
+        assertTrue(TaskStages.targetDistance(stage, o) > 0.0, "the Task keeps its need");
+        assertTrue(TaskStages.settled(Traj.obs(Traj.json().size() - 1)), "carried there, it is");
     }
 
     // --- Goal Generator ------------------------------------------------------------------------

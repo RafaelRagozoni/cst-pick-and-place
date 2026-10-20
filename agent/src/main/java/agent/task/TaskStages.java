@@ -10,12 +10,12 @@ import agent.sim.Observation;
  * trajectory. The port exists because the agent must not read the environment's task tracker: the
  * bridge returns it, but a robot outside the simulator would have no such thing.
  *
- * <p>Two deliberate differences. goals.py ends {@code release} after the cube has been still for 10
- * consecutive observations. The agent's termination is a pure function of one observation (released,
- * on the pad, below the settle speed), so the PlanTracker can evaluate it without keeping a counter.
- * And goals.py's episode success (test S2, BAS-01) also needs the carry's history -- was the cube let
- * go over the pad, after a transport? -- which {@link #placed} does not have: a cube pushed onto the
- * pad is {@code placed} here, and is not a success there.
+ * <p>{@code release} ends on the strict success test S2 (BAS-01), which needs the carry's history:
+ * was the cube let go over the pad after a transport, and has it been still since? The Sensory
+ * codelet keeps that history ({@link Carry}) and writes it into each observation, so every predicate
+ * here is still a function of one observation, and {@link #settled} is S2. {@link #placed} -- on the
+ * pad and not held, however it got there -- is goals.py's one-observation predicate, kept for the
+ * parity test: a cube pushed onto the pad is placed, and the task is not done.
  */
 public final class TaskStages {
 
@@ -24,6 +24,7 @@ public final class TaskStages {
     public static final double TRANSPORT_XY = 0.05;
     public static final double TRANSPORT_MIN_LIFT = 0.03;
     public static final double SETTLE_SPEED = 0.01;
+    public static final int SETTLE_STEPS = 10;
 
     public static final String[] STAGES = {"reach", "grasp", "transport", "release"};
     public static final int DONE = STAGES.length;
@@ -71,13 +72,18 @@ public final class TaskStages {
         return onPad(o) && !grasped(o);
     }
 
+    /** S2, the bridge's episode success: let go over the pad after a transport, then still. */
+    public static boolean settled(Observation o) {
+        return o.placing() && o.still() >= SETTLE_STEPS;
+    }
+
     // --- stage structure ------------------------------------------------------
     public static boolean precondition(int stage, Observation o) {
         switch (stage) {
             case 0: return true;
             case 1: return reached(o);
             case 2: return grasped(o);
-            case 3: return transported(o);
+            case 3: return transported(o) || o.placing();
             default: return true;
         }
     }
@@ -87,18 +93,25 @@ public final class TaskStages {
             case 0: return reached(o);
             case 1: return grasped(o);
             case 2: return transported(o);
-            case 3: return placed(o) && cubeSpeed(o) < SETTLE_SPEED;
+            case 3: return settled(o);
             default: return false;
         }
     }
 
-    /** The stage the scene is in, read from one observation alone. The Task drive uses this. */
+    /**
+     * The stage the scene is in, read from one observation and the carry it remembers. The Task drive
+     * uses this. A cube that reached the pad any other way than let go there after a carry is still
+     * to be reached, so the Task keeps its need.
+     */
     public static int infer(Observation o) {
         if (grasped(o)) {
             return transported(o) ? 3 : 2;
         }
-        if (placed(o)) {
+        if (settled(o)) {
             return DONE;
+        }
+        if (o.placing()) {
+            return 3;
         }
         return reached(o) ? 1 : 0;
     }

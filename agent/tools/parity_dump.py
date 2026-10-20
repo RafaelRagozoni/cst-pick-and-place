@@ -1,13 +1,16 @@
 """What the Python environment layer computes on the recorded trajectory, for the Java parity tests.
 
-The agent ports three pieces of coppelia_environment to Java: the step-completion rule
-(actions.StepCompletion), the task predicates (goals.py) and the behaviour characterisation
-(metrics.characterise). Each pair must agree, or the agent and the experiment disagree about when a
-step ends, when the task is done, or what "a visited region" is. ParityTest runs this script and
+The agent ports four pieces of coppelia_environment to Java: the step-completion rule
+(actions.StepCompletion), the task predicates (goals.py), the carry the success test S2 follows
+(goals.GoalTracker, as agent.task.Carry) and the behaviour characterisation (metrics.characterise).
+Each pair must agree, or the agent and the experiment disagree about when a step ends, when the task
+is done, or what "a visited region" is. The carry is compared on the expert trajectory and on
+test_success.py's cases, the sequences S2 exists to tell apart. ParityTest runs this script and
 compares, so the comparison is always against the current Python, never a stale fixture.
 
     python3 agent/tools/parity_dump.py > parity.json
 """
+import copy
 import json
 import math
 import os
@@ -17,8 +20,9 @@ SIM = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'copp
 sys.path.insert(0, SIM)
 
 from actions import HOLD, StepCompletion, grab, move  # noqa: E402
-from goals import grasped, on_pad, placed, reached, transported  # noqa: E402
+from goals import GoalTracker, grasped, on_pad, placed, reached, transported  # noqa: E402
 from metrics import characterise  # noqa: E402
+import test_success  # noqa: E402
 
 
 def joint(traj, i, j):
@@ -61,9 +65,28 @@ def scenarios(traj):
     return out
 
 
+def carries(seq):
+    """The tracker's carry after each observation: [carried, placing, still, success]."""
+    tracker = GoalTracker()
+    out = []
+    for o in seq:
+        tracker.update(o)
+        out.append([tracker._carried, tracker._placing, tracker._still, tracker.success])
+    return out
+
+
+def full(template, partial):
+    """test_success.py's observation, with the fields it leaves out taken from `template`."""
+    o = copy.deepcopy(template)
+    o['innerSense']['gripper']['isHolding'] = partial['innerSense']['gripper']['isHolding']
+    o['vision']['cube']['vel'] = partial['vision']['cube']['vel']
+    o['derived'].update(partial['derived'])
+    return o
+
+
 def main():
     traj = [json.loads(l) for l in open(os.path.join(SIM, 'traj.jsonl'))]
-    dump = {'predicates': [], 'bins': [], 'completion': []}
+    dump = {'predicates': [], 'bins': [], 'completion': [], 'carry': carries(traj), 'cases': []}
     for o in traj:
         dump['predicates'].append([reached(o), grasped(o), transported(o), on_pad(o), placed(o)])
         e, c, h, k, d = characterise(o)
@@ -77,6 +100,9 @@ def main():
             if r is not None:
                 break
         dump['completion'].append({'name': name, 'start': start, 'records': records, 'ticks': ticks})
+    for name, seq, _ in test_success.cases():
+        obs = [full(traj[0], o) for o in seq]
+        dump['cases'].append({'name': name, 'obs': obs, 'carry': carries(obs)})
     json.dump(dump, sys.stdout)
 
 

@@ -4,7 +4,9 @@ import agent.habit.Command;
 import agent.motivation.Characterization;
 import agent.sim.Observation;
 import agent.sim.StepCompletion;
+import agent.task.Carry;
 import agent.task.TaskStages;
+import br.unicamp.cst.representation.idea.Idea;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -26,7 +28,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * The Java ports agree with the Python they port, on the recorded expert trajectory: task
- * predicates (goals.py), characterization bins (metrics.characterise) and step completion
+ * predicates (goals.py), the carry behind the success test S2 (goals.GoalTracker, also on
+ * test_success.py's cases), characterization bins (metrics.characterise) and step completion
  * (actions.StepCompletion). The Python side is run fresh by tools/parity_dump.py, so this compares
  * against the current code, not a fixture that could go stale. Skipped if python3 is missing.
  */
@@ -68,6 +71,38 @@ class ParityTest {
             checked++;
         }
         assertTrue(checked > 800);
+    }
+
+    @Test
+    void carryMatchesGoalTracker() {
+        JsonArray traj = dump.getAsJsonArray("carry");
+        assertEquals(Traj.json().size(), traj.size());
+        for (int i = 0; i < traj.size(); i++) {
+            sameCarry(traj.get(i).getAsJsonArray(), Traj.obs(i), "observation " + i);
+        }
+        assertTrue(TaskStages.settled(Traj.obs(traj.size() - 1)), "the expert succeeds under S2");
+
+        JsonArray cases = dump.getAsJsonArray("cases");
+        assertTrue(cases.size() >= 12);
+        for (JsonElement ce : cases) {
+            JsonObject c = ce.getAsJsonObject();
+            JsonArray obs = c.getAsJsonArray("obs");
+            JsonArray want = c.getAsJsonArray("carry");
+            Carry carry = new Carry();
+            for (int k = 0; k < obs.size(); k++) {
+                Idea o = Observation.toIdea(obs.get(k).getAsJsonObject(), k, 0, k == 0, false);
+                carry.observe(o);
+                sameCarry(want.get(k).getAsJsonArray(), new Observation(o),
+                        c.get("name").getAsString() + ", observation " + k);
+            }
+        }
+    }
+
+    private static void sameCarry(JsonArray want, Observation o, String at) {
+        assertEquals(want.get(0).getAsBoolean(), o.carried(), at + " carried");
+        assertEquals(want.get(1).getAsBoolean(), o.placing(), at + " placing");
+        assertEquals(want.get(2).getAsInt(), o.still(), at + " still");
+        assertEquals(want.get(3).getAsBoolean(), TaskStages.settled(o), at + " success");
     }
 
     @Test
