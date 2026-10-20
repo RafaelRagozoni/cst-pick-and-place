@@ -43,7 +43,7 @@ import simconfig
 import simprocess
 from actions import Actuator, joint_positions, primitive_repertoire, record_id
 from episode import EpisodeReset
-from goals import GoalTracker, STEPS, succeeded
+from goals import GoalTracker, STEPS, SUCCESS_TEST
 from grasp_rule import GraspRule
 from observations import Observer
 from translog import EpisodeLog, check_annotation, open_log
@@ -90,6 +90,7 @@ class Bridge:
             'protocol': PROTOCOL_VERSION,
             'primitives': [{'id': record_id(h[0]), 'records': h} for h in primitive_repertoire()],
             'goalSteps': list(STEPS),
+            'successTest': SUCCESS_TEST,
             'stepLimit': self.step_limit,
             'physics': simconfig.physics_signature(self.sim),
             'log': self.log_path,
@@ -128,7 +129,7 @@ class Bridge:
         self.steps += 1
         obs = self.last_obs = self.obs.read()
         fired = self.tracker.update(obs)
-        success = succeeded(obs)
+        success = self.tracker.success
         self.done = success or self.steps >= self.step_limit
         if self.episode is not None:
             self.episode.step(records, obs, self.tracker.current, fired, success, annotate)
@@ -140,7 +141,7 @@ class Bridge:
     def _close_episode(self, aborted=False):
         """Write the episode's terminal record. `aborted`: reset or shut down before it was done."""
         if self.episode is not None:
-            self.episode.close(self.tracker.current, False if aborted else succeeded(self.episode.obs),
+            self.episode.close(self.tracker.current, False if aborted else self.tracker.success,
                                [t[0] for t in self.tracker.transitions], aborted=aborted)
             self.episode = None
 

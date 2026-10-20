@@ -14,7 +14,7 @@ import numpy as np
 
 from actions import Actuator, StepCompletion, joint_positions, primitive_repertoire
 from episode import EpisodeReset
-from goals import GoalTracker, succeeded
+from goals import GoalTracker
 from translog import EpisodeLog, open_log
 
 DEFAULT_STEP_LIMIT = 500     # DEC-04: provisional, to be replaced by a pilot-derived value
@@ -70,7 +70,7 @@ class Runner:
             self.sim.step()
             obs = self.obs.read()
             fired = tracker.update(obs)
-            success = succeeded(obs)
+            success = tracker.success
             log.step(records, obs, tracker.current, fired, success)
             if success:
                 break

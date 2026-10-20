@@ -54,7 +54,7 @@ from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 import simconfig
 from actions import Actuator, StepCompletion, grab, joint_positions, primitive_repertoire, record_id
 from episode import EpisodeReset
-from goals import GoalTracker, succeeded
+from goals import GoalTracker
 from grasp_rule import GraspRule
 from observations import TABLE_TOP_Z, Observer
 from translog import open_log
@@ -218,7 +218,7 @@ class Pilot:
             'condition': 'PILOT', 'segment': self.segment,
             'obs': o_before, 'action': records, 'habit_id': [record_id(r) for r in records],
             'goal_step': self.tracker.current, 'goal_fired': fired,
-            'success': succeeded(o), 'done': False, 'rewards': {},
+            'success': self.tracker.success, 'done': False, 'rewards': {},
         }) + '\n')
         return o, fired
 
@@ -323,7 +323,7 @@ class Pilot:
             o, _ = self.apply([], o)
             if self.tracker.current == 'done':
                 break
-        return self.finish(o, succeeded(o))
+        return self.finish(o, self.tracker.success)
 
     def finish(self, o, ok):
         self.sink.write(json.dumps({

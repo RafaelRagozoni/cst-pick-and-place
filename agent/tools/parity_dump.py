@@ -17,7 +17,7 @@ SIM = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'copp
 sys.path.insert(0, SIM)
 
 from actions import HOLD, StepCompletion, grab, move  # noqa: E402
-from goals import grasped, on_pad, reached, succeeded, transported  # noqa: E402
+from goals import grasped, on_pad, placed, reached, transported  # noqa: E402
 from metrics import characterise  # noqa: E402
 
 
@@ -65,7 +65,7 @@ def main():
     traj = [json.loads(l) for l in open(os.path.join(SIM, 'traj.jsonl'))]
     dump = {'predicates': [], 'bins': [], 'completion': []}
     for o in traj:
-        dump['predicates'].append([reached(o), grasped(o), transported(o), on_pad(o), succeeded(o)])
+        dump['predicates'].append([reached(o), grasped(o), transported(o), on_pad(o), placed(o)])
         e, c, h, k, d = characterise(o)
         dump['bins'].append(list(e) + list(c) + [int(h), int(k), d])
     for name, start, records in scenarios(traj):

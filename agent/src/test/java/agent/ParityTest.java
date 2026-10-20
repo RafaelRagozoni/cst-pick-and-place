@@ -64,7 +64,7 @@ class ParityTest {
             assertEquals(p.get(1).getAsBoolean(), TaskStages.grasped(o), at + " grasped");
             assertEquals(p.get(2).getAsBoolean(), TaskStages.transported(o), at + " transported");
             assertEquals(p.get(3).getAsBoolean(), TaskStages.onPad(o), at + " on_pad");
-            assertEquals(p.get(4).getAsBoolean(), TaskStages.succeeded(o), at + " succeeded");
+            assertEquals(p.get(4).getAsBoolean(), TaskStages.placed(o), at + " placed");
             checked++;
         }
         assertTrue(checked > 800);

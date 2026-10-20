@@ -21,7 +21,7 @@ from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import simconfig
-from goals import GoalTracker, succeeded
+from goals import GoalTracker
 from grasp_rule import GraspRule, set_gripper
 from observations import Observer
 
@@ -124,7 +124,7 @@ def main():
     set_gripper(sim, True); o = run(150)
 
     print('  released: cube %.4f m from the pad centre, success=%s'
-          % (o['derived']['cubeToPadXY'], succeeded(o)))
+          % (o['derived']['cubeToPadXY'], tracker.success))
     print('  goal steps: %s' % [t[0] for t in tracker.transitions])
 
     with open(OUT, 'w') as f:
