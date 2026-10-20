@@ -6,23 +6,24 @@ import agent.sim.Observation;
  * The four task stages of cap4 4.5, with the precondition and termination of each (cap4 4.3.3).
  *
  * <p>The predicates are a port of {@code coppelia_environment/goals.py}, which defines success for
- * the experiment; {@code TaskStagesParityTest} checks the two agree on the recorded expert
- * trajectory. The port exists because the agent must not read the environment's task tracker: the
- * bridge returns it, but a robot outside the simulator would have no such thing.
+ * the experiment; {@code ParityTest} checks the two agree on the recorded expert trajectory. The
+ * port exists because the agent must not read the environment's task tracker: the bridge returns
+ * it, but a robot outside the simulator would have no such thing.
  *
- * <p>{@code release} ends on the strict success test S2 (BAS-01), which needs the carry's history:
- * was the cube let go over the pad after a transport, and has it been still since? The Sensory
- * codelet keeps that history ({@link Carry}) and writes it into each observation, so every predicate
- * here is still a function of one observation, and {@link #settled} is S2. {@link #placed} -- on the
- * pad and not held, however it got there -- is goals.py's one-observation predicate, kept for the
- * parity test: a cube pushed onto the pad is placed, and the task is not done.
+ * <p>{@code release} ends on the strict success test (BAS-01; goals.py's {@code SUCCESS_TEST} names
+ * its version), which needs the carry's history: was the cube let go over the pad after a
+ * transport, and has it been still since? The Sensory codelet keeps that history ({@link Carry}) and
+ * writes it into each observation, so every predicate here is still a function of one observation,
+ * and {@link #settled} is that test. {@link #placed} -- on the pad and not held, however it got
+ * there -- is goals.py's one-observation predicate, kept for the parity test: a cube pushed onto the
+ * pad is placed, and the task is not done.
  */
 public final class TaskStages {
 
     public static final double REACH_DIST = 0.05;
     public static final double EPS_TASK = 0.05;
     public static final double TRANSPORT_XY = 0.05;
-    public static final double TRANSPORT_MIN_LIFT = 0.03;
+    public static final double TRANSPORT_MIN_LIFT = 0.05;    // goals.py says why, with the heights
     public static final double SETTLE_SPEED = 0.01;
     public static final int SETTLE_STEPS = 10;
 
@@ -72,7 +73,7 @@ public final class TaskStages {
         return onPad(o) && !grasped(o);
     }
 
-    /** S2, the bridge's episode success: let go over the pad after a transport, then still. */
+    /** The bridge's episode success: let go over the pad after a transport, then still. */
     public static boolean settled(Observation o) {
         return o.placing() && o.still() >= SETTLE_STEPS;
     }

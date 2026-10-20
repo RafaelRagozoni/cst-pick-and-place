@@ -1,8 +1,9 @@
-"""BAS-01: the strict success test S2, on synthetic observation sequences.
+"""BAS-01: the strict success test (goals.SUCCESS_TEST), on synthetic observation sequences.
 
 Offline, no CoppeliaSim. Each case is a sequence the agent produced or could produce; the cases that
-are not successes are the ones the rule S2 replaced counted as successes (code_notes 20, and the log
-analysis of 2026-10-20): pushed in, dropped beside the pad and nudged in, bounced off, still falling.
+are not successes are the ones an earlier rule counted (code_notes 20-22, and the log analysis of
+2026-10-20): pushed in, dropped beside the pad and nudged in, bounced off, still falling (S1); held
+but never lifted onto the pad (S2, and two of the six logged first successes).
 
     python3 test_success.py
 """
@@ -77,17 +78,30 @@ def cases():
 
     regrasp = carry() + still(5) + [obs(True, 0.01, PAD_REST)]
     yield ('grasped again before settled: not yet', regrasp + still(5), None)
-    yield ('grasped again, let go again over the pad', regrasp + still(SETTLE_STEPS),
-           len(regrasp) + SETTLE_STEPS - 1)
+    yield ('grasped again in place, let go: a new carry, unlifted', regrasp + still(SETTLE_STEPS),
+           None)
+    relifted = regrasp + [obs(True, 0.01, 0.06)]
+    yield ('grasped again, lifted, let go over the pad', relifted + still(SETTLE_STEPS),
+           len(relifted) + SETTLE_STEPS - 1)
 
     dragged = [obs(False, 0.46, TABLE_REST, eef=0.30), obs(False, 0.46, TABLE_REST)]
     dragged += [obs(True, x, TABLE_REST) for x in (0.46, 0.30, 0.15, 0.01)]
     yield ('held but dragged at table height, never lifted', dragged + still(3 * SETTLE_STEPS), None)
 
+    onto = dragged[:-1] + [obs(True, 0.03, PAD_REST), obs(True, 0.01, PAD_REST)]
+    yield ('held, dragged up onto the pad, let go', onto + still(3 * SETTLE_STEPS), None)
+
+    pushed_in = pushed + [obs(False, 0.01, PAD_REST, eef=0.01)]
+    pushed_in += [obs(True, 0.01, PAD_REST) for _ in range(3)]
+    yield ('pushed in, grasped where it lies, let go', pushed_in + still(3 * SETTLE_STEPS), None)
+
+    low = carry(at_h=0.045)
+    yield ('carried over the pad 2 cm up, under the lift', low + still(3 * SETTLE_STEPS), None)
+
 
 def main():
-    ok = SUCCESS_TEST == 'S2'
-    print('  success test is S2         : %s' % ('PASS' if ok else 'FAIL (%s)' % SUCCESS_TEST))
+    ok = SUCCESS_TEST == 'S3'
+    print('  success test is S3         : %s' % ('PASS' if ok else 'FAIL (%s)' % SUCCESS_TEST))
     for name, seq, want in cases():
         got = first_success(seq)
         good = got == want
@@ -105,7 +119,7 @@ def main():
     ok &= cleared
     print('  %-52s: %s' % ('reset clears the carry and the placing', 'PASS' if cleared else 'FAIL'))
 
-    print('\nBAS-01 S2: %s' % ('PASS' if ok else 'FAIL'))
+    print('\nBAS-01 %s: %s' % (SUCCESS_TEST, 'PASS' if ok else 'FAIL'))
     return 0 if ok else 1
 
 

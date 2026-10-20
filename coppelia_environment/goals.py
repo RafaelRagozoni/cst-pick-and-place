@@ -8,9 +8,10 @@ Every predicate here is a **pure function of one observation dict** (see observa
 in this file touches the simulator, so the whole goal layer can be replayed and tested offline
 against a recorded trajectory -- which is exactly how its acceptance test runs.
 
-Episode success is not a predicate: it is the tracker reaching `done`, under the strict test S2
-(BAS-01) that `GoalTracker` documents. S2 needs the history of the carry -- was the cube let go
-over the pad, after being transported? -- which no single observation holds.
+Episode success is not a predicate: it is the tracker reaching `done`, under the strict success
+test (BAS-01; version `SUCCESS_TEST`) that `GoalTracker` documents. It needs the history of the
+carry -- was the cube let go over the pad, after being transported? -- which no single observation
+holds.
 
 Thresholds are DEC-04's starting values. `EPS_TASK` also appears in the proposal text, so changing
 it means editing the paper too.
@@ -20,10 +21,17 @@ import math
 REACH_DIST = 0.05        # m, end-effector to cube
 EPS_TASK = 0.05          # m, cube centre to pad centre (xy) for success
 TRANSPORT_XY = 0.05      # m, held cube within this of the pad centre counts as "over the target"
-TRANSPORT_MIN_LIFT = 0.03    # m above the table, so "over the pad" cannot fire while still resting
+# m, cube centre above the table. The cube rests at 0.025 on the table and 0.031 on the pad; at 0.03
+# a cube held while resting on the pad counted as transported, so pushing it onto the pad and
+# grasping it there, or dragging it up onto the pad, passed the success test without a lift. The
+# expert carries it over the pad at 0.07 or higher.
+TRANSPORT_MIN_LIFT = 0.05
 SETTLE_SPEED = 0.01      # m/s
 SETTLE_STEPS = 10        # consecutive observations below SETTLE_SPEED before "settled"
-SUCCESS_TEST = 'S2'      # BAS-01; a new rule gets a new name, so runs under different rules never compare
+# The success test's version (BAS-01). A new rule gets a new name, so runs under different rules
+# never compare. S1: `placed` in one observation. S2: the rule GoalTracker documents, with
+# TRANSPORT_MIN_LIFT 0.03. S3: the same with 0.05.
+SUCCESS_TEST = 'S3'
 
 STEPS = ('reach', 'grasp', 'transport', 'release')
 
@@ -61,15 +69,16 @@ def placed(obs):
 class GoalTracker:
     """Advances through STEPS, firing each transition exactly once; `success` once all four fired.
 
-    `release` is the strict success test S2 (BAS-01). It fires when, in this order:
+    `release` is the strict success test (BAS-01). It fires when, in this order:
       1. since the cube was last grasped, it was transported -- held over the pad and lifted;
       2. the gripper let go of it while it was still over the pad (`TRANSPORT_XY`; no lift needed,
          so lowering the cube onto the pad before opening counts);
       3. from then on, without being grasped again and without leaving the zone (`EPS_TASK`), the
          cube stayed below SETTLE_SPEED for SETTLE_STEPS consecutive observations.
     A cube pushed or knocked onto the pad, dropped beside it and nudged in, bouncing off it, or still
-    falling past it is not a success. The rule S2 replaces -- `placed` in one observation -- counted
-    all four, and ended the episode on the first frame a falling cube clipped the pad.
+    falling past it is not a success, and neither is one held but never lifted onto the pad. S1 --
+    `placed` in one observation -- counted all of these, and ended the episode on the first frame a
+    falling cube clipped the pad.
     """
 
     def __init__(self):

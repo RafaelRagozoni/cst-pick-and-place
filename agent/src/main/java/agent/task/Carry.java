@@ -4,10 +4,10 @@ import agent.sim.Observation;
 import br.unicamp.cst.representation.idea.Idea;
 
 /**
- * What the agent remembers of the carry, so that the strict success test S2 (BAS-01) is a function
- * of one SensoryMO: a port of goals.GoalTracker's {@code _track}. The Sensory codelet keeps one per
+ * What the agent remembers of the carry, so that the strict success test (BAS-01) is a function of
+ * one SensoryMO: a port of goals.GoalTracker's {@code _track}. The Sensory codelet keeps one per
  * run, resets it when an episode starts, and writes its state into every observation's
- * {@code carry} group; {@link TaskStages#settled} then reads S2 off that observation alone.
+ * {@code carry} group; {@link TaskStages#settled} then reads the test off that observation alone.
  *
  * <p>The agent keeps its own for the reason TaskStages gives: the bridge's tracker is the
  * environment's, and a robot outside the simulator would have none. Two copies of one rule stay

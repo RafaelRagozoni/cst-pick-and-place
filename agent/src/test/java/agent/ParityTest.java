@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * The Java ports agree with the Python they port, on the recorded expert trajectory: task
- * predicates (goals.py), the carry behind the success test S2 (goals.GoalTracker, also on
+ * predicates (goals.py), the carry behind the strict success test (goals.GoalTracker, also on
  * test_success.py's cases), characterization bins (metrics.characterise) and step completion
  * (actions.StepCompletion). The Python side is run fresh by tools/parity_dump.py, so this compares
  * against the current code, not a fixture that could go stale. Skipped if python3 is missing.
@@ -80,10 +80,10 @@ class ParityTest {
         for (int i = 0; i < traj.size(); i++) {
             sameCarry(traj.get(i).getAsJsonArray(), Traj.obs(i), "observation " + i);
         }
-        assertTrue(TaskStages.settled(Traj.obs(traj.size() - 1)), "the expert succeeds under S2");
+        assertTrue(TaskStages.settled(Traj.obs(traj.size() - 1)), "the expert succeeds");
 
         JsonArray cases = dump.getAsJsonArray("cases");
-        assertTrue(cases.size() >= 12);
+        assertTrue(cases.size() >= 16);
         for (JsonElement ce : cases) {
             JsonObject c = ce.getAsJsonObject();
             JsonArray obs = c.getAsJsonArray("obs");

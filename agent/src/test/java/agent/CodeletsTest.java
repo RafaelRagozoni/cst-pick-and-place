@@ -588,7 +588,7 @@ class CodeletsTest {
             link.step(new JsonArray(), null);
             s.notifyCodelet();
         }
-        assertTrue(TaskStages.settled(Observation.of(sensoryMO)), "the expert's carry ends in S2");
+        assertTrue(TaskStages.settled(Observation.of(sensoryMO)), "the expert's carry ends in success");
         link.reset(1, 1);
         s.notifyCodelet();
         Observation o = Observation.of(sensoryMO);

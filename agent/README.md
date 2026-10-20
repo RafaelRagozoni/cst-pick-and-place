@@ -123,8 +123,9 @@ exactly.
   bins `metrics.characterise` uses for metric 5, which `ParityTest` holds together.
 - **Task stage regression**: if the current stage's precondition stops holding (cube dropped), the
   Goal Generator falls back to the stage perception shows. TROCA only advances.
-- **Release ends on the agent's own S2** (since 2026-10-20, vault spec BAS-01): the cube let go over
-  the pad after a transport, then still for 10 observations, as goals.py's success test. That needs
+- **Release ends on the agent's own strict success test** (since 2026-10-20, vault spec BAS-01): the
+  cube let go over the pad after a transport, then still for 10 observations, as goals.py's success
+  test (version `SUCCESS_TEST`, S3 since the transport lift went from 0.03 to 0.05). That needs
   the carry's history, which the Sensory codelet keeps (`task.Carry`) and writes into SensoryMO's
   `carry` group, so `TaskStages` stays a function of one observation. A cube that reached the pad any
   other way is placed but not done: the Task keeps its need and points back at the cube. Before, any

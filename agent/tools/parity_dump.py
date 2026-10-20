@@ -1,11 +1,11 @@
 """What the Python environment layer computes on the recorded trajectory, for the Java parity tests.
 
 The agent ports four pieces of coppelia_environment to Java: the step-completion rule
-(actions.StepCompletion), the task predicates (goals.py), the carry the success test S2 follows
+(actions.StepCompletion), the task predicates (goals.py), the carry the strict success test follows
 (goals.GoalTracker, as agent.task.Carry) and the behaviour characterisation (metrics.characterise).
 Each pair must agree, or the agent and the experiment disagree about when a step ends, when the task
 is done, or what "a visited region" is. The carry is compared on the expert trajectory and on
-test_success.py's cases, the sequences S2 exists to tell apart. ParityTest runs this script and
+test_success.py's cases, the sequences that test exists to tell apart. ParityTest runs this script and
 compares, so the comparison is always against the current Python, never a stale fixture.
 
     python3 agent/tools/parity_dump.py > parity.json
