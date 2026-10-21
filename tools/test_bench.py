@@ -64,12 +64,20 @@ def fake_seed(batch, seed, first, emax=10, eref=4, p2=None, condition='C4', fp=F
         json.dump(meta, f)
 
 
-def batch(tmp, name, seeds, **kw):
+def batch(tmp, name, seeds, proto=None, **kw):
+    """A fake batch; `proto` the keys its protocol.json adds to PROTO (None: it has none)."""
     b = os.path.join(tmp, name)
     os.makedirs(b)
     for seed, first in seeds:
         fake_seed(b, seed, first, **kw)
+    if proto is not None:
+        with open(os.path.join(b, 'protocol.json'), 'w') as f:
+            json.dump(dict(PROTO, **proto), f)
     return b
+
+
+PROTO = {'protocol': 'PT', 'successTest': 'S3', 'conditions': ['C0', 'C4'], 'selection': 'ucb:0.1',
+         'curiosity': 'lp', 'seeds': [1, 2, 3], 'emax': 10, 'eref': 4, 'stepLimit': 500}
 
 
 def failed(card):
@@ -92,8 +100,15 @@ def main():
         check('M1: the CI holds the median', m1['low'] <= 6 and (m1['high'] is None or m1['high'] >= 6))
         check('M1b: reach first at episode 0 everywhere, median 1', card['m1b']['reach']['median'] == 1)
         check('M1b: release as M1', card['m1b']['release']['median'] == 6)
-        check('M2: jumpstart and final 0.5 (every other Phase 2 episode succeeds)',
-              card['m2']['jumpstart']['mean'] == 0.5 and card['m2']['final']['mean'] == 0.5)
+        check('M2: jumpstart 0.5 over the 4 seeds with a Phase 2 (every other episode succeeds)',
+              card['m2']['jumpstart']['mean'] == 0.5 and card['m2']['jumpstart']['n'] == 4)
+        check('M2 final: the 2 seeds that never succeeded count 0, not dropped (2/6)',
+              abs(card['m2']['final']['mean'] - 2 / 6) < 1e-9 and card['m2']['final']['n'] == 6
+              and card['m2']['noPhase2'] == 2)
+        check('  ... and enter time to θ as never reaching it (n 6, not 4)',
+              card['m2']['timeToTheta']['0.25']['n'] == 6
+              and card['m2']['timeToTheta']['0.25']['events'] == 0)
+        check('  ... and the scorecard says so', 'counted 0' in open(os.path.join(b, 'scorecard.md')).read())
         check('M3: steps per Phase 2 success are each seed\'s, not Phase 1\'s',
               card['m3']['steps']['n'] == 4)
         check('a clean fake batch is valid', card['valid'] and not failed(card))
@@ -123,6 +138,15 @@ def main():
         bench.score(os.path.join(tmp, 'short'), jobs=1, ledger=ledger)
         check('a protocol batch still running gets no ledger line yet',
               open(ledger).read().count('short') == before)
+        card = bench.score(os.path.join(tmp, 'short'), jobs=1, ledger=ledger)
+        check('a seed still in Phase 1 is not counted 0 in M2 final: it may yet succeed',
+              card['m2']['final']['n'] == 0 and card['m2']['noPhase2'] == 0)
+        f = os.path.join(tmp, 'short', 'scorecard.json')
+        old_card = json.load(open(f))
+        old_card['version'] = bench.CARD - 1
+        json.dump(old_card, open(f, 'w'))
+        check('a scorecard.json of an older version is scored again',
+              bench.scored(os.path.join(tmp, 'short'), ledger)['version'] == bench.CARD)
 
         # Phase 2 that learns: first 50 fail, last 100 succeed.
         learn = [False] * 50 + [True] * 150
@@ -156,6 +180,28 @@ def main():
         check('C4 against C4 on another commit is the track, with git log',
               'git log A..B' in out)
         check('  ... and warns that the environment changed too', 'environment changed' in out)
+        ts = {t['key']: t for t in bench.tests(bench.scored(a, ledger), bench.scored(c0, ledger))}
+        check('no primary in the protocol: the four tests are Holm-corrected together',
+              not any(t['primary'] for t in ts.values())
+              and [round(t['pHolm'], 9) for t in ts.values() if t['test']]
+              == [round(p, 9) for p in bench.holm([t['test']['p'] for t in ts.values() if t['test']])])
+        check('the tests are the metrics protocol.PRIMARY names', sorted(ts) == sorted(protocol.PRIMARY))
+
+        # A primary metric: M2 final decides alone; s3 never succeeds and counts 0.
+        pa = batch(tmp, 'PA', [(1, 1), (2, 3), (3, None)], proto={'primary': 'm2_final'})
+        pb = batch(tmp, 'PB', [(1, 0), (2, 1), (3, 2)], condition='C0', p2=[True] * 4,
+                   proto={'primary': 'm2_final'})
+        ts = {t['key']: t for t in bench.tests(bench.scored(pa, ledger), bench.scored(pb, ledger))}
+        check('the primary keeps its own p: Mann-Whitney of [0.5 0.5 0] against [1 1 1]',
+              ts['m2_final']['primary'] and ts['m2_final']['pHolm'] is None
+              and ts['m2_final']['test']['p'] == bench.mw([0.5, 0.5, 0.0], [1.0, 1.0, 1.0])['p'])
+        rest = [ts[k] for k in ('m1', 'm3_steps', 'm4_bins_p2') if ts[k]['test']]
+        check('  ... and the others are Holm-corrected among themselves, without it',
+              [t['pHolm'] for t in rest] == bench.holm([t['test']['p'] for t in rest]))
+        out = bench.compare(pa, pb, ledger=ledger)
+        check('  ... and compare says which one decides', '**primary:** M2 final' in out
+              and 'It alone decides' in out)
+
         smoke = batch(tmp, 'smoke', [(1, 0)], fp=dict(FP, protocol=None))
         check('a smoke is refused without --exploratory',
               refused(bench.compare, a, smoke, False, ledger, says='--exploratory'))

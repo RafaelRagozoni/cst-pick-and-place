@@ -7,7 +7,9 @@
 `score` reads every seed's log once (in parallel) and writes the batch's scorecard: M1 episodes to
 the first success, Kaplan-Meier with the seeds that never succeeded censored at E_max, not dropped;
 M1b the same for the first time each task stage fired; M2 Phase 2's success rate -- jumpstart (first
-50 episodes), time to threshold (the running mean of 50 reaching theta), final (last 100); M2b
+50 episodes), time to threshold (the running mean of 50 reaching theta), final (last 100); a seed
+that ended without a first success has no Phase 2, and counts as never reaching theta and as final
+0 (its last 100 episodes all failed), not dropped; M2b
 whether it has stopped improving; M3 steps and joint energy per Phase 2 success; M4 coverage bins at
 the end of each phase; M5 the repertoire's size. Then sanity checks: any failing one makes the batch
 invalid. A protocol batch (run_live.py --protocol) also gets its line in bench/ledger.csv, replaced
@@ -17,7 +19,9 @@ when scored again; a smoke never does.
 refuse: two protocol versions, or C0 against C4 on different fingerprints. Two batches of one
 condition on different commits are the track; it prints what changed between them (git log) and
 warns if the environment changed too. --exploratory compares batches that are not protocol batches
-(a pilot, count against lp), and says so at the top and the bottom of what it prints.
+(a pilot, count against lp), and says so at the top and the bottom of what it prints. A protocol
+with a 'primary' metric has it decide alone, at alpha 0.05; the other metrics are secondary, Holm-
+corrected among themselves. Without one, all are Holm-corrected together.
 
 Censored seeds tie at the top in Mann-Whitney, which holds because both batches share E_max (one
 protocol); the log-rank test is printed beside it as a check. Confidence intervals are 95%, the
@@ -52,6 +56,7 @@ BLOCK = 50                      # M2's blocks and its running mean
 FINAL = 100                     # M2's final window, and M2b's two windows
 THETAS = (0.25, 0.5, 0.75)      # time to threshold when the protocol fixes none (the pilot)
 ENV_KEYS = ('coppeliaSim', 'java', 'python')
+CARD = 2                        # scorecard.json's version: an older one is scored again
 
 
 # --- one seed ---------------------------------------------------------------------------------
@@ -230,9 +235,18 @@ def checks(batch, seeds, ms):
     return out
 
 
-def theta_of(batch):
+def protocol_of(batch):
+    """The protocol file run_live copied into the batch; {} for a batch without one."""
     f = os.path.join(batch, 'protocol.json')
-    return protocol.read_protocol(f).get('theta') if os.path.isfile(f) else None
+    return protocol.read_protocol(f) if os.path.isfile(f) else {}
+
+
+def p2_final(s, m):
+    """M2 final for one seed: its last FINAL Phase 2 episodes; 0 for a seed that ended with no first
+    success, whose last FINAL episodes all failed; None while it may still find one."""
+    if s['p2']:
+        return float(np.mean(s['p2'][-FINAL:]))
+    return 0.0 if 'end' in m and s['first'] is None else None
 
 
 def score(batch, theta=None, jobs=None, ledger=LEDGER):
@@ -244,7 +258,8 @@ def score(batch, theta=None, jobs=None, ledger=LEDGER):
         raise SystemExit('no s<seed>/run.json in %s' % batch)
     with Pool(jobs or len(ms)) as pool:
         seeds = pool.map(scan_seed, seed_dirs(batch))
-    theta = theta if theta is not None else theta_of(batch)
+    proto = protocol_of(batch)
+    theta = theta if theta is not None else proto.get('theta')
     thetas = (theta,) if theta is not None else THETAS
     emax = {m['emax'] for m in ms}
     # Censored where the seed stands: at E_max once it has ended, at its last episode while it runs.
@@ -254,11 +269,16 @@ def score(batch, theta=None, jobs=None, ledger=LEDGER):
                   caps) for st in STAGES}
     with_p2 = [s for s in seeds if s['p2']]
     eref = max(m['eref'] for m in ms)
-    m2 = {'n': len(with_p2),
+    for m, s in zip(ms, seeds):
+        s['p2final'] = p2_final(s, m)
+    # Seeds that ended with no first success: final 0, and censored at E_ref for time to theta.
+    none = [s for s in seeds if not s['p2'] and s['p2final'] is not None]
+    m2 = {'n': len(with_p2), 'noPhase2': len(none),
           'jumpstart': mean_ci([float(np.mean(s['p2'][:BLOCK])) for s in with_p2]),
-          'final': mean_ci([float(np.mean(s['p2'][-FINAL:])) for s in with_p2]),
-          'timeToTheta': {str(t): km([time_to(s['p2'], t) for s in with_p2],
-                                     [len(s['p2']) for s in with_p2]) for t in thetas},
+          'final': mean_ci([s['p2final'] for s in seeds]),
+          'timeToTheta': {str(t): km([time_to(s['p2'], t) for s in with_p2] + [None] * len(none),
+                                     [len(s['p2']) for s in with_p2] + [eref] * len(none))
+                          for t in thetas},
           'blocks': [[float(np.mean(s['p2'][i:i + BLOCK])) for i in range(0, len(s['p2']), BLOCK)]
                      for s in with_p2]}
     long = [s for s in with_p2 if len(s['p2']) >= 2 * FINAL]
@@ -271,10 +291,11 @@ def score(batch, theta=None, jobs=None, ledger=LEDGER):
                                for s in seeds])}
     m4 = {p: median_ci([s['bins'].get(p) for s in seeds]) for p in ('bootstrap', 'refinement')}
     cs = checks(batch, seeds, ms)
-    card = {'batch': os.path.basename(batch), 'condition': ms[0]['condition'],
+    card = {'version': CARD, 'batch': os.path.basename(batch), 'condition': ms[0]['condition'],
             'protocol': ms[0].get('protocol'), 'commit': ms[0]['commit'],
             'fingerprint': ms[0].get('fingerprint'), 'emax': sorted(emax), 'eref': eref,
-            'theta': theta, 'finished': all('end' in m for m in ms), 'caps': caps,
+            'theta': theta, 'primary': proto.get('primary'),
+            'finished': all('end' in m for m in ms), 'caps': caps,
             'seeds': seeds, 'm1': m1, 'm1b': m1b, 'm2': m2, 'm2b': gain, 'm3': m3,
             'm4': m4, 'checks': [{'name': n, 'ok': ok, 'detail': d} for n, ok, d in cs],
             'valid': all(ok is not False for _, ok, _ in cs),
@@ -299,8 +320,8 @@ def scored(batch, ledger=LEDGER):
     if os.path.isfile(f):
         with open(f) as fh:
             card = json.load(fh)
-        if card['logs'] == {str(m['seed']): log_stamp(d)
-                            for m, d in zip(metas(batch), seed_dirs(batch))}:
+        if card.get('version') == CARD and card['logs'] == {
+                str(m['seed']): log_stamp(d) for m, d in zip(metas(batch), seed_dirs(batch))}:
             return card
     return score(batch, ledger=ledger)
 
@@ -347,10 +368,12 @@ def render(card):
             s['seed'], s['episodes'], fmt(s['first']) if s['first'] is not None else 'none yet'
             if not card['finished'] else 'censored',
             ' | '.join(fmt(s['stageFirst'].get(st)) for st in STAGES), len(p2),
-            fmt(np.mean(p2[:BLOCK]), 2) if p2 else '–', fmt(np.mean(p2[-FINAL:]), 2) if p2 else '–',
+            fmt(np.mean(p2[:BLOCK]), 2) if p2 else '–', fmt(s['p2final'], 2),
             s['bins'].get('bootstrap', '–'), s['bins'].get('refinement', '–')))
     lines += ['', 'Episodes are 0-based; "1st success" is its episode index. The M1 times below count '
-              'episodes, so they are that index + 1.', '',
+              'episodes, so they are that index + 1. A seed that ended with no first success has no '
+              'Phase 2: its final is 0 (its last %d episodes all failed), and it never reaches θ.'
+              % FINAL, '',
               '## Batch', '', '| metric | value [95% CI] | n |', '|---|---|---|',
               '| M1 episodes to 1st success (KM median) | %s | %d (%d censored) |' % (
                   km_cell(card['m1'], cap), n, card['m1']['censored'])]
@@ -361,8 +384,9 @@ def render(card):
     m2 = card['m2']
     lines += ['| M2 jumpstart (Phase 2, first %d) | %s | %d |' % (BLOCK, ci_cell(m2['jumpstart'],
                                                                                  key='mean'), m2['n']),
-              '| M2 final (Phase 2, last %d) | %s | %d |' % (FINAL, ci_cell(m2['final'], key='mean'),
-                                                            m2['n'])]
+              '| M2 final (Phase 2, last %d) | %s | %d%s |' % (
+                  FINAL, ci_cell(m2['final'], key='mean'), m2['final']['n'],
+                  ' (%d with no Phase 2, counted 0)' % m2['noPhase2'] if m2['noPhase2'] else '')]
     for t, k in m2['timeToTheta'].items():
         lines.append('| M2 Phase 2 episodes until the running mean of %d reaches %s | %s | %d '
                      'censored |' % (BLOCK, t, km_cell(k, card['eref']), k['censored']))
@@ -474,40 +498,55 @@ def mw(x, y):
     return {'p': float(r.pvalue), 'rb': float(2.0 * r.statistic / (len(x) * len(y)) - 1.0)}
 
 
+def tests(a, b):
+    """The four Mann-Whitney tests of two scorecards, one dict each, keyed as protocol.PRIMARY: the
+    primary metric, if the protocol fixes one, keeps its own p at alpha 0.05 and the others are
+    Holm-corrected among themselves; without one, all four are."""
+    cap = max(a['emax'] + b['emax'])
+
+    def per_seed(card, f):
+        return [f(s) for s in card['seeds'] if f(s) is not None]
+    rows = [('m1', 'M1 episodes to 1st success (censored tie at %d)' % cap,
+             lambda s: cap if s['first'] is None else s['first'] + 1,
+             lambda c: km_cell(c['m1'], cap)),
+            ('m2_final', 'M2 final (Phase 2, last %d; no Phase 2 counts 0)' % FINAL,
+             lambda s: s['p2final'], lambda c: ci_cell(c['m2']['final'], key='mean')),
+            ('m3_steps', 'M3 steps per Phase 2 success',
+             lambda s: float(np.median(s['p2steps'])) if s['p2steps'] else None,
+             lambda c: ci_cell(c['m3']['steps'], 0)),
+            ('m4_bins_p2', 'M4 coverage bins, end of Phase 2', lambda s: s['bins'].get('refinement'),
+             lambda c: ci_cell(c['m4']['refinement'], 0))]
+    primary = a.get('primary') if a.get('primary') == b.get('primary') else None
+    out = [{'key': k, 'name': name, 'a': cell(a), 'b': cell(b), 'primary': k == primary,
+            'test': mw(per_seed(a, f), per_seed(b, f)), 'pHolm': None}
+           for k, name, f, cell in rows]
+    family = [t for t in out if t['test'] is not None and not t['primary']]
+    for t, p in zip(family, holm([t['test']['p'] for t in family])):
+        t['pHolm'] = p
+    return out
+
+
 def compare(a_dir, b_dir, exploratory=False, ledger=LEDGER):
     a = scored(os.path.abspath(a_dir), ledger)
     b = scored(os.path.abspath(b_dir), ledger)
     warn = check_compare(a, b, exploratory)
-    cap = max(a['emax'] + b['emax'])
-    t1 = [cap if s['first'] is None else s['first'] + 1 for s in a['seeds']]
-    t2 = [cap if s['first'] is None else s['first'] + 1 for s in b['seeds']]
-    tests = [('M1 episodes to 1st success (censored tie at %d)' % cap, mw(t1, t2))]
-
-    def per_seed(card, f):
-        return [f(s) for s in card['seeds'] if f(s) is not None]
-    for name, f in (('M2 final (Phase 2, last %d)' % FINAL,
-                     lambda s: float(np.mean(s['p2'][-FINAL:])) if s['p2'] else None),
-                    ('M3 steps per Phase 2 success',
-                     lambda s: float(np.median(s['p2steps'])) if s['p2steps'] else None),
-                    ('M4 coverage bins, end of Phase 2', lambda s: s['bins'].get('refinement'))):
-        tests.append((name, mw(per_seed(a, f), per_seed(b, f))))
-    done = [t for t in tests if t[1] is not None]
-    adj = holm([t[1]['p'] for t in done])
+    ts = tests(a, b)
     lr = logrank(x=censored(a), y=censored(b)) if a['m1']['events'] + b['m1']['events'] else None
     lines = ['# %s vs %s' % (a['batch'], b['batch']), '']
     lines += ['> %s' % w for w in warn] + ([''] if warn else [])
+    first = next((t for t in ts if t['primary']), None)
     lines += ['A: %s, commit %s, %d seeds · B: %s, commit %s, %d seeds' % (
         a['condition'], a['commit'], len(a['seeds']), b['condition'], b['commit'], len(b['seeds'])),
+        '', ('Primary metric, fixed by the protocol before its batches ran: **%s**. It alone decides, '
+             'at α 0.05; the others are secondary, Holm-corrected among themselves.' % first['name'])
+        if first else 'No primary metric in the protocol: the four are Holm-corrected together.',
         '', '| metric | A | B | p (Mann–Whitney) | p Holm | rank-biserial (> 0: A larger) |',
         '|---|---|---|---|---|---|']
-    cells = {tests[0][0]: (km_cell(a['m1'], cap), km_cell(b['m1'], cap)),
-             tests[1][0]: (ci_cell(a['m2']['final'], key='mean'), ci_cell(b['m2']['final'], key='mean')),
-             tests[2][0]: (ci_cell(a['m3']['steps'], 0), ci_cell(b['m3']['steps'], 0)),
-             tests[3][0]: (ci_cell(a['m4']['refinement'], 0), ci_cell(b['m4']['refinement'], 0))}
-    for name, r in tests:
-        p_adj = adj[[t[0] for t in done].index(name)] if r else None
-        lines.append('| %s | %s | %s | %s | %s | %s |' % (
-            name, cells[name][0], cells[name][1], fmt(r and r['p'], 3), fmt(p_adj, 3),
+    for t in ts:
+        r = t['test']
+        lines.append('| %s%s | %s | %s | %s | %s | %s |' % (
+            '**primary:** ' if t['primary'] else '', t['name'], t['a'], t['b'], fmt(r and r['p'], 3),
+            'primary, not corrected' if t['primary'] else fmt(t['pHolm'], 3),
             fmt(r and r['rb'], 2)))
     lines += ['', 'Log-rank on M1 (the check on the tie): %s' % (
         'p = %.3f' % lr.pvalue if lr is not None else 'no successes in either batch')]

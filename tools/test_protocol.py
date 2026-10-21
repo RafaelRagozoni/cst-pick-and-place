@@ -120,7 +120,9 @@ def main():
         for name, change in (('a missing key', lambda d: d.pop('eref')),
                              ('an unknown key', lambda d: d.update(emx=3)),
                              ('a negative budget', lambda d: d.update(emax=-1)),
-                             ('no seeds', lambda d: d.update(seeds=[]))):
+                             ('no seeds', lambda d: d.update(seeds=[])),
+                             ('a primary metric bench does not test', lambda d: d.update(primary='m9')),
+                             ('theta 25, not 0.25', lambda d: d.update(theta=25))):
             bad = dict(PROTOCOL)
             change(bad)
             with open(p, 'w') as f:
@@ -166,9 +168,11 @@ def main():
     finally:
         shutil.rmtree(tmp)
 
-    real = os.path.join(protocol.ROOT, 'bench', 'P0.json')
-    check('bench/P0.json reads, for the success test this tree runs',
-          protocol.read_protocol(real)['successTest'] == protocol.success_test())
+    for name in sorted(os.listdir(os.path.join(protocol.ROOT, 'bench'))):
+        if name.startswith('P') and name.endswith('.json'):
+            real = os.path.join(protocol.ROOT, 'bench', name)
+            check('bench/%s reads, for the success test this tree runs' % name,
+                  protocol.read_protocol(real)['successTest'] == protocol.success_test())
 
     print('\nprotocol: %s' % ('PASS' if not FAILS else 'FAIL (%d)' % len(FAILS)))
     return 1 if FAILS else 0

@@ -1,0 +1,14 @@
+{
+  "protocol": "P1",
+  "note": "BAS-01: the protocol every milestone reruns, fixed from pilot P0 (runs/2026-10-20_1031_C4_ucb-0.1_lp_P0) before any P1 batch. Primary: M2 final, each seed's success rate over its last 100 episodes; a seed with no first success counts 0. 9 seeds: C4 sits at 0.00-0.02 on it, so a WP3 that lifts most seeds above it separates. E_max 2000: P0's slowest first success was episode 958. E_ref 500: C4 is flat by then. theta 0.25. C0 is listed so WP3's C0 against C4 runs under this same version.",
+  "successTest": "S3",
+  "conditions": ["C0", "C4"],
+  "selection": "ucb:0.1",
+  "curiosity": "lp",
+  "seeds": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+  "emax": 2000,
+  "eref": 500,
+  "stepLimit": 500,
+  "theta": 0.25,
+  "primary": "m2_final"
+}

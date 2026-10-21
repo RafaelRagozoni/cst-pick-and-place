@@ -30,9 +30,11 @@ scene and `cst` included; the `-dirty` suffix used to look only at `agent/` and
 libraries, and the Java and Python versions. `agent.json`, written by the agent before its first
 episode, adds the effective Config, every field, and the bridge's handshake.
 
-`--protocol FILE` makes a batch the baseline track can use. The file (`bench/P0.json` is the pilot's)
-fixes selection, Curiosity, seeds, E_max, E_ref and step limit, and lists the conditions it allows,
-and the success test it was written for. Refused, each with what to change:
+`--protocol FILE` makes a batch the baseline track can use. The file (`bench/P0.json` is the pilot's,
+`bench/P1.json` the one every milestone reruns) fixes selection, Curiosity, seeds, E_max, E_ref and
+step limit, and lists the conditions it allows, and the success test it was written for. Optional:
+`theta`, M2's threshold, and `primary`, the metric that decides a comparison (`m1`, `m2_final`,
+`m3_steps` or `m4_bins_p2`); a file with another is refused. Refused, each with what to change:
 - any of `--selection --curiosity --seeds --emax --eref --step-limit` on the command line;
 - a `--condition` the file does not list, or none;
 - a tree whose success test is not the file's;
@@ -47,7 +49,9 @@ Without `--protocol`, nothing is refused and the fingerprint is recorded all the
 `score` reads every seed's log in parallel (~7 s for 6 × 170 episodes) and writes the scorecard. M1
 is episodes to the first success, Kaplan–Meier, a seed without one censored at E_max — or, while it
 runs, at the episodes it has run, so a scorecard mid-run says "in progress", not "invalid". M1b is
-the same per task stage, M2 Phase 2's jumpstart, time to θ and final rate, M2b whether the last 100
+the same per task stage, M2 Phase 2's jumpstart, time to θ and final rate (a seed that ended with
+no first success has no Phase 2: final 0, since its last 100 episodes all failed, and θ never
+reached — counted, not dropped, so a condition that fails some seeds is not flattered), M2b whether the last 100
 still differ from the 100 before, M3 steps and energy per Phase 2 success, M4 coverage bins, M5 the
 repertoire. A batch with a failing sanity check is invalid: a seed that did not end where the
 protocol ends it, Effort not 0 in Phase 1 or 0 in Phase 2, C4 or C6 off the 14 primitives, two
@@ -55,7 +59,9 @@ fingerprints in one batch, a success without the four stages in order. A finishe
 writes its line into `bench/ledger.csv`, replacing an older one of the same batch.
 
 `compare A B` tests M1 (censored seeds tied at E_max, with log-rank beside it as the check), M2's
-final rate, M3's steps and M4's bins by Mann–Whitney, with rank-biserial and Holm. It refuses two
+final rate, M3's steps and M4's bins by Mann–Whitney, with rank-biserial and Holm. When the protocol
+names a `primary`, that test alone decides at α 0.05 and the other three are Holm-corrected among
+themselves; P1's primary is `m2_final`. It refuses two
 protocol versions, C0 against C4 on different fingerprints, and batches without a protocol unless
 `--exploratory`, which says so at the top and the bottom.
 

@@ -23,11 +23,13 @@ ENV = os.path.join(ROOT, 'coppelia_environment')
 SCENE = os.path.join('coppelia_environment', 'pick_and_place.ttt')
 LIBS = ('libcoppeliaSim.so', 'libcoppeliaSimHeadless.so')
 
-# What a protocol file holds; every key is required. Optional: 'note', and 'theta', the success
-# rate M2's time to threshold counts to (bench.py; P1 fixes it from the pilot).
+# What a protocol file holds; every key is required. Optional: 'note'; 'theta', the success rate
+# M2's time to threshold counts to; and 'primary', the one metric that decides a comparison
+# (bench.py compare), one of PRIMARY. P1 fixes both from the pilot, before its batch runs.
 KEYS = ('protocol', 'successTest', 'conditions', 'selection', 'curiosity', 'seeds', 'emax', 'eref',
         'stepLimit')
-OPTIONAL = ('note', 'theta')
+OPTIONAL = ('note', 'theta', 'primary')
+PRIMARY = ('m1', 'm2_final', 'm3_steps', 'm4_bins_p2')
 # run_live.py arguments a protocol fixes: given on the command line, they are refused.
 FIXED = ('selection', 'curiosity', 'seeds', 'emax', 'eref', 'step_limit')
 
@@ -136,6 +138,10 @@ def read_protocol(path):
             or not p['conditions']:
         raise Refused('%s: emax, eref and stepLimit are whole numbers >= 0, seeds and conditions '
                       'non-empty lists%s' % (path, ' (not: %s)' % ', '.join(ints) if ints else ''))
+    if 'primary' in p and p['primary'] not in PRIMARY:
+        raise Refused('%s: primary is one of %s, not %s' % (path, ', '.join(PRIMARY), p['primary']))
+    if 'theta' in p and not (isinstance(p['theta'], (int, float)) and 0 < p['theta'] <= 1):
+        raise Refused('%s: theta is a success rate in (0, 1], not %s' % (path, p['theta']))
     return p
 
 
