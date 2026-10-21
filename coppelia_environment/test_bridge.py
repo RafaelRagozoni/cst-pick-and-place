@@ -50,7 +50,9 @@ def main():
             ('protocol advertised', info['protocol'] == 2),
             ('14 primitives offered', len(info['primitives']) == 14),
             ('goal steps advertised', info['goalSteps'] == ['reach', 'grasp', 'transport', 'release']),
-            ('physics reported', info['physics']['engineName'] == 'bullet'),
+            ('physics reported, the engine named by the simulator', info['physics']['engineName'] == 'bullet'),
+            ('CoppeliaSim reports its version', info['simulator']['version'].count('.') == 2
+             and info['simulator']['fullVersion'] > 0),
             ('logging to the given path', info['log'] == LOG and info['condition'] == 'TEST'),
             ('step before any reset is refused', refused_before_reset),
         ]

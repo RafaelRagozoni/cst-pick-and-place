@@ -14,8 +14,10 @@ switching engines invalidates every run recorded under the old one, so it is a d
 once, deliberately, before the grid starts.
 
 The engine *version* (2.78 vs 2.83) is chosen in the scene's dynamics dialog and is not exposed as
-a settable parameter, so it cannot be pinned from here; the loaded plugin is visible in the
-CoppeliaSim startup log.
+a parameter, so it cannot be pinned or read from here; it is saved in the scene, whose hash every
+run.json's fingerprint records (tools/protocol.py), and the loaded plugin is visible in the
+CoppeliaSim startup log. The engine's name and CoppeliaSim's version are read from the simulator
+itself, so the handshake says what ran, not what this file expects.
 
 Joint limits are pinned here too. The UR5 model's joints span [-360, +360] deg -- a real UR5 is
 effectively unbounded -- and Bullet does not enforce a joint's interval under velocity control
@@ -29,6 +31,7 @@ import math
 TIMESTEP = 0.05
 SOLVER_ITERATIONS = 100
 JOINT_LIMIT = math.radians(180)     # rad, every arm joint is kept within +/- this
+ENGINES = ('bullet', 'ode', 'vortex', 'newton', 'mujoco', 'physx')     # sim.physics_<name>
 
 
 def pin_physics(sim):
@@ -51,10 +54,25 @@ def physics_signature(sim):
         iters = sim.getEngineInt32Param(sim.bullet_global_constraintsolvingiterations, -1)
     except Exception:
         iters = None
+    engine = sim.getInt32Param(sim.intparam_dynamic_engine)
     return {
-        'engine': sim.getInt32Param(sim.intparam_dynamic_engine),
-        'engineName': 'bullet',
+        'engine': engine,
+        'engineName': engine_name(sim, engine),
         'timestep': sim.getFloatParam(sim.floatparam_simulation_time_step),
         'solverIterations': iters,
         'jointLimitDeg': math.degrees(JOINT_LIMIT),
     }
+
+
+def engine_name(sim, engine):
+    """The name of engine id `engine`, from the simulator's own sim.physics_* constants; None if it
+    is none of ENGINES."""
+    return next((n for n in ENGINES if getattr(sim, 'physics_' + n, None) == engine), None)
+
+
+def simulator(sim):
+    """The CoppeliaSim the bridge is connected to, as it reports itself (decoded as its own
+    pythonLuaSetupAssistant.lua does)."""
+    full = sim.getInt32Param(sim.intparam_program_full_version)
+    return {'version': '%d.%d.%d' % (full // 1000000, full // 10000 % 100, full // 100 % 100),
+            'revision': sim.getInt32Param(sim.intparam_program_revision), 'fullVersion': full}

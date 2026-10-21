@@ -93,6 +93,7 @@ class Bridge:
             'successTest': SUCCESS_TEST,
             'stepLimit': self.step_limit,
             'physics': simconfig.physics_signature(self.sim),
+            'simulator': simconfig.simulator(self.sim),
             'log': self.log_path,
             'condition': self.condition,
         }
