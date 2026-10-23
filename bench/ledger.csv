@@ -1,0 +1,2 @@
+batch,date,protocol,condition,commit,cst,n,m1_median,m1_low,m1_high,censored,m2_jumpstart,m2_time_to_theta,m2_final,m2_plateau,m3_steps,m3_energy,m4_bins_p1,m4_bins_p2,valid
+2026-10-21_0842_C4_ucb-0.1_lp_P1,2026-10-21,P1,C4,b590ea9,3ae65c8,9,727.0,550.0,968.0,0,0.011,,0.011,True,290.5,3.967,3091.0,4407.0,True
