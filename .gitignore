@@ -18,3 +18,7 @@ build/
 
 # Live runs (tools/run_live.py): logs are large and regenerable
 runs/
+
+# IDE build output: VS Code's Java extension compiles to agent/bin/. Untracked files make the tree
+# dirty, and run_live.py --protocol refuses a dirty tree.
+agent/bin/
