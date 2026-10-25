@@ -47,14 +47,14 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
     private final Config cfg;
     private Random rng;
     private final Selector selector;
-    private double spread;
-    private MemoryContainer pool;
+    private double referenceSpread;
+    private MemoryContainer habitPool;
     private Memory goalMO;
     private Memory sensoryMO;
     private Memory driveMO;
     private Memory trackerMO;
     private Memory planMO;
-    private long serial;
+    private long planSerial;
 
     public BehaviorGeneratorCodelet(Config cfg, long seed) {
         super("BehaviorGenerator");
@@ -65,8 +65,8 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
 
     @Override
     public void accessMemoryObjects() {
-        if (pool == null) {
-            pool = (MemoryContainer) in("HabitPoolMC");
+        if (habitPool == null) {
+            habitPool = (MemoryContainer) in("HabitPoolMC");
             goalMO = in("GoalMO");
             sensoryMO = in("SensoryMO");
             driveMO = in("DriveMO");
@@ -77,39 +77,40 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
 
     @Override
     public void proc() {
-        Observation o = Observation.of(sensoryMO);
-        if (o.terminal()) {
+        Observation observation = Observation.of(sensoryMO);
+        if (observation.terminal()) {
             return;
         }
-        TrackerState ts = (TrackerState) trackerMO.getI();
-        boolean running = ts != null && ts.running();
+        TrackerState trackerState = (TrackerState) trackerMO.getI();
+        boolean planRunning = trackerState != null && trackerState.running();
         Goal goal = Goal.of(goalMO);
-        String context = CreditTable.context(goal.name(), Characterization.key(o));
-        double[] levels = Drives.of(driveMO).levels();
+        String creditContext = CreditTable.context(goal.name(), Characterization.key(observation));
+        double[] driveLevels = Drives.of(driveMO).levels();
         List<Idea> habits = new ArrayList<>();
-        List<CreditSnapshot> credit = new ArrayList<>();
-        for (Memory m : pool.getAllMemories()) {
-            Idea h = (Idea) m.getI();
-            habits.add(h);
-            credit.add(HabitIdeas.credit(h));
+        List<CreditSnapshot> habitCredits = new ArrayList<>();
+        for (Memory poolMember : habitPool.getAllMemories()) {
+            Idea habit = (Idea) poolMember.getI();
+            habits.add(habit);
+            habitCredits.add(HabitIdeas.credit(habit));
         }
-        spread = CreditSnapshot.reference(credit, levels);
+        referenceSpread = CreditSnapshot.reference(habitCredits, driveLevels);
         List<Candidate> candidates = new ArrayList<>();
-        Candidate current = null;
+        Candidate runningCandidate = null;
         for (int i = 0; i < habits.size(); i++) {
-            Idea h = habits.get(i);
-            Candidate c = new Candidate(h, score(credit.get(i), context, levels),
-                    credit.get(i).count(context),
-                    credit.get(i).spread(spread, levels, cfg.spreadPriorWeight));
-            if (running && HabitIdeas.id(h).equals(ts.habit())) {
-                current = c;
+            Idea habit = habits.get(i);
+            CreditSnapshot habitCredit = habitCredits.get(i);
+            Candidate candidate = new Candidate(habit, score(habitCredit, creditContext, driveLevels),
+                    habitCredit.count(creditContext),
+                    habitCredit.spread(referenceSpread, driveLevels, cfg.spreadPriorWeight));
+            if (planRunning && HabitIdeas.id(habit).equals(trackerState.habit())) {
+                runningCandidate = candidate;
             }
-            candidates.add(c);
+            candidates.add(candidate);
         }
-        Candidate pick = selector.select(candidates, current, rng);
-        if (pick != null) {
-            planMO.setI(new Plan(++serial, pick.habit(), goal.name(), goal.id(), context,
-                    pick.score()));
+        Candidate chosen = selector.select(candidates, runningCandidate, rng);
+        if (chosen != null) {
+            planMO.setI(new Plan(++planSerial, chosen.habit(), goal.name(), goal.id(), creditContext,
+                    chosen.score()));
         }
     }
 
@@ -125,15 +126,15 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        JsonObject s = new JsonObject();
-        s.addProperty("serial", serial);
-        s.addProperty("rng", Base64.getEncoder().encodeToString(bytes.toByteArray()));
-        return s;
+        JsonObject stateJson = new JsonObject();
+        stateJson.addProperty("serial", planSerial);
+        stateJson.addProperty("rng", Base64.getEncoder().encodeToString(bytes.toByteArray()));
+        return stateJson;
     }
 
-    public void restore(JsonObject s) {
-        serial = s.get("serial").getAsLong();
-        byte[] bytes = Base64.getDecoder().decode(s.get("rng").getAsString());
+    public void restore(JsonObject stateJson) {
+        planSerial = stateJson.get("serial").getAsLong();
+        byte[] bytes = Base64.getDecoder().decode(stateJson.get("rng").getAsString());
         try (ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
             in.setObjectInputFilter(ObjectInputFilter.Config.createFilter("java.util.Random;!*"));
             rng = (Random) in.readObject();
@@ -147,15 +148,16 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
      * records: 0 means no habit has a finished execution, or every habit's results are the same.
      */
     public double spread() {
-        return spread;
+        return referenceSpread;
     }
 
-    double score(CreditSnapshot credit, String context, double[] levels) {
-        double[] c = credit.value(context, cfg.creditRead);
-        double e = 0.0;
-        for (int d = 0; d < Drives.N; d++) {
-            e += levels[d] * c[d];
+    /** E(h), eq. (4.1): each drive's level times the habit's credit for that drive, summed. */
+    double score(CreditSnapshot habitCredit, String creditContext, double[] driveLevels) {
+        double[] creditByDrive = habitCredit.value(creditContext, cfg.creditRead);
+        double score = 0.0;
+        for (int drive = 0; drive < Drives.N; drive++) {
+            score += driveLevels[drive] * creditByDrive[drive];
         }
-        return e;
+        return score;
     }
 }
