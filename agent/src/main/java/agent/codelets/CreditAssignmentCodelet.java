@@ -47,18 +47,18 @@ import java.util.Map;
 public final class CreditAssignmentCodelet extends AgentCodelet {
 
     /** Cycles of per-cycle drive changes kept; a step longer than this is credited partially. */
-    private static final int DELTA_WINDOW = 1024;
+    private static final int DRIVE_CHANGE_WINDOW = 1024;
 
-    private record Trace(long anchor, String context) {
+    private record Trace(long lastEndCycle, String context) {
     }
 
     private final Config cfg;
-    private final CreditTable table = new CreditTable();
-    private final Map<String, Trace> traces = new LinkedHashMap<>();
-    private final Map<Long, double[]> deltas = new LinkedHashMap<>() {
+    private final CreditTable creditTable = new CreditTable();
+    private final Map<String, Trace> eligibilityTraces = new LinkedHashMap<>();
+    private final Map<Long, double[]> driveChangeByCycle = new LinkedHashMap<>() {
         @Override
         protected boolean removeEldestEntry(Map.Entry<Long, double[]> eldest) {
-            return size() > DELTA_WINDOW;
+            return size() > DRIVE_CHANGE_WINDOW;
         }
     };
     private Memory executionMO;
@@ -66,13 +66,13 @@ public final class CreditAssignmentCodelet extends AgentCodelet {
     private Memory sensoryMO;
     private Memory creditMO;
     /** Per context (goal, state bin): the running mean change of each drive per step, any habit. */
-    private final Map<String, double[]> baselines = new HashMap<>();
+    private final Map<String, double[]> contextBaselines = new HashMap<>();
     /** Task levels of the last progressWindow cycles of this stage, this episode. */
-    private final ArrayDeque<Double> recentTask = new ArrayDeque<>();
-    private double[] prev;
-    private double prevYield;
-    private int prevStage;
-    private long readSeq;
+    private final ArrayDeque<Double> recentTaskLevels = new ArrayDeque<>();
+    private double[] previousDriveLevels;
+    private double previousYieldFactor;
+    private int previousTaskStage;
+    private long nextUnreadSeq;
 
     public CreditAssignmentCodelet(Config cfg) {
         super("CreditAssignment");
@@ -80,7 +80,7 @@ public final class CreditAssignmentCodelet extends AgentCodelet {
     }
 
     public CreditTable table() {
-        return table;
+        return creditTable;
     }
 
     /**
@@ -88,24 +88,24 @@ public final class CreditAssignmentCodelet extends AgentCodelet {
      * ExecutionBuffer was read.
      */
     public JsonObject state() {
-        JsonObject b = new JsonObject();
-        for (Map.Entry<String, double[]> e : baselines.entrySet()) {
-            b.add(e.getKey(), Checkpoint.array(e.getValue()));
+        JsonObject baselinesJson = new JsonObject();
+        for (Map.Entry<String, double[]> entry : contextBaselines.entrySet()) {
+            baselinesJson.add(entry.getKey(), Checkpoint.array(entry.getValue()));
         }
-        JsonObject s = new JsonObject();
-        s.add("table", table.state());
-        s.add("baselines", b);
-        s.addProperty("readSeq", readSeq);
-        return s;
+        JsonObject stateJson = new JsonObject();
+        stateJson.add("table", creditTable.state());
+        stateJson.add("baselines", baselinesJson);
+        stateJson.addProperty("readSeq", nextUnreadSeq);
+        return stateJson;
     }
 
-    public void restore(JsonObject s) {
-        table.restore(s.getAsJsonObject("table"));
-        baselines.clear();
-        for (Map.Entry<String, JsonElement> e : s.getAsJsonObject("baselines").entrySet()) {
-            baselines.put(e.getKey(), Checkpoint.doubles(e.getValue()));
+    public void restore(JsonObject stateJson) {
+        creditTable.restore(stateJson.getAsJsonObject("table"));
+        contextBaselines.clear();
+        for (Map.Entry<String, JsonElement> entry : stateJson.getAsJsonObject("baselines").entrySet()) {
+            contextBaselines.put(entry.getKey(), Checkpoint.doubles(entry.getValue()));
         }
-        readSeq = s.get("readSeq").getAsLong();
+        nextUnreadSeq = stateJson.get("readSeq").getAsLong();
     }
 
     @Override
@@ -120,97 +120,102 @@ public final class CreditAssignmentCodelet extends AgentCodelet {
 
     @Override
     public void proc() {
-        Observation o = Observation.of(sensoryMO);
+        Observation observation = Observation.of(sensoryMO);
         Drives drives = Drives.of(driveMO);
-        double[] levels = drives.levels();
-        if (o.episodeStart() || prev == null) {
-            traces.clear();
-            table.closeExecutions();
-            deltas.clear();
-            recentTask.clear();
+        double[] driveLevels = drives.levels();
+        if (observation.episodeStart() || previousDriveLevels == null) {
+            eligibilityTraces.clear();
+            creditTable.closeExecutions();
+            driveChangeByCycle.clear();
+            recentTaskLevels.clear();
         } else {
-            double[] delta = new double[Drives.N];
-            for (int d = 0; d < Drives.N; d++) {
-                delta[d] = prev[d] - levels[d];
+            double[] driveChange = new double[Drives.N];
+            for (int drive = 0; drive < Drives.N; drive++) {
+                driveChange[drive] = previousDriveLevels[drive] - driveLevels[drive];
             }
             if (drives.effortRestarted()) {
-                delta[Drives.EFFORT] = 0.0;
+                driveChange[Drives.EFFORT] = 0.0;
             }
-            double y = drives.curiosityYield();
-            if (y != prevYield) {
+            double yieldFactor = drives.curiosityYield();
+            if (yieldFactor != previousYieldFactor) {
                 // gain * y * (boredom before - boredom now): the yield's own drift is no habit's doing.
-                delta[Drives.CURIOSITY] = prevYield > 0.0
-                        ? prev[Drives.CURIOSITY] * (y / prevYield) - levels[Drives.CURIOSITY] : 0.0;
+                driveChange[Drives.CURIOSITY] = previousYieldFactor > 0.0
+                        ? previousDriveLevels[Drives.CURIOSITY] * (yieldFactor / previousYieldFactor)
+                            - driveLevels[Drives.CURIOSITY]
+                        : 0.0;
             }
-            if (drives.taskStage() != prevStage) {
-                delta[Drives.TASK] = 0.0;
-                recentTask.clear();
+            if (drives.taskStage() != previousTaskStage) {
+                driveChange[Drives.TASK] = 0.0;
+                recentTaskLevels.clear();
             } else if (cfg.progressWindow > 0) {
-                boolean retreat = levels[Drives.TASK] > prev[Drives.TASK];
-                delta[Drives.TASK] = retreat && cfg.progressChargesRetreat
-                        ? prev[Drives.TASK] - levels[Drives.TASK]
-                        : Math.max(0.0, Collections.min(recentTask) - levels[Drives.TASK]);
+                boolean taskRetreated = driveLevels[Drives.TASK] > previousDriveLevels[Drives.TASK];
+                driveChange[Drives.TASK] = taskRetreated && cfg.progressChargesRetreat
+                        ? previousDriveLevels[Drives.TASK] - driveLevels[Drives.TASK]
+                        : Math.max(0.0, Collections.min(recentTaskLevels) - driveLevels[Drives.TASK]);
             }
-            deltas.put(o.cycle(), delta);
+            driveChangeByCycle.put(observation.cycle(), driveChange);
         }
         if (cfg.progressWindow > 0) {
-            recentTask.addLast(levels[Drives.TASK]);
-            if (recentTask.size() > cfg.progressWindow) {
-                recentTask.removeFirst();
+            recentTaskLevels.addLast(driveLevels[Drives.TASK]);
+            if (recentTaskLevels.size() > cfg.progressWindow) {
+                recentTaskLevels.removeFirst();
             }
         }
-        prev = levels;
-        prevYield = drives.curiosityYield();
-        prevStage = drives.taskStage();
+        previousDriveLevels = driveLevels;
+        previousYieldFactor = drives.curiosityYield();
+        previousTaskStage = drives.taskStage();
 
-        ExecutionBuffer buffer = (ExecutionBuffer) executionMO.getI();
-        for (ExecutionBuffer.Entry e : buffer.since(readSeq)) {
-            if (e instanceof ExecutionBuffer.Step s && cfg.creditUpdates) {
-                credit(s);
+        ExecutionBuffer executionBuffer = (ExecutionBuffer) executionMO.getI();
+        for (ExecutionBuffer.Entry entry : executionBuffer.since(nextUnreadSeq)) {
+            if (entry instanceof ExecutionBuffer.Step step && cfg.creditUpdates) {
+                credit(step);
             }
         }
-        readSeq = buffer.nextSeq();
-        if (o.terminal()) {
-            traces.clear();
-            table.closeExecutions();
+        nextUnreadSeq = executionBuffer.nextSeq();
+        if (observation.terminal()) {
+            eligibilityTraces.clear();
+            creditTable.closeExecutions();
         }
-        creditMO.setI(new CreditUpdate(table, table.drainDirty(), o.cycle()));
+        creditMO.setI(new CreditUpdate(creditTable, creditTable.drainDirty(), observation.cycle()));
     }
 
-    private void credit(ExecutionBuffer.Step s) {
-        double[] change = new double[Drives.N];
-        int cycles = 0;
-        for (long c = s.startCycle() + 1; c <= s.endCycle(); c++) {
-            double[] d = deltas.get(c);
-            if (d != null) {
-                cycles++;
-                for (int i = 0; i < Drives.N; i++) {
-                    change[i] += d[i];
+    private void credit(ExecutionBuffer.Step step) {
+        double[] stepChange = new double[Drives.N];
+        int cyclesCounted = 0;
+        for (long cycle = step.startCycle() + 1; cycle <= step.endCycle(); cycle++) {
+            double[] cycleChange = driveChangeByCycle.get(cycle);
+            if (cycleChange != null) {
+                cyclesCounted++;
+                for (int drive = 0; drive < Drives.N; drive++) {
+                    stepChange[drive] += cycleChange[drive];
                 }
             }
         }
-        if (cfg.baselineRate > 0 && cycles > 0) {
+        if (cfg.baselineRate > 0 && cyclesCounted > 0) {
             // What a step in this context changes whatever runs, before this step joins the average.
             // Per step, not per cycle: a drive's change does not grow with the step's length.
-            double[] b = baselines.computeIfAbsent(s.context(), k -> new double[Drives.N]);
-            for (int i = 0; i < Drives.N; i++) {
-                double x = change[i];
-                change[i] = x - b[i];
-                b[i] += cfg.baselineRate * (x - b[i]);
+            double[] contextBaseline = contextBaselines.computeIfAbsent(step.context(),
+                    k -> new double[Drives.N]);
+            for (int drive = 0; drive < Drives.N; drive++) {
+                double rawChange = stepChange[drive];
+                stepChange[drive] = rawChange - contextBaseline[drive];
+                contextBaseline[drive] += cfg.baselineRate * (rawChange - contextBaseline[drive]);
             }
         }
-        traces.remove(s.habit());
-        traces.put(s.habit(), new Trace(s.endCycle(), s.context()));
-        Iterator<Map.Entry<String, Trace>> it = traces.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<String, Trace> t = it.next();
-            double w = Math.pow(cfg.lambda, s.endCycle() - t.getValue().anchor());
-            if (w < cfg.traceFloor) {
-                it.remove();
+        eligibilityTraces.remove(step.habit());
+        eligibilityTraces.put(step.habit(), new Trace(step.endCycle(), step.context()));
+        Iterator<Map.Entry<String, Trace>> traceIterator = eligibilityTraces.entrySet().iterator();
+        while (traceIterator.hasNext()) {
+            Map.Entry<String, Trace> traceEntry = traceIterator.next();
+            String tracedHabit = traceEntry.getKey();
+            Trace trace = traceEntry.getValue();
+            double traceWeight = Math.pow(cfg.lambda, step.endCycle() - trace.lastEndCycle());
+            if (traceWeight < cfg.traceFloor) {
+                traceIterator.remove();
                 continue;
             }
-            boolean execution = t.getKey().equals(s.habit()) && s.stepIndex() == 0;
-            table.add(t.getKey(), t.getValue().context(), change, w, execution);
+            boolean countsAsExecution = tracedHabit.equals(step.habit()) && step.stepIndex() == 0;
+            creditTable.add(tracedHabit, trace.context(), stepChange, traceWeight, countsAsExecution);
         }
     }
 }
