@@ -50,15 +50,15 @@ public final class PlanTrackerCodelet extends AgentCodelet {
     private Memory trackerMO;
     private Memory executionMO;
 
-    private long trackedCycle = Long.MIN_VALUE;
+    private long lastTrackedCycle = Long.MIN_VALUE;
     private Plan plan;                  // in execution, or null
-    private List<List<Command>> steps;
+    private List<List<Command>> planSteps;
     private int stepIndex;
-    private StepCompletion completion;
-    private long stepStart;
-    private long loadedSerial = -1;
-    private Goal tracked;
-    private long lastMetGoal = -1;
+    private StepCompletion stepCompletion;
+    private long stepStartCycle;
+    private long loadedPlanSerial = -1;
+    private Goal trackedGoal;
+    private long lastMetGoalId = -1;
 
     public PlanTrackerCodelet(Config cfg) {
         super("PlanTracker");
@@ -79,93 +79,95 @@ public final class PlanTrackerCodelet extends AgentCodelet {
 
     @Override
     public void proc() {
-        Observation o = Observation.of(sensoryMO);
-        ExecutionBuffer buffer = (ExecutionBuffer) executionMO.getI();
-        if (o.cycle() != trackedCycle) {
-            trackedCycle = o.cycle();
-            track(o, buffer);
+        Observation observation = Observation.of(sensoryMO);
+        ExecutionBuffer executionBuffer = (ExecutionBuffer) executionMO.getI();
+        if (observation.cycle() != lastTrackedCycle) {
+            lastTrackedCycle = observation.cycle();
+            track(observation, executionBuffer);
         } else {
-            load(o, buffer);
+            load(observation, executionBuffer);
         }
-        executionMO.setI(buffer);
-        trackerMO.setI(state(o));
+        executionMO.setI(executionBuffer);
+        trackerMO.setI(state(observation));
     }
 
-    private void track(Observation o, ExecutionBuffer buffer) {
-        if (o.episodeStart()) {
+    private void track(Observation observation, ExecutionBuffer executionBuffer) {
+        if (observation.episodeStart()) {
             plan = null;
-            tracked = null;
+            trackedGoal = null;
         }
         if (plan != null) {
-            String outcome = completion.update(o);
-            if (outcome != null) {
-                record(buffer, o, outcome);
+            String stepOutcome = stepCompletion.update(observation);
+            if (stepOutcome != null) {
+                record(executionBuffer, observation, stepOutcome);
                 stepIndex++;
-                if (stepIndex >= steps.size()) {
+                if (stepIndex >= planSteps.size()) {
                     plan = null;
                 } else {
-                    completion = new StepCompletion(steps.get(stepIndex), o);
-                    stepStart = o.cycle();
+                    stepCompletion = new StepCompletion(planSteps.get(stepIndex), observation);
+                    stepStartCycle = observation.cycle();
                 }
             }
         }
 
-        if (tracked != null && tracked.met(o, Drives.of(driveMO), cfg.curiosityGoalMet,
+        if (trackedGoal != null && trackedGoal.met(observation, Drives.of(driveMO), cfg.curiosityGoalMet,
                 cfg.safetyGoalMet)) {
             if (plan != null) {
-                record(buffer, o, CLOSED);
+                record(executionBuffer, observation, CLOSED);
                 plan = null;
             }
-            buffer.addGoalMark(tracked.name(), tracked.id(), tracked.source(), o.cycle(), o.episode());
-            lastMetGoal = tracked.id();
-            tracked = null;
+            executionBuffer.addGoalMark(trackedGoal.name(), trackedGoal.id(), trackedGoal.source(),
+                    observation.cycle(), observation.episode());
+            lastMetGoalId = trackedGoal.id();
+            trackedGoal = null;
         }
-        if (o.terminal() && plan != null) {
-            record(buffer, o, INTERRUPTED);
+        if (observation.terminal() && plan != null) {
+            record(executionBuffer, observation, INTERRUPTED);
             plan = null;
         }
 
-        Goal goal = Goal.of(goalMO);
-        if (goal != null && goal.id() != lastMetGoal && (tracked == null || goal.id() != tracked.id())) {
-            tracked = goal;
+        Goal currentGoal = Goal.of(goalMO);
+        if (currentGoal != null && currentGoal.id() != lastMetGoalId
+                && (trackedGoal == null || currentGoal.id() != trackedGoal.id())) {
+            trackedGoal = currentGoal;
         }
     }
 
-    private void load(Observation o, ExecutionBuffer buffer) {
-        Plan p = (Plan) planMO.getI();
-        if (o.terminal() || p == null || p.serial() == loadedSerial) {
+    private void load(Observation observation, ExecutionBuffer executionBuffer) {
+        Plan decidedPlan = (Plan) planMO.getI();
+        if (observation.terminal() || decidedPlan == null || decidedPlan.serial() == loadedPlanSerial) {
             return;
         }
         if (plan != null) {
-            record(buffer, o, PREEMPTED);
+            record(executionBuffer, observation, PREEMPTED);
         }
-        loadedSerial = p.serial();
-        steps = HabitIdeas.steps(p.habit());
-        if (steps.isEmpty()) {
+        loadedPlanSerial = decidedPlan.serial();
+        planSteps = HabitIdeas.steps(decidedPlan.habit());
+        if (planSteps.isEmpty()) {
             plan = null;
             return;
         }
-        plan = p;
+        plan = decidedPlan;
         stepIndex = 0;
-        completion = new StepCompletion(steps.get(0), o);
-        stepStart = o.cycle();
+        stepCompletion = new StepCompletion(planSteps.get(0), observation);
+        stepStartCycle = observation.cycle();
     }
 
     /** Append the current step. A step cut on the cycle it started never ran, so it is not kept. */
-    private void record(ExecutionBuffer buffer, Observation o, String outcome) {
-        if (o.cycle() == stepStart) {
+    private void record(ExecutionBuffer executionBuffer, Observation observation, String stepOutcome) {
+        if (observation.cycle() == stepStartCycle) {
             return;
         }
-        buffer.addStep(HabitIdeas.id(plan.habit()), plan.serial(), stepIndex, steps.size(),
-                completion.records(), stepStart, o.cycle(), outcome, plan.goal(), plan.goalId(),
-                plan.context(), o.episode());
+        executionBuffer.addStep(HabitIdeas.id(plan.habit()), plan.serial(), stepIndex, planSteps.size(),
+                stepCompletion.records(), stepStartCycle, observation.cycle(), stepOutcome, plan.goal(),
+                plan.goalId(), plan.context(), observation.episode());
     }
 
-    private TrackerState state(Observation o) {
+    private TrackerState state(Observation observation) {
         if (plan == null) {
-            return TrackerState.idle(o.cycle());
+            return TrackerState.idle(observation.cycle());
         }
         return new TrackerState(true, HabitIdeas.id(plan.habit()), plan.serial(), stepIndex,
-                steps.size(), completion.commands(o), o.cycle());
+                planSteps.size(), stepCompletion.commands(observation), observation.cycle());
     }
 }
