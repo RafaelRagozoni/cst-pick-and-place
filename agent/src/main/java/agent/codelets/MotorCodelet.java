@@ -43,8 +43,8 @@ public final class MotorCodelet extends AgentCodelet {
         if (Observation.of(sensoryMO).terminal()) {
             return;
         }
-        TrackerState ts = (TrackerState) trackerMO.getI();
-        List<Command> commands = ts == null ? List.of() : ts.commands();
-        link.step(HabitIdeas.toJson(commands), telemetry == null ? null : telemetry.annotation());
+        TrackerState trackerState = (TrackerState) trackerMO.getI();
+        List<Command> stepCommands = trackerState == null ? List.of() : trackerState.commands();
+        link.step(HabitIdeas.toJson(stepCommands), telemetry == null ? null : telemetry.annotation());
     }
 }
