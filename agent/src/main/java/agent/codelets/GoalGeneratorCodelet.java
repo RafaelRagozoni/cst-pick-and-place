@@ -32,11 +32,11 @@ public final class GoalGeneratorCodelet extends AgentCodelet {
     private Memory sensoryMO;
     private Memory driveMO;
     private Memory goalMO;
-    private int stage;
-    private String source = Goal.TASK;
-    private String name;
-    private long id;
-    private long setAtCycle;
+    private int taskStage;
+    private String goalSource = Goal.TASK;
+    private String goalName;
+    private long goalId;
+    private long goalSetAtCycle;
 
     public GoalGeneratorCodelet(Config cfg) {
         super("GoalGenerator");
@@ -46,12 +46,12 @@ public final class GoalGeneratorCodelet extends AgentCodelet {
     /** What outlives an episode, for a checkpoint: the goal numbering. The rest restarts per episode. */
     public JsonObject state() {
         JsonObject s = new JsonObject();
-        s.addProperty("id", id);
+        s.addProperty("id", goalId);
         return s;
     }
 
     public void restore(JsonObject s) {
-        id = s.get("id").getAsLong();
+        goalId = s.get("id").getAsLong();
     }
 
     @Override
@@ -65,65 +65,67 @@ public final class GoalGeneratorCodelet extends AgentCodelet {
 
     @Override
     public void proc() {
-        Observation o = Observation.of(sensoryMO);
+        Observation observation = Observation.of(sensoryMO);
         Drives drives = Drives.of(driveMO);
-        boolean fresh = o.episodeStart() || name == null;
-        if (o.episodeStart()) {
-            stage = 0;
-            source = Goal.TASK;
+        boolean forceNewGoal = observation.episodeStart() || goalName == null;
+        if (observation.episodeStart()) {
+            taskStage = 0;
+            goalSource = Goal.TASK;
         }
 
-        while (stage < TaskStages.DONE && TaskStages.termination(stage, o)
-                && (stage + 1 == TaskStages.DONE || TaskStages.precondition(stage + 1, o))) {
-            stage++;
+        while (taskStage < TaskStages.DONE && TaskStages.termination(taskStage, observation)
+                && (taskStage + 1 == TaskStages.DONE
+                    || TaskStages.precondition(taskStage + 1, observation))) {
+            taskStage++;
         }
-        if (stage < TaskStages.DONE && !TaskStages.precondition(stage, o)) {
-            stage = TaskStages.infer(o);
+        if (taskStage < TaskStages.DONE && !TaskStages.precondition(taskStage, observation)) {
+            taskStage = TaskStages.infer(observation);
         }
 
-        String next = chooseSource(drives);
-        String nextName = Goal.TASK.equals(next) ? TaskStages.name(stage)
-                : Goal.CURIOSITY.equals(next) ? Goal.EXPLORE : Goal.RECOVER;
-        if (fresh || !next.equals(source) || !nextName.equals(name)) {
-            id++;
-            setAtCycle = o.cycle();
+        String nextGoalSource = chooseGoalSource(drives);
+        String nextGoalName = Goal.TASK.equals(nextGoalSource) ? TaskStages.name(taskStage)
+                : Goal.CURIOSITY.equals(nextGoalSource) ? Goal.EXPLORE : Goal.RECOVER;
+        if (forceNewGoal || !nextGoalSource.equals(goalSource) || !nextGoalName.equals(goalName)) {
+            goalId++;
+            goalSetAtCycle = observation.cycle();
         }
-        source = next;
-        name = nextName;
-        double[] target = Goal.TASK.equals(source) ? TaskStages.target(stage, o) : new double[0];
-        goalMO.setI(Goal.toIdea(id, source, name, stage, setAtCycle, target));
+        goalSource = nextGoalSource;
+        goalName = nextGoalName;
+        double[] taskTarget = Goal.TASK.equals(goalSource)
+                ? TaskStages.target(taskStage, observation) : new double[0];
+        goalMO.setI(Goal.toIdea(goalId, goalSource, goalName, taskStage, goalSetAtCycle, taskTarget));
     }
 
-    private String chooseSource(Drives d) {
-        boolean safetyOk = d.raw(Drives.SAFETY) >= cfg.safetyGoalMet;
-        boolean taskOk = stage < TaskStages.DONE;
-        boolean curiosityOk = d.boredom() >= cfg.curiosityGoalMet;
-        if (safetyOk && d.level(Drives.SAFETY) >= cfg.safetyOverride) {
+    private String chooseGoalSource(Drives drives) {
+        boolean safetyIsCandidate = drives.raw(Drives.SAFETY) >= cfg.safetyGoalMet;
+        boolean taskIsCandidate = taskStage < TaskStages.DONE;
+        boolean curiosityIsCandidate = drives.boredom() >= cfg.curiosityGoalMet;
+        if (safetyIsCandidate && drives.level(Drives.SAFETY) >= cfg.safetyOverride) {
             return Goal.SAFETY;
         }
-        // Candidates in tie-breaking order: safety, task, curiosity.
-        String best = null;
-        double bestLevel = Double.NEGATIVE_INFINITY;
-        String[] names = {Goal.SAFETY, Goal.TASK, Goal.CURIOSITY};
-        boolean[] ok = {safetyOk, taskOk, curiosityOk};
-        int[] drive = {Drives.SAFETY, Drives.TASK, Drives.CURIOSITY};
-        double current = Double.NEGATIVE_INFINITY;
-        for (int i = 0; i < names.length; i++) {
-            if (!ok[i]) {
+        // Sources in tie-breaking order: safety, task, curiosity.
+        String strongestSource = null;
+        double strongestLevel = Double.NEGATIVE_INFINITY;
+        String[] sources = {Goal.SAFETY, Goal.TASK, Goal.CURIOSITY};
+        boolean[] sourceIsCandidate = {safetyIsCandidate, taskIsCandidate, curiosityIsCandidate};
+        int[] sourceDrives = {Drives.SAFETY, Drives.TASK, Drives.CURIOSITY};
+        double currentSourceLevel = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i < sources.length; i++) {
+            if (!sourceIsCandidate[i]) {
                 continue;
             }
-            double level = d.level(drive[i]);
-            if (level > bestLevel) {
-                bestLevel = level;
-                best = names[i];
+            double sourceLevel = drives.level(sourceDrives[i]);
+            if (sourceLevel > strongestLevel) {
+                strongestLevel = sourceLevel;
+                strongestSource = sources[i];
             }
-            if (names[i].equals(source)) {
-                current = level;
+            if (sources[i].equals(goalSource)) {
+                currentSourceLevel = sourceLevel;
             }
         }
-        if (best == null) {
+        if (strongestSource == null) {
             return Goal.TASK;                   // nothing pressing: stay on the task, done or not
         }
-        return current + cfg.goalHysteresis >= bestLevel ? source : best;
+        return currentSourceLevel + cfg.goalHysteresis >= strongestLevel ? goalSource : strongestSource;
     }
 }
