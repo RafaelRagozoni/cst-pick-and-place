@@ -33,9 +33,9 @@ public final class HabitLearnerCodelet extends AgentCodelet {
 
     private final Config cfg;
     private final Mind mind;
-    private final Map<String, Idea> byId = new LinkedHashMap<>();
+    private final Map<String, Idea> habitsById = new LinkedHashMap<>();
     private Memory creditMO;
-    private MemoryContainer pool;
+    private MemoryContainer habitPool;
 
     public HabitLearnerCodelet(Config cfg, Mind mind) {
         super("HabitLearner");
@@ -47,49 +47,49 @@ public final class HabitLearnerCodelet extends AgentCodelet {
     public void accessMemoryObjects() {
         if (creditMO == null) {
             creditMO = in("CreditMO");
-            pool = (MemoryContainer) out("HabitPoolMC");
+            habitPool = (MemoryContainer) out("HabitPoolMC");
         }
     }
 
     /** Put the primary repertoire into the pool, before the first cycle. */
     public void seed(List<Idea> primitives) {
         accessMemoryObjects();
-        for (Idea h : primitives) {
-            add(h);
+        for (Idea primitive : primitives) {
+            add(primitive);
         }
     }
 
     private void add(Idea habit) {
-        String id = HabitIdeas.id(habit);
-        if (byId.containsKey(id)) {
-            throw new IllegalArgumentException("duplicate habit id " + id);
+        String habitId = HabitIdeas.id(habit);
+        if (habitsById.containsKey(habitId)) {
+            throw new IllegalArgumentException("duplicate habit id " + habitId);
         }
-        MemoryObject member = mind.createMemoryObject(id, habit);
-        pool.add(member);
-        byId.put(id, habit);
+        MemoryObject poolMember = mind.createMemoryObject(habitId, habit);
+        habitPool.add(poolMember);
+        habitsById.put(habitId, habit);
     }
 
     public Map<String, Idea> habits() {
-        return Collections.unmodifiableMap(byId);
+        return Collections.unmodifiableMap(habitsById);
     }
 
     /** Copy every habit's credit from the table: after a checkpoint is restored into it. */
-    public void refreshCredit(CreditTable table) {
-        for (Map.Entry<String, Idea> e : byId.entrySet()) {
-            HabitIdeas.setCredit(e.getValue(), table.snapshot(e.getKey()));
+    public void refreshCredit(CreditTable creditTable) {
+        for (Map.Entry<String, Idea> habitEntry : habitsById.entrySet()) {
+            HabitIdeas.setCredit(habitEntry.getValue(), creditTable.snapshot(habitEntry.getKey()));
         }
     }
 
     @Override
     public void proc() {
-        Object i = creditMO.getI();
-        if (!(i instanceof CreditUpdate u)) {
+        Object creditContent = creditMO.getI();
+        if (!(creditContent instanceof CreditUpdate creditUpdate)) {
             return;
         }
-        for (String h : u.changed()) {
-            Idea habit = byId.get(h);
+        for (String habitId : creditUpdate.changed()) {
+            Idea habit = habitsById.get(habitId);
             if (habit != null) {
-                HabitIdeas.setCredit(habit, u.table().snapshot(h));
+                HabitIdeas.setCredit(habit, creditUpdate.table().snapshot(habitId));
             }
         }
     }
