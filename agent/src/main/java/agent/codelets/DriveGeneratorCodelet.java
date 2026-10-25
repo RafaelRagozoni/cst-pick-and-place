@@ -46,7 +46,7 @@ public final class DriveGeneratorCodelet extends AgentCodelet {
     private Memory goalMO;
     private Memory trackerMO;
     private Memory driveMO;
-    private long goalSeen = Long.MIN_VALUE;
+    private long lastGoalId = Long.MIN_VALUE;
     private long cyclesOnGoal;
 
     public DriveGeneratorCodelet(Config cfg) {
@@ -99,49 +99,54 @@ public final class DriveGeneratorCodelet extends AgentCodelet {
 
     @Override
     public void proc() {
-        Observation o = Observation.of(sensoryMO);
-        double[] raw = new double[Drives.N];
+        Observation observation = Observation.of(sensoryMO);
+        double[] rawDriveLevels = new double[Drives.N];
 
-        String bin = Characterization.key(o);
-        double[] b = Characterization.vector(o, cfg.salience);
-        double novelty = archive.visit(b, bin, o.cycle());
+        String binKey = Characterization.key(observation);
+        double[] characterizationVector = Characterization.vector(observation, cfg.salience);   // b, cap4 4.3.1
+        double novelty = archive.visit(characterizationVector, binKey, observation.cycle());
         double boredom = 1.0 / (1.0 + novelty / cfg.noveltyScale);
-        double y = yield.observe(o, bin, b, habitThatRan(o));
-        raw[Drives.CURIOSITY] = boredom * y;
+        double yieldFactor = yield.observe(observation, binKey, characterizationVector,   // y, CUR-01
+                habitThatRan(observation));
+        rawDriveLevels[Drives.CURIOSITY] = boredom * yieldFactor;
 
-        int stage = TaskStages.infer(o);
-        raw[Drives.TASK] = Math.min(1.0, TaskStages.targetDistance(stage, o) / cfg.taskDistanceScale);
+        int stage = TaskStages.infer(observation);
+        rawDriveLevels[Drives.TASK] = Math.min(1.0,
+                TaskStages.targetDistance(stage, observation) / cfg.taskDistanceScale);
 
-        double safety = (o.envCollision() || o.selfCollision()) ? 1.0 : 0.0;
-        for (double m : o.jointLimitMargin()) {
-            safety = Math.max(safety, Math.min(1.0, Math.max(0.0, 1.0 - m / cfg.safetyMargin)));
+        double safety = (observation.envCollision() || observation.selfCollision()) ? 1.0 : 0.0;
+        for (double jointMargin : observation.jointLimitMargin()) {
+            double limitProximity = 1.0 - jointMargin / cfg.safetyMargin;   // 1 at the limit, 0 at safetyMargin
+            safety = Math.max(safety, Math.min(1.0, Math.max(0.0, limitProximity)));
         }
-        raw[Drives.SAFETY] = safety;
+        rawDriveLevels[Drives.SAFETY] = safety;
 
         Goal goal = Goal.of(goalMO);
         long goalId = goal == null ? -1 : goal.id();
-        boolean restarted = o.episodeStart() || goalId != goalSeen;
-        if (restarted) {
+        boolean effortRestarted = observation.episodeStart() || goalId != lastGoalId;
+        if (effortRestarted) {
             cyclesOnGoal = 0;
-            goalSeen = goalId;
+            lastGoalId = goalId;
         } else {
             cyclesOnGoal++;
         }
-        raw[Drives.EFFORT] = cyclesOnGoal / cfg.effortScale;
+        rawDriveLevels[Drives.EFFORT] = cyclesOnGoal / cfg.effortScale;
 
-        double[] gained = new double[Drives.N];
-        for (int d = 0; d < Drives.N; d++) {
-            gained[d] = gains[d] * raw[d];
+        double[] gainedDriveLevels = new double[Drives.N];
+        for (int drive = 0; drive < Drives.N; drive++) {
+            gainedDriveLevels[drive] = gains[drive] * rawDriveLevels[drive];
         }
-        driveMO.setI(Drives.toIdea(o.cycle(), gained, raw, stage, restarted, novelty, boredom, y));
+        driveMO.setI(Drives.toIdea(observation.cycle(), gainedDriveLevels, rawDriveLevels, stage,
+                effortRestarted, novelty, boredom, yieldFactor));
     }
 
-    /** The habit in execution last cycle, whose commands led to o; null if none ran. */
-    private String habitThatRan(Observation o) {
-        Object t = trackerMO.getI();
-        if (!(t instanceof TrackerState ts) || !ts.running() || ts.cycle() != o.cycle() - 1) {
+    /** The habit in execution last cycle, whose commands led to the observation; null if none ran. */
+    private String habitThatRan(Observation observation) {
+        Object trackerContent = trackerMO.getI();
+        if (!(trackerContent instanceof TrackerState trackerState) || !trackerState.running()
+                || trackerState.cycle() != observation.cycle() - 1) {
             return null;
         }
-        return ts.habit();
+        return trackerState.habit();
     }
 }
