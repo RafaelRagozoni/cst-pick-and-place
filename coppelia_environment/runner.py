@@ -5,53 +5,43 @@ callable `policy(obs, rng) -> [record, ...]`. The CST agent will be one; `Random
 and is not a placeholder -- uniform-random selection over the primitives *is* condition C6, the
 random baseline every motivated condition must beat.
 
-Log format: one JSON object per line.
-
-    {episode, step, t, seed, condition, obs, action, habit_id, goal_step, goal_fired,
-     success, done, rewards}
-
-The observation logged in a record is the one the agent saw **before** acting, and the action is
-what it did about it. The next record's `obs` is therefore the resulting state, so `(s, a, s')`
-triples read off unambiguously -- except across an episode boundary, which is why every episode ends
-with a terminal record carrying `action: null` and `done: true`. Merging observation and outcome
-into one record is what makes those triples ambiguous, so it is deliberately not done.
-
-`rewards` is left empty here. Intrinsic rewards are computed by CST codelets (WP2), and the field
-exists so the schema does not change when they arrive.
-
-One logger, three consumers: the ablation metrics (metrics.py), credit-assignment debugging, and
-the behaviour-cloning dataset of nn_slots_spec.md 4.3.
-
-Logs are gzipped when the path ends in `.gz`, which is the default and strongly recommended: a full
-observation is ~1.5 kB of the ~1.8 kB record, and the projected ablation grid (1e6 steps x 35 runs)
-comes to ~63 GB uncompressed. The JSON is highly repetitive, so gzip costs little CPU and takes a
-large bite out of that.
+The log it writes is defined in translog.py, which bridge.py writes through as well.
 """
-import gzip
-import json
-import math
 import os
 import time
 
 import numpy as np
 
-from actions import Actuator, primitive_repertoire, record_id
+from actions import Actuator, StepCompletion, joint_positions, primitive_repertoire
 from episode import EpisodeReset
-from goals import GoalTracker, succeeded
+from goals import GoalTracker
+from translog import EpisodeLog, open_log
 
 DEFAULT_STEP_LIMIT = 500     # DEC-04: provisional, to be replaced by a pilot-derived value
 
 
 class RandomPolicy:
-    """Uniform-random over the primitive repertoire: condition C6."""
+    """Uniform-random over the primitive repertoire: condition C6.
+
+    Like the agent, it runs the chosen primitive until its step completes (actions.StepCompletion)
+    and only then picks again. Picking afresh every tick would give C6 a finer action grain than
+    the agent has, and the C4-vs-C6 contrast is meant to isolate motivated *selection* only.
+    """
 
     name = 'random'
 
     def __init__(self):
         self.repertoire = primitive_repertoire()
+        self.current = None
+
+    def reset(self):
+        self.current = None
 
     def __call__(self, obs, rng):
-        return self.repertoire[int(rng.integers(len(self.repertoire)))]
+        if self.current is None or self.current.update(obs) is not None:
+            habit = self.repertoire[int(rng.integers(len(self.repertoire)))]
+            self.current = StepCompletion(habit, obs)
+        return self.current.commands(obs)
 
 
 class Runner:
@@ -65,57 +55,28 @@ class Runner:
 
     def run_episode(self, policy, seed, index, sink, condition):
         info = self.reset.reset(seed, index)   # establishes velocity control before settling
+        if hasattr(policy, 'reset'):
+            policy.reset()
         tracker = GoalTracker()
         rng = np.random.default_rng(np.random.SeedSequence([int(seed), int(index), 0xA]))
 
         obs = self.obs.read()
-        energy = 0.0
-        prev_q = [j['pos'] for j in obs['innerSense']['joints']]
+        log = EpisodeLog(sink, seed, index, condition, obs, info['cube'])
         success = False
 
         for k in range(self.step_limit):
             records = policy(obs, rng)
-            self.actuator.apply(records)
+            self.actuator.apply(records, joint_positions(obs))
             self.sim.step()
-            nxt = self.obs.read()
-
-            q = [j['pos'] for j in nxt['innerSense']['joints']]
-            energy += sum(abs(a - b) for a, b in zip(q, prev_q))   # E_joint, cap4 metric 3
-            prev_q = q
-
-            fired = tracker.update(nxt)
-            success = succeeded(nxt)
-            done = success or k == self.step_limit - 1
-
-            sink.write(json.dumps({
-                'episode': index, 'step': k, 't': obs['t'], 'seed': seed,
-                'condition': condition, 'obs': obs, 'action': records,
-                'habit_id': [record_id(r) for r in records],
-                'goal_step': tracker.current, 'goal_fired': fired,
-                'success': success, 'done': False, 'rewards': {},
-            }) + '\n')
-            obs = nxt
-            if done:
+            obs = self.obs.read()
+            fired = tracker.update(obs)
+            success = tracker.success
+            log.step(records, obs, tracker.current, fired, success)
+            if success:
                 break
 
-        # Terminal record: the final state, no action. Keeps (s, a, s') unambiguous at the boundary.
-        sink.write(json.dumps({
-            'episode': index, 'step': k + 1, 't': obs['t'], 'seed': seed,
-            'condition': condition, 'obs': obs, 'action': None, 'habit_id': None,
-            'goal_step': tracker.current, 'goal_fired': None,
-            'success': success, 'done': True, 'rewards': {},
-            'episode_summary': {
-                'steps': k + 1, 'success': success, 'jointEnergy': energy,
-                'goalsReached': [t[0] for t in tracker.transitions],
-                'cube_start': info['cube'],
-            },
-        }) + '\n')
-        return {'success': success, 'steps': k + 1, 'energy': energy}
-
-
-def open_log(path, mode='wt'):
-    """Transparently gzip when the path ends in .gz. Shared by the runner and metrics.load()."""
-    return gzip.open(path, mode) if str(path).endswith('.gz') else open(path, mode.replace('t', ''))
+        s = log.close(tracker.current, success, [t[0] for t in tracker.transitions])
+        return {'success': success, 'steps': s['steps'], 'energy': s['jointEnergy']}
 
 
 def run(sim, grasp_rule, observer, policy, seed, episodes, out_path,

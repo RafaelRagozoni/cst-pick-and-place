@@ -3,7 +3,8 @@
 Everything that has succeeded so far was driven by a scripted *Cartesian* expert commanding tool
 poses through inverse kinematics. The agent gets none of that. It gets the primary repertoire of
 cap4 4.4.1 -- joint rotations in either direction for each of the six joints, plus gripper
-open/close, 14 single-record habits -- one record per simulation step.
+open/close, 14 single-record habits -- each run until its step completes (actions.StepCompletion),
+as the agent will run them.
 
 This pilot answers, before any of the habit machinery is built:
 
@@ -51,12 +52,12 @@ import time
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 
 import simconfig
-from actions import Actuator, GRIP_FORCE_N, JOINT_SPEED, grab, move, primitive_repertoire, record_id
+from actions import Actuator, StepCompletion, grab, joint_positions, primitive_repertoire, record_id
 from episode import EpisodeReset
-from goals import GoalTracker, succeeded
+from goals import GoalTracker
 from grasp_rule import GraspRule
 from observations import TABLE_TOP_Z, Observer
-from runner import open_log
+from translog import open_log
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCENE = os.path.join(HERE, 'pick_and_place.ttt')
@@ -166,7 +167,6 @@ class Pilot:
         self.tracker = GoalTracker()
         self.repertoire = primitive_repertoire()
         self.moves = [h for h in self.repertoire if h[0]['action'] == 'MOVE']
-        self.delta = JOINT_SPEED * sim.getSimulationTimeStep()      # rad applied in one step
         self.rng = random.Random(0)
         self.sink = open_log(log_path)
         self.steps = 0
@@ -187,11 +187,19 @@ class Pilot:
     def _q(self, o):
         return [j['pos'] for j in o['innerSense']['joints']]
 
+    def run_primitive(self, habit, o):
+        """Run one primitive until its step completes, exactly as the agent will."""
+        step = StepCompletion(habit, o)
+        while True:
+            o, _ = self.apply(step.commands(o), o)
+            if step.update(o) is not None:
+                return o
+
     def apply(self, records, o_before):
         for r in records:
             assert any(record_id(r) == record_id(h[0]) for h in self.repertoire), \
                 'pilot emitted a non-primitive record: %r' % r
-        self.actuator.apply(records)
+        self.actuator.apply(records, joint_positions(o_before))
         self.sim.step()
         if self.slow:
             time.sleep(self.slow)      # only for watching; does not affect the simulation
@@ -210,7 +218,7 @@ class Pilot:
             'condition': 'PILOT', 'segment': self.segment,
             'obs': o_before, 'action': records, 'habit_id': [record_id(r) for r in records],
             'goal_step': self.tracker.current, 'goal_fired': fired,
-            'success': succeeded(o), 'done': False, 'rewards': {},
+            'success': self.tracker.success, 'done': False, 'rewards': {},
         }) + '\n')
         return o, fired
 
@@ -233,8 +241,7 @@ class Pilot:
             scored = []
             for h in self.moves:
                 rec = h[0]
-                delta = self.delta if rec['speed'] > 0 else -self.delta
-                p = self.kin.predict(q, rec['joint'], delta)
+                p = self.kin.predict(q, rec['joint'], rec['angle'])
                 scored.append((math.dist(p, target), h))
             scored.sort(key=lambda x: x[0])
             best_d, best_h = scored[0]
@@ -251,12 +258,12 @@ class Pilot:
                 if bursts > MAX_PERTURB:
                     return o, False
                 for _ in range(STALL_PERTURB):
-                    o, _ = self.apply(self.rng.choice(self.moves), o)
+                    o = self.run_primitive(self.rng.choice(self.moves), o)
                 since = 0
                 best_seen = math.dist(o['innerSense']['eef']['pos'], target)
                 continue
 
-            o, _ = self.apply(best_h, o)
+            o = self.run_primitive(best_h, o)
 
     def gripper(self, o, name, opening):
         """Hold the GRAB primitive until the grasp state actually changes.
@@ -316,7 +323,7 @@ class Pilot:
             o, _ = self.apply([], o)
             if self.tracker.current == 'done':
                 break
-        return self.finish(o, succeeded(o))
+        return self.finish(o, self.tracker.success)
 
     def finish(self, o, ok):
         self.sink.write(json.dumps({

@@ -1,0 +1,12 @@
+{
+  "protocol": "P0",
+  "note": "BAS-01 pilot: sets E_max, E_ref, theta and N for P1. runs/2026-10-20_1031_C4_ucb-0.1_lp_P0 ran these values from a clean tree at 29e67b0, launched before protocol mode existed, so its run.json has no fingerprint.",
+  "successTest": "S3",
+  "conditions": ["C4"],
+  "selection": "ucb:0.1",
+  "curiosity": "lp",
+  "seeds": [1, 2, 3, 4, 5, 6],
+  "emax": 2000,
+  "eref": 500,
+  "stepLimit": 500
+}

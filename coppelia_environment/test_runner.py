@@ -49,6 +49,10 @@ def part1():
         ('repertoire reported unavailable', m['repertoire'] is None),
         ('coverage counted', m['coverageBins'] > 1),
         ('goal steps tallied', m['goalStepsReached'].get('reach') == 3),
+        ('selection reported not logged', m['selection'] == []),
+        ('selection read from the log',
+         metrics.reduce_log([dict(r, selection='ucb') for r in synthetic_log()])['selection']
+         == ['ucb']),
     ]
     ok = True
     for name, good in checks:

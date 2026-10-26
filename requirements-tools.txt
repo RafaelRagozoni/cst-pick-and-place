@@ -1,0 +1,3 @@
+# Python packages tools/ needs beyond what the environment layer already uses (vault spec BAS-01).
+# Tested with scipy 1.18.1 and numpy 2.4.6 (miniconda base, Python 3.13).
+scipy>=1.15     # stats.ecdf on CensoredData (1.11), stats.logrank (1.12), bootstrap(rng=) (1.15)

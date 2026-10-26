@@ -3,7 +3,10 @@
 Offline, over a recorded trajectory:  python3 test_observations.py traj.jsonl
 """
 import json
+import math
 import sys
+
+FAR_FROM_CUBE = 0.10     # m, end-effector to cube; nothing of the robot can touch the cube from here
 
 
 def edges(vals):
@@ -30,8 +33,9 @@ def main(path):
         ('gripper.width', lambda x: isinstance(x['innerSense']['gripper']['width'], float)),
         ('gripper.isHolding', lambda x: 'isHolding' in x['innerSense']['gripper']),
         ('gripper.inContact', lambda x: 'inContact' in x['innerSense']['gripper']),
-        ('jointLimitProximity', lambda x: len(x['innerSense']['jointLimitProximity']) == 6),
+        ('jointLimitMargin', lambda x: len(x['innerSense']['jointLimitMargin']) == 6),
         ('selfCollision', lambda x: isinstance(x['innerSense']['selfCollision'], bool)),
+        ('envCollision', lambda x: isinstance(x['innerSense']['envCollision'], bool)),
         ('manipulability', lambda x: x['innerSense']['manipulability'] is not None),
         ('vision.cube', lambda x: len(x['vision']['cube']['pos']) == 3),
         ('vision.pad', lambda x: len(x['vision']['pad']['pos']) == 3),
@@ -55,18 +59,35 @@ def main(path):
     print('  isHolding edges (want 1,1) : %d rising, %d falling -> %s'
           % (r, f, 'PASS' if hold_ok else 'FAIL'))
 
-    contact = [x['innerSense']['gripper']['inContact'] for x in obs]
-    print('  inContact ever true        : %s' % ('PASS' if any(contact) else 'FAIL'))
+    # Contact means the robot touches the cube. It must hold whenever the cube is held, and it must
+    # NOT follow the gripper: closing on empty air, far from the cube, is not contact. The second
+    # check is only meaningful if the trajectory closes on air somewhere, so that is checked too.
+    g = [x['innerSense']['gripper'] for x in obs]
+    far = [x['derived']['eefToCube'] > FAR_FROM_CUBE for x in obs]
+    held_contact = all(gi['inContact'] for gi in g if gi['isHolding'])
+    closed_far = sum(1 for gi, f in zip(g, far) if f and not gi['commanded_open'])
+    false_contact = sum(1 for gi, f in zip(g, far) if f and gi['inContact'])
+    contact_ok = held_contact and closed_far > 0 and false_contact == 0
+    print('  inContact while holding    : %s' % ('PASS' if held_contact else 'FAIL'))
+    print('  closed on air, far (steps) : %d -> %s' % (closed_far, 'PASS' if closed_far else 'FAIL'))
+    print('  inContact far from cube    : %d steps -> %s'
+          % (false_contact, 'PASS' if false_contact == 0 else 'FAIL'))
 
     moved = max(x['derived']['cubeDisplacement'] for x in obs)
     print('  cube displacement observed : %.4f m -> %s' % (moved, 'PASS' if moved > 0 else 'FAIL'))
 
-    jlp = max(max(x['innerSense']['jointLimitProximity']) for x in obs)
-    print('  NOTE jointLimitProximity max = %.3f — this UR5 model reports (-360, 720) deg on every'
-          % jlp)
-    print('       joint, so the field is uninformative until real limits are imposed.')
+    # Safety signals must be quiet on a clean run, or the Safety drive starts every episode high.
+    # The scripted expert never hits anything and stays well inside the joint limits.
+    margin = min(min(x['innerSense']['jointLimitMargin']) for x in obs)
+    env_hits = sum(1 for x in obs if x['innerSense']['envCollision'])
+    self_hits = sum(1 for x in obs if x['innerSense']['selfCollision'])
+    safety_ok = margin > 0 and env_hits == 0 and self_hits == 0
+    print('  min joint-limit margin     : %.1f deg -> %s'
+          % (math.degrees(margin), 'PASS' if margin > 0 else 'FAIL'))
+    print('  collisions on a clean run  : env %d, self %d -> %s'
+          % (env_hits, self_hits, 'PASS' if env_hits == 0 and self_hits == 0 else 'FAIL'))
 
-    ok = schema_ok and hold_ok and any(contact) and moved > 0
+    ok = schema_ok and hold_ok and contact_ok and safety_ok and moved > 0
     print('\nSIM-03 ACCEPTANCE: %s' % ('PASS' if ok else 'FAIL'))
     return 0 if ok else 1
 

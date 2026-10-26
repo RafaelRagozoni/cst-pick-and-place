@@ -29,6 +29,8 @@ from grasp_rule import set_gripper
 CUBE_Z = TABLE_TOP_Z + CUBE_SIZE / 2
 TABLE_MARGIN = 0.08          # m, keep the cube off the table edge
 MIN_CUBE_PAD_GAP = 0.15      # m, the cube must not start on the target zone
+GRIPPER_REST = 1e-3          # m/s, finger motor slower than this: the fingers have stopped
+GRIPPER_SETTLE_CAP = 100     # backstop on the steps spent waiting for them
 
 # Annulus about the arm base, used only in mode='annulus'. Verified reachable post-DEC-05.
 REACH_R_MIN = 0.45
@@ -82,6 +84,7 @@ class EpisodeReset:
         self.pad = sim.getObject('/PlacePad')
         self.arm = [j for j in sim.getObjectsInTree(self.ur5, sim.sceneobject_joint)
                     if 'RG2' not in sim.getObjectAlias(j, 2)][:6]
+        self.gripper_motor = sim.getObject('/UR5/RG2/openCloseJoint')
 
     def reset(self, run_seed, episode_index):
         sim = self.sim
@@ -117,11 +120,21 @@ class EpisodeReset:
             self.on_start()
         for j in self.arm:
             sim.setJointTargetVelocity(j, 0.0)
+        # The finger motor's target velocity persists across stops too, and the RG2 script does not
+        # set it before the first step: after an episode that closed the gripper, that first step
+        # still closed it, and the episode started 4.6 mm more closed than one after an open.
+        sim.setJointTargetVelocity(self.gripper_motor, 0.0)
 
         # The RG2 script closes the gripper whenever no signal is set, and only the property API
         # reaches it -- the legacy sim.setInt32Signal is inert in 4.10.
         set_gripper(sim, True)
         for _ in range(self.settle_steps):
+            sim.step()
+        # The fingers take longer than the arm to settle: wait until they stop opening, so no
+        # episode begins with the gripper still moving on its own.
+        for _ in range(GRIPPER_SETTLE_CAP):
+            if abs(sim.getJointVelocity(self.gripper_motor)) < GRIPPER_REST:
+                break
             sim.step()
 
         if self.observer is not None:

@@ -21,7 +21,7 @@ from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import simconfig
-from goals import GoalTracker, succeeded
+from goals import GoalTracker
 from grasp_rule import GraspRule, set_gripper
 from observations import Observer
 
@@ -79,6 +79,13 @@ def main():
 
     set_gripper(sim, True)
     run(40)
+    # Close on empty air and reopen, far from the cube. Nothing is touched, so the contact flag
+    # must stay false here even though the finger force sensors load up -- test_observations.py
+    # checks exactly that.
+    set_gripper(sim, False)
+    run(50)
+    set_gripper(sim, True)
+    run(50)
     sim.setObjectPose(target, sim.getObjectPose(tip, -1), -1)
     simIK.syncFromSim(env, [grp])
 
@@ -117,7 +124,7 @@ def main():
     set_gripper(sim, True); o = run(150)
 
     print('  released: cube %.4f m from the pad centre, success=%s'
-          % (o['derived']['cubeToPadXY'], succeeded(o)))
+          % (o['derived']['cubeToPadXY'], tracker.success))
     print('  goal steps: %s' % [t[0] for t in tracker.transitions])
 
     with open(OUT, 'w') as f:

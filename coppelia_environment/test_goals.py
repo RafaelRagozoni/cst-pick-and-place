@@ -10,7 +10,7 @@ threshold change, without standing up a simulator.
 import json
 import sys
 
-from goals import GoalTracker, STEPS, succeeded
+from goals import GoalTracker, STEPS, placed
 
 
 def main(path):
@@ -29,8 +29,8 @@ def main(path):
 
     order_ok = [f[0] for f in fired] == list(STEPS)
     once_ok = len(fired) == len(set(f[0] for f in fired))
-    success_ok = succeeded(obs[-1])
-    never_early = not succeeded(obs[0])
+    success_ok = tracker.success
+    never_early = not placed(obs[0])
 
     print('  all four steps, in order : %s' % ('PASS' if order_ok else
           'FAIL (got %s)' % [f[0] for f in fired]))

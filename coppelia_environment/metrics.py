@@ -5,9 +5,9 @@ that a finished run reduces to every reported metric **without re-running anythi
 cannot be computed from the log, the log is missing a field and that is a bug to fix now, not after
 a two-day experiment grid.
 
-Metric 4 (repertoire size and fusion fraction) needs the HabitPool, which lives on the CST side and
-does not exist yet (WP2). The reducer reports it as unavailable rather than silently returning 0 --
-a zero would look like a real measurement.
+Metric 4 (repertoire size and fusion fraction) needs the HabitPool, which lives on the CST side: the
+agent logs it with every step (agent/.../Telemetry.java). A log without it -- the Python runner's --
+reports it as unavailable rather than silently returning 0, which would look like a real measurement.
 """
 import gzip
 import json
@@ -67,13 +67,17 @@ def reduce_log(records):
 
     goals = Counter(g for s in summaries for g in s.get('goalsReached', []))
 
+    # the agent's selection mechanism; more than one name means runs were mixed into one log
+    selection = sorted(set(r['selection'] for r in records if 'selection' in r))
+
     return {
         'episodes': n,
         'successRate': success_rate,
         'episodesToFirstSuccess': first,
         'stepsPerSuccess': steps_per_success,
         'jointEnergyPerSuccess': energy_per_success,
-        'repertoire': repertoire,          # None == not logged (no HabitPool yet, WP2)
+        'repertoire': repertoire,          # None == not logged (e.g. runner.py, no HabitPool)
+        'selection': selection,            # [] == not logged
         'coverageBins': len(bins),
         'goalStepsReached': dict(goals),
         'totalSteps': sum(s['steps'] for s in summaries),
@@ -82,13 +86,14 @@ def reduce_log(records):
 
 def report(m):
     print('  episodes                 : %d' % m['episodes'])
+    print('  selection                : %s' % (', '.join(m['selection']) or 'not logged'))
     print('  1. success rate          : %.3f' % m['successRate'])
     print('  2. episodes to 1st success: %s' % (m['episodesToFirstSuccess']
                                                 if m['episodesToFirstSuccess'] is not None
                                                 else 'never'))
     print('  3. steps / success       : %.1f' % m['stepsPerSuccess'])
     print('     joint energy / success: %.2f rad' % m['jointEnergyPerSuccess'])
-    print('  4. repertoire            : %s' % (m['repertoire'] or 'unavailable (no HabitPool yet)'))
+    print('  4. repertoire            : %s' % (m['repertoire'] or 'unavailable (not logged)'))
     print('  5. coverage bins visited : %d' % m['coverageBins'])
     print('  goal steps reached       : %s' % (m['goalStepsReached'] or 'none'))
 

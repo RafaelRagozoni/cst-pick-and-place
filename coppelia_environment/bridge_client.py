@@ -10,7 +10,10 @@ Protocol: ZeroMQ REQ/REP, one JSON object each way. Every reply carries `ok`; on
     ping  -> {protocol, physics}
     info  -> {primitives, goalSteps, stepLimit, physics}
     reset {seed, episode} -> {obs, placement, goal, success, done, step}
-    step  {records}       -> {obs, goal, success, done, step}
+    step  {records, annotate?} -> {obs, goal, success, done, step}
+
+Records follow actions.py. A MOVE record's `angle` is the signed angle the joint still has to turn
+in the current step; `speed` is a magnitude.
     shutdown
 """
 import json
@@ -49,8 +52,11 @@ class BridgeClient:
     def reset(self, seed, episode):
         return self.call(op='reset', seed=seed, episode=episode)
 
-    def step(self, records):
-        return self.call(op='step', records=records)
+    def step(self, records, annotate=None):
+        """`annotate`: optional dict logged with this step (habit id, drives, repertoire...)."""
+        if annotate is None:
+            return self.call(op='step', records=records)
+        return self.call(op='step', records=records, annotate=annotate)
 
     def shutdown(self):
         try:

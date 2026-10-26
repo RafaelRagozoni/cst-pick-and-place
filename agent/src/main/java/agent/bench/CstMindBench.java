@@ -1,3 +1,6 @@
+package agent.bench;
+
+import agent.sim.BridgeClient;
 import br.unicamp.cst.core.entities.Codelet;
 import br.unicamp.cst.core.entities.MemoryObject;
 import br.unicamp.cst.core.entities.Mind;
@@ -29,8 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * request-reply and is not safe to share across threads.
  *
  * <pre>
- *   javac -cp "lib/*" -d out *.java
- *   java  -cp "lib/*:out" CstMindBench [port] [seconds]
+ *   ./gradlew liveRun -Pmain=agent.bench.CstMindBench -PagentArgs="5555 400 [timer]"
  * </pre>
  */
 public class CstMindBench {
@@ -117,7 +119,7 @@ public class CstMindBench {
             JsonArray recs = new JsonArray();
             int k = rng.nextInt(14);
             if (k < 12) {
-                recs.add(BridgeClient.move(k / 2, (k % 2 == 0) ? 0.4 : -0.4));
+                recs.add(BridgeClient.move(k / 2, (k % 2 == 0 ? 1 : -1) * Math.toRadians(1.0), 0.4));
             } else {
                 recs.add(BridgeClient.grab(k == 12));
             }

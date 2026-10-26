@@ -1,3 +1,6 @@
+package agent.bench;
+
+import agent.sim.BridgeClient;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
@@ -9,8 +12,7 @@ import com.google.gson.JsonObject;
  * which is exactly the interface a CST MotorHEC/sensory-HEC pair will use.
  *
  * <pre>
- *   javac -cp "lib/*" -d out BridgeClient.java BridgeSmokeTest.java
- *   java  -cp "lib/*:out" BridgeSmokeTest [port]
+ *   ./gradlew liveRun -Pmain=agent.bench.BridgeSmokeTest -PagentArgs="5555"
  * </pre>
  */
 public class BridgeSmokeTest {
@@ -49,7 +51,7 @@ public class BridgeSmokeTest {
             long[] lat = new long[200];
             for (int i = 0; i < lat.length; i++) {
                 JsonArray recs = new JsonArray();
-                recs.add(BridgeClient.move(1, i < 120 ? 0.4 : -0.4));
+                recs.add(BridgeClient.move(1, (i < 120 ? 1 : -1) * Math.toRadians(1.0), 0.4));
                 long t = System.nanoTime();
                 s = c.step(recs);
                 lat[i] = System.nanoTime() - t;

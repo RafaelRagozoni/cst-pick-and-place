@@ -8,6 +8,11 @@ Every predicate here is a **pure function of one observation dict** (see observa
 in this file touches the simulator, so the whole goal layer can be replayed and tested offline
 against a recorded trajectory -- which is exactly how its acceptance test runs.
 
+Episode success is not a predicate: it is the tracker reaching `done`, under the strict success
+test (BAS-01; version `SUCCESS_TEST`) that `GoalTracker` documents. It needs the history of the
+carry -- was the cube let go over the pad, after being transported? -- which no single observation
+holds.
+
 Thresholds are DEC-04's starting values. `EPS_TASK` also appears in the proposal text, so changing
 it means editing the paper too.
 """
@@ -16,9 +21,17 @@ import math
 REACH_DIST = 0.05        # m, end-effector to cube
 EPS_TASK = 0.05          # m, cube centre to pad centre (xy) for success
 TRANSPORT_XY = 0.05      # m, held cube within this of the pad centre counts as "over the target"
-TRANSPORT_MIN_LIFT = 0.03    # m above the table, so "over the pad" cannot fire while still resting
+# m, cube centre above the table. The cube rests at 0.025 on the table and 0.031 on the pad; at 0.03
+# a cube held while resting on the pad counted as transported, so pushing it onto the pad and
+# grasping it there, or dragging it up onto the pad, passed the success test without a lift. The
+# expert carries it over the pad at 0.07 or higher.
+TRANSPORT_MIN_LIFT = 0.05
 SETTLE_SPEED = 0.01      # m/s
 SETTLE_STEPS = 10        # consecutive observations below SETTLE_SPEED before "settled"
+# The success test's version (BAS-01). A new rule gets a new name, so runs under different rules
+# never compare. S1: `placed` in one observation. S2: the rule GoalTracker documents, with
+# TRANSPORT_MIN_LIFT 0.03. S3: the same with 0.05.
+SUCCESS_TEST = 'S3'
 
 STEPS = ('reach', 'grasp', 'transport', 'release')
 
@@ -47,16 +60,25 @@ def on_pad(obs):
     return d['cubeToPadXY'] <= EPS_TASK and d['cubeHeightAboveTable'] > 0.0
 
 
-def succeeded(obs):
-    """Episode success: the cube is on the target zone and no longer held."""
+def placed(obs):
+    """The cube lies on the target zone and is not held. One observation, so a cube pushed or knocked
+    onto the pad is placed too: this is not the success test (`GoalTracker.success` is)."""
     return on_pad(obs) and not grasped(obs)
 
 
 class GoalTracker:
-    """Advances through STEPS, firing each transition exactly once.
+    """Advances through STEPS, firing each transition exactly once; `success` once all four fired.
 
-    `release` needs the cube to be *settled*, not merely touching the pad: a bouncing cube clips the
-    pad on its first frame and would otherwise register success immediately.
+    `release` is the strict success test (BAS-01). It fires when, in this order:
+      1. since the cube was last grasped, it was transported -- held over the pad and lifted;
+      2. the gripper let go of it while it was still over the pad (`TRANSPORT_XY`; no lift needed,
+         so lowering the cube onto the pad before opening counts);
+      3. from then on, without being grasped again and without leaving the zone (`EPS_TASK`), the
+         cube stayed below SETTLE_SPEED for SETTLE_STEPS consecutive observations.
+    A cube pushed or knocked onto the pad, dropped beside it and nudged in, bouncing off it, or still
+    falling past it is not a success, and neither is one held but never lifted onto the pad. S1 --
+    `placed` in one observation -- counted all of these, and ended the episode on the first frame a
+    falling cube clipped the pad.
     """
 
     def __init__(self):
@@ -64,22 +86,40 @@ class GoalTracker:
 
     def reset(self):
         self.index = 0
-        self._still = 0
         self.transitions = []
+        self._prev = None
+        self._carried = False       # condition 1, for the carry in progress
+        self._placing = False       # 1 and 2 held at the let-go, and 3 has not failed since
+        self._still = 0
 
     @property
     def current(self):
         return STEPS[self.index] if self.index < len(STEPS) else 'done'
 
+    @property
+    def success(self):
+        return self.index >= len(STEPS)
+
+    def _track(self, obs):
+        """Follow the carry and the placing it may end in, whatever step is current."""
+        held = grasped(obs)
+        was_held = self._prev is not None and grasped(self._prev)
+        if held:
+            self._carried = (self._carried and was_held) or transported(obs)
+            self._placing = False
+        elif was_held:                                   # let go on this observation
+            self._placing = self._carried and self._prev['derived']['cubeToPadXY'] <= TRANSPORT_XY
+        if self._placing and not on_pad(obs):
+            self._placing = False                        # bounced, rolled or fell off the zone
+        self._still = self._still + 1 if self._placing and cube_speed(obs) < SETTLE_SPEED else 0
+        self._prev = obs
+
     def _released(self, obs):
-        if not grasped(obs) and on_pad(obs) and cube_speed(obs) < SETTLE_SPEED:
-            self._still += 1
-        else:
-            self._still = 0
-        return self._still >= SETTLE_STEPS
+        return self._placing and self._still >= SETTLE_STEPS
 
     def update(self, obs):
         """Feed one observation. Returns the step name if a transition fired, else None."""
+        self._track(obs)
         if self.index >= len(STEPS):
             return None
         step = STEPS[self.index]

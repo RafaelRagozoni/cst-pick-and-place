@@ -1,0 +1,45 @@
+plugins {
+    id 'application'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation 'com.github.CST-Group:cst:1.6.1'
+    implementation 'org.zeromq:jeromq:0.5.4'
+    implementation 'com.google.code.gson:gson:2.11.0'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+application {
+    mainClass = 'agent.AgentMain'
+}
+
+test {
+    useJUnitPlatform()
+    // Parity fixtures are produced by the Python side; tests find them relative to the repo.
+    systemProperty 'sim.dir', file('../coppelia_environment').absolutePath
+    testLogging {
+        events 'failed'
+        exceptionFormat 'full'
+    }
+}
+
+// Anything that needs CoppeliaSim and the bridge running. Not part of `test`.
+//   ./gradlew liveRun -PagentArgs="--port 5555 --condition C0 --seed 1"
+//   ./gradlew liveRun -Pmain=agent.bench.BridgeSmokeTest -PagentArgs="5555"
+tasks.register('liveRun', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = (project.findProperty('main') ?: 'agent.AgentMain').toString()
+    args = (project.findProperty('agentArgs') ?: '').toString().split(' ').findAll { it }
+}
