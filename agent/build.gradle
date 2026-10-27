@@ -29,6 +29,9 @@ test {
     useJUnitPlatform()
     // Parity fixtures are produced by the Python side; tests find them relative to the repo.
     systemProperty 'sim.dir', file('../coppelia_environment').absolutePath
+    // GoldenTrajectoryTest rewrites its reference files instead of comparing: -PgoldenUpdate=true
+    systemProperty 'golden.update', (project.findProperty('goldenUpdate') ?: 'false').toString()
+    systemProperty 'golden.dir', file('src/test/resources/golden').absolutePath
     testLogging {
         events 'failed'
         exceptionFormat 'full'

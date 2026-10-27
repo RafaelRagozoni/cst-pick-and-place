@@ -336,6 +336,16 @@ diffing the logs, and held since by every older test passing unchanged. **Not ru
   `count:200` and `lp:200` falling under 0.9 in the small fake world; UCB and Thompson closed-loop trying all 14 habits, reproducing per
   seed, logging their name and σ, and with σ > 0 — at σ = 0 both silently rank by score alone, like GREEDY. Mutation-checked:
   dropping the sample recording fails three tests.
+- `GoldenTrajectoryTest` — golden master: a fixed seed reproduces, step for step, the trajectory in
+  `src/test/resources/golden` (habit, goal, the four drives, novelty, yield, σ, holding, success,
+  then every habit's credit), for the P1 setting (C4, `ucb:0.1`, `lp`) and for C0 with Thompson and
+  `count:200`. It pins today's behaviour before a change meant to leave it alone at some setting
+  (vault spec CRE-01). The fake starts each episode with the gripper over the cube
+  (`FakeEnvironment.startingOverTheCube`): from its usual start a short run never grasps, and the pin
+  would guard the reach stage only; the test fails if a pinned run grasps fewer than 3 times or holds
+  fewer than 50 steps. A missing file fails rather than being written. Rewrite on purpose with
+  `./gradlew test --offline -PgoldenUpdate=true --tests agent.GoldenTrajectoryTest` and read the diff.
+  Mutation-checked: not zeroing the Task change at a stage change fails both pins.
 
 - `CheckpointTest` — a run paused after episode 3, saved to a file and resumed in a new mind is the
   run that never stopped: every command and every logged decision (habit, goal, drive levels,
