@@ -55,6 +55,17 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
     private Memory trackerMO;
     private Memory planMO;
     private long planSerial;
+    private Choice lastChoice;
+
+    /**
+     * What was known when a plan was chosen, for the run log (vault spec CRE-01): the chosen habit's
+     * executions under its context, the pseudo-executions its score borrowed (priorCount), and how
+     * many of the candidates had neither -- untried, which UCB ranks above any score, so a choice
+     * made while untried > 0 was one of them, drawn at random.
+     */
+    public record Choice(long planSerial, long executionsHere, double priorCount, int untried,
+                         int candidates) {
+    }
 
     public BehaviorGeneratorCodelet(Config cfg, long seed) {
         super("BehaviorGenerator");
@@ -111,7 +122,20 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
         if (chosen != null) {
             planMO.setI(new Plan(++planSerial, chosen.habit(), goal.name(), goal.id(), creditContext,
                     chosen.score()));
+            int untried = 0;
+            for (Candidate candidate : candidates) {
+                if (candidate.count() + candidate.priorCount() == 0) {
+                    untried++;
+                }
+            }
+            lastChoice = new Choice(planSerial, chosen.count(), chosen.priorCount(), untried,
+                    candidates.size());
         }
+    }
+
+    /** The last plan chosen and what was known then, or null before the first. */
+    public Choice lastChoice() {
+        return lastChoice;
     }
 
     /**

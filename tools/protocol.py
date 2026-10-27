@@ -31,7 +31,8 @@ KEYS = ('protocol', 'successTest', 'conditions', 'selection', 'curiosity', 'seed
 OPTIONAL = ('note', 'theta', 'primary')
 PRIMARY = ('m1', 'm2_final', 'm3_steps', 'm4_bins_p2')
 # run_live.py arguments a protocol fixes: given on the command line, they are refused.
-FIXED = ('selection', 'curiosity', 'seeds', 'emax', 'eref', 'step_limit')
+FIXED = ('selection', 'curiosity', 'seeds', 'emax', 'eref', 'step_limit', 'task_stage_weight',
+         'context_prior_weight')
 
 
 class Refused(Exception):

@@ -20,7 +20,12 @@ different condition label than the one it runs. `--selection` (greedy, ucb, ucb:
 default greedy) is the selection mechanism. Every logged step records `selection` and the `spread`
 it used, and `metrics.py` reports the selection (two names means two runs went into one log).
 `--curiosity` (none, count, count:<W>, lp, lp:<W>; default none) is the Curiosity yield ("Curiosity
-that runs out"); every logged step records `curiosity` and the `yield`.
+that runs out"); every logged step records `curiosity` and the `yield`. `--task-stage-weight` and
+`--context-prior-weight` (vault spec CRE-01; defaults 1 and 2, 0 turns each off) are for runs that
+test one change without the other. Every step of a plan logs its `choice`: the chosen habit's
+executions in its context, the `priorCount` its score borrowed, and how many habits were `untried`
+there (no execution, nothing borrowed; UCB starts one of those at random while there are any), out
+of the `candidates`. A misspelt flag is refused, not ignored.
 
 Long runs go through `../tools/run_live.py`, which also checkpoints and resumes them (below).
 
@@ -125,10 +130,10 @@ exactly.
   n0 = `Config.contextPriorWeight` = 2. UCB and Thompson add n0 to the count, so a habit that ran
   elsewhere is no longer untried here; only a habit never run anywhere is, and goes first. Before,
   every habit not yet run in a bin was tried there first, in random order: with the cube held that
-  was 55–79 % of P1's choices (22–39 % late), and ~77 % of its `grab_open` picks while holding. In a
-  bin never visited every bonus is 0 (ln 1 = 0), and the best borrowed record starts. Every habit
-  with a record adds the same n0, so none gets a larger bonus for having run more elsewhere (the
-  2026-10-16 bug). The cost: n0 counts as evidence in visited bins too, so a habit tried once there
+  was 61 % of P1's choices in its first 500 episodes (24–35 % after), and 53–87 % of its `grab_open`
+  picks while holding (`tools/carry_report.py`). In a bin never visited every bonus is 0
+  (ln 1 = 0), and the best borrowed record starts. Every habit with a record adds the same n0, so
+  none gets a larger bonus for having run more elsewhere (the 2026-10-16 bug). The cost: n0 counts as evidence in visited bins too, so a habit tried once there
   has its bonus √3 smaller than before. n0 = 0 is the rule before, to the bit
   (`GoldenTrajectoryTest`); `creditRead = SUM` with n0 > 0 is refused when the mind starts.
 - **Novelty is per cycle**, not per completed habit as §4.3.1 says: the archive and the bin counts
@@ -141,7 +146,8 @@ exactly.
   (`TaskStages.taskLevel`; w = `Config.taskStageWeight`, 1). cap4 has the Task rise with the
   distance to "that stage's target" alone, and that target moves at every stage change, so Credit
   zeroed the jump: completing a stage paid nothing, and letting the cube go mid-transport cost
-  nothing (P1: 95 % of grasps ended with the cube dropped away from the pad, 74 % by `grab_open`).
+  nothing (P1: 93–97 % of grasps ended with the cube dropped away from the pad, every one right after
+  a `grab_open`).
   Now a stage gained lowers the Task by w / (4w + 1) = 0.2 and a stage undone raises it as much, and
   Credit credits the jump: letting go is charged the progress it undoes, and success pays a stage.
   Going in and out of a stage still pays nothing overall. w = 0 is the Task before, to the bit

@@ -162,6 +162,55 @@ class AgentMindTest {
         }
     }
 
+    /** The choice of every plan, logged with each of its steps, from a fresh UCB 0.1 mind. */
+    private static List<JsonObject> choices(double contextPriorWeight) {
+        Config config = Config.forCondition("C4").withSelection("ucb:0.1").withCuriosity("lp");
+        config.contextPriorWeight = contextPriorWeight;
+        FakeEnvironment env = run(config, 6, 4, 150);
+        List<JsonObject> out = new ArrayList<>();
+        long lastPlan = -1;
+        for (JsonObject a : env.annotations) {
+            if (!a.has("plan")) {
+                continue;
+            }
+            assertTrue(a.has("choice"), "a running plan without its choice: " + a);
+            if (a.get("plan").getAsLong() != lastPlan) {
+                lastPlan = a.get("plan").getAsLong();
+                out.add(a.getAsJsonObject("choice"));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The log says what was known when each plan was chosen (CRE-01's measure of UCB's forced draw).
+     * Without borrowing, a mind's first choice has all 14 habits untried, and whenever some are, UCB
+     * starts one of them, a draw. Borrowing, a habit counts as tried once it ran anywhere: the
+     * draws end within the first choices.
+     */
+    @Test
+    void theLogSaysWhatWasKnownWhenEachPlanWasChosen() {
+        List<JsonObject> before = choices(0.0);
+        assertEquals(14, before.get(0).get("untried").getAsInt());
+        assertEquals(14, before.get(0).get("candidates").getAsInt());
+        int drawsBefore = 0;
+        for (JsonObject c : before) {
+            if (c.get("untried").getAsInt() > 0) {
+                drawsBefore++;
+                assertEquals(0, c.get("executionsHere").getAsLong(), "a draw among the untried");
+                assertEquals(0.0, c.get("priorCount").getAsDouble());
+            }
+        }
+        int drawsBorrowing = 0;
+        for (JsonObject c : choices(2.0)) {
+            double priorCount = c.get("priorCount").getAsDouble();
+            assertTrue(priorCount == 0.0 || priorCount == 2.0, "n0 or nothing: " + priorCount);
+            drawsBorrowing += c.get("untried").getAsInt() > 0 ? 1 : 0;
+        }
+        assertTrue(drawsBorrowing <= 14, "at most one per habit: " + drawsBorrowing);
+        assertTrue(drawsBefore > 5 * drawsBorrowing, drawsBefore + " draws against " + drawsBorrowing);
+    }
+
     @Test
     void refinementRaisesEffortsGain() {
         FakeEnvironment env = new FakeEnvironment(30);

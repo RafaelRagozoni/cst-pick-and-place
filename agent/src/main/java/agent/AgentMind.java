@@ -142,7 +142,7 @@ public final class AgentMind {
         behavior.addOutput(planMO);
 
         telemetry = new Telemetry(trackerMO, goalMO, driveMO, pool, cfg.selection, cfg.curiosityYield,
-                behavior::spread);
+                behavior::spread, behavior::lastChoice);
         motor = new MotorCodelet(link, telemetry);
         motor.addInput(trackerMO);
         motor.addInput(sensoryMO);

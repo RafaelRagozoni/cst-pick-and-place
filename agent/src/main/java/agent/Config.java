@@ -145,8 +145,9 @@ public final class Config {
      * mean) / (executions here + n0). UCB's and Thompson's counts add n0 too, so a habit that ran
      * elsewhere is no longer untried here: only a habit never run anywhere is. 0 = the rule before
      * CRE-01: the context's mean, else the total, and every habit not yet run in a context tried
-     * there first, in random order. In P1 those forced draws were 55-79% of the choices with the cube
-     * held (22-39% late), and ~77% of grab_open picks while holding. Needs creditRead MEAN.
+     * there first, in random order. In P1 those forced draws were 61% of the choices with the cube
+     * held in the first 500 episodes (24-35% after), and 53-87% of the grab_open picks while holding
+     * (tools/carry_report.py). Needs creditRead MEAN.
      */
     public double contextPriorWeight = 2.0;
 

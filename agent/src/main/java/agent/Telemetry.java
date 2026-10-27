@@ -1,5 +1,6 @@
 package agent;
 
+import agent.codelets.BehaviorGeneratorCodelet;
 import agent.habit.HabitIdeas;
 import agent.memory.Goal;
 import agent.memory.TrackerState;
@@ -12,11 +13,13 @@ import com.google.gson.JsonObject;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 
 /**
  * What the agent attaches to each step of the bridge's run log (translog.py's {@code annotate}):
  * the habit in execution, the goal, the drive levels, Curiosity's yield, the selection mechanism and
- * the spread it used, the Curiosity yield's name, and the repertoire for metric 4.
+ * the spread it used, the Curiosity yield's name, what was known when the plan in execution was
+ * chosen, and the repertoire for metric 4.
  *
  * <p>Instrumentation, not part of the architecture: it reads memories but no codelet reads it, and
  * nothing the agent decides depends on it. Field names avoid the ones the log owns (translog.OWNED).
@@ -30,6 +33,7 @@ public final class Telemetry {
     private final String selection;
     private final String curiosity;
     private final DoubleSupplier spread;
+    private final Supplier<BehaviorGeneratorCodelet.Choice> lastChoice;
     private String phase = "bootstrap";
 
     /**
@@ -37,9 +41,11 @@ public final class Telemetry {
      * @param curiosity the Curiosity yield's name
      * @param spread    the spread the Behavior Generator's last selection used, read from it rather
      *                  than recomputed, so the log shows what the selector saw
+     * @param lastChoice the Behavior Generator's last choice, logged with every step of its plan
      */
     public Telemetry(Memory trackerMO, Memory goalMO, Memory driveMO, MemoryContainer pool,
-                     String selection, String curiosity, DoubleSupplier spread) {
+                     String selection, String curiosity, DoubleSupplier spread,
+                     Supplier<BehaviorGeneratorCodelet.Choice> lastChoice) {
         this.trackerMO = trackerMO;
         this.goalMO = goalMO;
         this.driveMO = driveMO;
@@ -47,6 +53,7 @@ public final class Telemetry {
         this.selection = selection;
         this.curiosity = curiosity;
         this.spread = spread;
+        this.lastChoice = lastChoice;
     }
 
     public void setPhase(String phase) {
@@ -85,6 +92,15 @@ public final class Telemetry {
         a.addProperty("selection", selection);
         a.addProperty("curiosity", curiosity);
         a.addProperty("spread", spread.getAsDouble());
+        BehaviorGeneratorCodelet.Choice choice = lastChoice.get();
+        if (running && choice != null && choice.planSerial() == ts.planSerial()) {
+            JsonObject c = new JsonObject();
+            c.addProperty("executionsHere", choice.executionsHere());
+            c.addProperty("priorCount", choice.priorCount());
+            c.addProperty("untried", choice.untried());
+            c.addProperty("candidates", choice.candidates());
+            a.add("choice", c);
+        }
         a.add("repertoire", repertoire());
         return a;
     }
