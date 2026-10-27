@@ -86,6 +86,8 @@ public final class CreditTable {
     private static final class Row {
         final Cell total = new Cell();
         final Map<String, Cell> byContext = new HashMap<>();
+        /** The same credit under each middle context (#middleContext), what a context borrows. */
+        final Map<String, Cell> byMiddle = new HashMap<>();
         final Samples samples = new Samples();
         /** Credit of the execution still receiving it, or null. */
         double[] open;
@@ -101,19 +103,41 @@ public final class CreditTable {
     }
 
     /**
+     * The coarser context a context borrows from (vault spec CRE-01): the same goal, and whether the
+     * hand holds the cube -- Characterization.key's "h" flag, read back from the key, so nothing new
+     * travels from the Behavior Generator to here. With the Task holding the goal, the goal is the
+     * stage, so "transport, holding" sets opening on the way apart from "release, holding". A
+     * context with no such flag (hand-made in a test) is its own middle.
+     */
+    public static String middleContext(String context) {
+        int bar = context.indexOf('|');
+        if (bar < 0) {
+            return context;
+        }
+        int holdingFlag = context.indexOf('h', bar + 1);
+        if (holdingFlag < 0 || holdingFlag + 1 >= context.length()) {
+            return context;
+        }
+        return context.substring(0, bar) + "|h" + context.charAt(holdingFlag + 1);
+    }
+
+    /**
      * Credit {@code weight * delta} to the habit under {@code context}. {@code execution} marks the
      * start of one execution of the habit, which is what the per-execution mean divides by.
      */
     public void add(String habit, String context, double[] delta, double weight, boolean execution) {
         Row r = rows.computeIfAbsent(habit, h -> new Row());
         Cell c = r.byContext.computeIfAbsent(context, k -> new Cell());
+        Cell middle = r.byMiddle.computeIfAbsent(middleContext(context), k -> new Cell());
         for (int d = 0; d < Drives.N; d++) {
             r.total.sum[d] += weight * delta[d];
             c.sum[d] += weight * delta[d];
+            middle.sum[d] += weight * delta[d];
         }
         if (execution) {
             r.total.count++;
             c.count++;
+            middle.count++;
             close(r);
             r.open = new double[Drives.N];
         }
@@ -149,12 +173,16 @@ public final class CreditTable {
         if (r == null) {
             return CreditSnapshot.EMPTY;
         }
-        Map<String, Cell> ctx = new HashMap<>(r.byContext.size() * 2);
-        for (Map.Entry<String, Cell> e : r.byContext.entrySet()) {
-            ctx.put(e.getKey(), e.getValue().copy());
+        return new CreditSnapshot(r.total.sum.clone(), r.total.count, copy(r.byContext),
+                copy(r.byMiddle), r.samples.n, r.samples.mean.clone(), r.samples.scatterCopy());
+    }
+
+    private static Map<String, Cell> copy(Map<String, Cell> cells) {
+        Map<String, Cell> out = new HashMap<>(cells.size() * 2);
+        for (Map.Entry<String, Cell> e : cells.entrySet()) {
+            out.put(e.getKey(), e.getValue().copy());
         }
-        return new CreditSnapshot(r.total.sum.clone(), r.total.count, ctx, r.samples.n,
-                r.samples.mean.clone(), r.samples.scatterCopy());
+        return out;
     }
 
     /** Habits whose credit changed since the last call; clears the set. */
@@ -185,6 +213,12 @@ public final class CreditTable {
             for (Map.Entry<String, Cell> c : r.byContext.entrySet()) {
                 contexts.add(c.getKey(), c.getValue().state());
             }
+            // Saved, not summed again from the contexts on restore: a sum in another order is
+            // another double, and the resumed run would part from the one that never stopped.
+            JsonObject middles = new JsonObject();
+            for (Map.Entry<String, Cell> c : r.byMiddle.entrySet()) {
+                middles.add(c.getKey(), c.getValue().state());
+            }
             JsonArray scatter = new JsonArray();
             for (double[] row : r.samples.scatter) {
                 scatter.add(Checkpoint.array(row));
@@ -196,6 +230,7 @@ public final class CreditTable {
             JsonObject row = new JsonObject();
             row.add("total", r.total.state());
             row.add("contexts", contexts);
+            row.add("middles", middles);
             row.add("samples", samples);
             out.add(e.getKey(), row);
         }
@@ -216,6 +251,9 @@ public final class CreditTable {
             r.total.count = total.count;
             for (Map.Entry<String, JsonElement> c : row.getAsJsonObject("contexts").entrySet()) {
                 r.byContext.put(c.getKey(), Cell.of(c.getValue().getAsJsonObject()));
+            }
+            for (Map.Entry<String, JsonElement> c : row.getAsJsonObject("middles").entrySet()) {
+                r.byMiddle.put(c.getKey(), Cell.of(c.getValue().getAsJsonObject()));
             }
             JsonObject samples = row.getAsJsonObject("samples");
             r.samples.n = samples.get("n").getAsLong();

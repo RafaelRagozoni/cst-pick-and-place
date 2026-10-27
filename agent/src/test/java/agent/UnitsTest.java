@@ -5,6 +5,7 @@ import agent.credit.CreditTable;
 import agent.habit.Command;
 import agent.habit.HabitIdeas;
 import agent.memory.ExecutionBuffer;
+import agent.motivation.Characterization;
 import agent.motivation.CuriosityYield;
 import agent.motivation.NoveltyArchive;
 import agent.motivation.Yields;
@@ -14,11 +15,13 @@ import agent.selection.Selectors;
 import agent.sim.Observation;
 import agent.task.TaskStages;
 import br.unicamp.cst.representation.idea.Idea;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -438,5 +441,131 @@ class UnitsTest {
         assertEquals(1, TaskStages.infer(dropped), "back to grasp: the hand is still at the cube");
         assertTrue(taskLevel(dropped, 1.0) - taskLevel(held, 1.0) > 0.05);
         assertTrue(taskLevel(dropped, 0.0) < taskLevel(held, 0.0));
+    }
+
+    // --- borrowed credit (vault spec CRE-01) --------------------------------------------
+    /**
+     * The middle context is read back from the state key's holding flag. If Characterization.key
+     * changed its format, the middle would silently become the whole context and borrowing would
+     * fall back to the total: this pins the two together.
+     */
+    @Test
+    void middleContextIsTheGoalAndWhetherTheHandHoldsTheCube() {
+        Observation holding = Traj.obs(400);
+        Observation notHolding = Traj.obs(0);
+        assertTrue(holding.holding());
+        assertEquals("transport|h1", CreditTable.middleContext(
+                CreditTable.context("transport", Characterization.key(holding))));
+        assertEquals("reach|h0", CreditTable.middleContext(
+                CreditTable.context("reach", Characterization.key(notHolding))));
+        assertEquals("ctx", CreditTable.middleContext("ctx"), "a hand-made context is its own");
+    }
+
+    /**
+     * Each middle cell is the sum of the context cells under it, kept as the credit arrives; the
+     * table's state carries them through a checkpoint as they are.
+     */
+    @Test
+    void middleCellsAddUpTheirContextsAndSurviveACheckpoint() {
+        Random rng = new Random(5);
+        CreditTable t = new CreditTable();
+        String[] goals = {"reach", "transport"};
+        for (int i = 0; i < 2000; i++) {
+            String context = CreditTable.context(goals[rng.nextInt(2)],
+                    "e" + rng.nextInt(4) + ",0,0c0,0,0h" + rng.nextInt(2) + "k0d0");
+            double[] delta = {rng.nextGaussian(), rng.nextGaussian(), 0, rng.nextGaussian()};
+            t.add("h" + rng.nextInt(3), context, delta, rng.nextDouble(), rng.nextBoolean());
+        }
+        t.closeExecutions();
+        JsonObject state = t.state();
+        for (Map.Entry<String, JsonElement> row : state.getAsJsonObject("rows").entrySet()) {
+            JsonObject contexts = row.getValue().getAsJsonObject().getAsJsonObject("contexts");
+            JsonObject middles = row.getValue().getAsJsonObject().getAsJsonObject("middles");
+            Map<String, double[]> summed = new java.util.HashMap<>();
+            Map<String, Long> counted = new java.util.HashMap<>();
+            for (Map.Entry<String, JsonElement> cell : contexts.entrySet()) {
+                String middle = CreditTable.middleContext(cell.getKey());
+                double[] sum = summed.computeIfAbsent(middle, k -> new double[4]);
+                JsonObject c = cell.getValue().getAsJsonObject();
+                for (int d = 0; d < 4; d++) {
+                    sum[d] += c.getAsJsonArray("sum").get(d).getAsDouble();
+                }
+                counted.merge(middle, c.get("count").getAsLong(), Long::sum);
+            }
+            assertEquals(summed.keySet(), middles.keySet(), row.getKey());
+            for (String middle : summed.keySet()) {
+                JsonObject m = middles.getAsJsonObject(middle);
+                assertEquals(counted.get(middle), m.get("count").getAsLong());
+                for (int d = 0; d < 4; d++) {
+                    assertEquals(summed.get(middle)[d], m.getAsJsonArray("sum").get(d).getAsDouble(),
+                            1e-9, row.getKey() + " " + middle);
+                }
+            }
+        }
+        CreditTable restored = new CreditTable();
+        restored.restore(state);
+        assertEquals(state, restored.state());
+    }
+
+    /**
+     * The borrowed value: a context's mean shrunk toward the middle's by n0 pseudo-executions; the
+     * middle's mean where the context has none; the total where the middle has none either; and at
+     * n0 = 0, or for a habit never run, the rule before CRE-01.
+     */
+    @Test
+    void borrowedValueShrinksTowardTheMiddleThenTheTotal() {
+        CreditTable t = new CreditTable();
+        t.add("h", "reach|e1c1h0k0d0", new double[]{0.5, 0, 0, 0}, 1.0, true);
+        t.add("h", "reach|e2c2h0k0d0", new double[]{-0.1, 0, 0, 0}, 1.0, true);
+        t.add("h", "reach|e9c9h1k0d0", new double[]{-0.6, 0, 0, 0}, 1.0, true);
+        t.closeExecutions();
+        CreditSnapshot s = t.snapshot("h");
+        var mean = CreditSnapshot.Read.MEAN;
+        double total = (0.5 - 0.1 - 0.6) / 3;
+        assertEquals((0.5 + 2 * 0.2) / (1 + 2), s.value("reach|e1c1h0k0d0", mean, 2.0)[0], 1e-12,
+                "its own mean, shrunk toward reach|h0's 0.2");
+        assertEquals(0.2, s.value("reach|e5c5h0k0d0", mean, 2.0)[0], 1e-12, "none here: the middle");
+        assertEquals(-0.6, s.value("reach|e5c5h1k0d0", mean, 2.0)[0], 1e-12, "the other hand");
+        assertEquals(total, s.value("grasp|e1c1h0k0d0", mean, 2.0)[0], 1e-12, "no middle: the total");
+        assertEquals(total, s.value("reach|e5c5h0k0d0", mean, 0.0)[0], 1e-12, "n0 = 0: as before");
+        assertArrayEquals(s.value("reach|e1c1h0k0d0", mean), s.value("reach|e1c1h0k0d0", mean, 0.0));
+        assertEquals(2.0, s.priorCount(2.0));
+        assertEquals(0.0, s.priorCount(0.0));
+        assertArrayEquals(new double[4], CreditSnapshot.EMPTY.value("reach|e1c1h0k0d0", mean, 2.0));
+        assertEquals(0.0, CreditSnapshot.EMPTY.priorCount(2.0), "never run: still untried");
+        assertThrows(IllegalArgumentException.class,
+                () -> s.value("reach|e1c1h0k0d0", CreditSnapshot.Read.SUM, 2.0));
+    }
+
+    /** UCB with a prior: a context never visited gives no bonus; n is executions plus priorCount. */
+    @Test
+    void ucbAddsThePriorCountAndGivesNoBonusInANewContext() {
+        Candidate better = new Candidate(new Idea("better"), 0.2, 0, 2.0, 1.0);
+        Candidate worse = new Candidate(new Idea("worse"), -0.1, 0, 2.0, 1.0);
+        Candidate untried = new Candidate(new Idea("untried"), 0.0, 0, 0.0, 1.0);
+        Random rng = new Random(1);
+        assertSame(better, Selectors.ucb(1.0).select(List.of(worse, better), null, rng));
+        assertSame(untried, Selectors.ucb(1.0).select(List.of(worse, better, untried), null, rng));
+        // visited 10 times by "worse": "better", with only its prior here, gets the larger bonus
+        Candidate worseHere = new Candidate(new Idea("worse"), 0.25, 10, 2.0, 1.0);
+        assertSame(better, Selectors.ucb(1.0).select(List.of(worseHere, better), null, rng),
+                "0.2 + sqrt(2 ln 10 / 2) beats 0.25 + sqrt(2 ln 10 / 12)");
+    }
+
+    /** Settings that mean nothing are refused when a mind starts. */
+    @Test
+    void aMindRefusesBorrowingWithSummedCreditAndNegativeWeights() {
+        Config summed = new Config();
+        summed.creditRead = CreditSnapshot.Read.SUM;
+        assertThrows(IllegalArgumentException.class,
+                () -> new AgentMind(summed, new FakeEnvironment(5), 1));
+        summed.contextPriorWeight = 0.0;
+        new AgentMind(summed, new FakeEnvironment(5), 1);
+        Config negative = new Config();
+        negative.taskStageWeight = -1.0;
+        assertThrows(IllegalArgumentException.class, negative::validate);
+        negative.taskStageWeight = 1.0;
+        negative.contextPriorWeight = Double.NaN;
+        assertThrows(IllegalArgumentException.class, negative::validate);
     }
 }

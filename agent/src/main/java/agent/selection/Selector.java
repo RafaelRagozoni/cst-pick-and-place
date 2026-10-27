@@ -19,13 +19,21 @@ public interface Selector {
      * A habit and what is known about it under the current goal, state and drive levels.
      *
      * @param score  E(h), eq. (4.1)
-     * @param count  executions under this context (goal, state bin); 0 where the habit has no record
-     *               here, even though the score then falls back to its total
-     * @param spread standard deviation of one of this habit's executions' score
-     *               ({@link agent.credit.CreditSnapshot#spread}): the repertoire's reference, shrunk
-     *               toward the habit's own as its executions accumulate; 0 until it can be estimated
+     * @param count      executions under this context (goal, state bin); 0 where the habit has no
+     *                   record here, even though the score then borrows from elsewhere
+     * @param priorCount the pseudo-executions the score's borrowed mean weighs as
+     *                   ({@link agent.credit.CreditSnapshot#priorCount}); UCB and Thompson add it to
+     *                   count. 0 for a habit never run anywhere, and with borrowing off
+     * @param spread     standard deviation of one of this habit's executions' score
+     *                   ({@link agent.credit.CreditSnapshot#spread}): the repertoire's reference, shrunk
+     *                   toward the habit's own as its executions accumulate; 0 until it can be estimated
      */
-    record Candidate(Idea habit, double score, long count, double spread) {
+    record Candidate(Idea habit, double score, long count, double priorCount, double spread) {
+
+        /** A candidate whose score borrows nothing: priorCount 0. */
+        public Candidate(Idea habit, double score, long count, double spread) {
+            this(habit, score, count, 0.0, spread);
+        }
     }
 
     /**

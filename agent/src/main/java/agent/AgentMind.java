@@ -82,6 +82,7 @@ public final class AgentMind {
     private final List<Codelet> schedule;
 
     public AgentMind(Config cfg, Environment env, long seed) {
+        cfg.validate();
         this.cfg = cfg;
         this.link = new SimLink(env);
 

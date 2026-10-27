@@ -536,11 +536,19 @@ class CodeletsTest {
         assertTrue(first.stream().distinct().count() > 1, "ties spread over the pool");
     }
 
+    /** Borrowing off (CRE-01's contextPriorWeight 0): a context's own record, else the total. */
+    private static Config withoutBorrowing(Config config) {
+        config.contextPriorWeight = 0.0;
+        return config;
+    }
+
     /**
      * UCB weighs what is known about a habit in THIS context. A habit that ran 50 times elsewhere and
      * never here is untried here and goes first. Counting its 50 instead left it a near-zero bonus
      * and gave the habit tried here once the largest: the 2026-10-15 baseline repeated a habit that
-     * had already run in the bin in 99% of its choices.
+     * had already run in the bin in 99% of its choices. This is the rule with borrowing off; with it
+     * on, a habit that ran elsewhere is no longer untried here, on purpose
+     * (borrowingRanksHabitsNewToAContextByTheirRecordElsewhere).
      */
     @Test
     void ucbTriesAHabitNeverRunHereBeforeRepeatingOneThatRan() {
@@ -560,9 +568,9 @@ class CodeletsTest {
         HabitIdeas.setCredit(habit(pool, "here"), t.snapshot("here"));
         HabitIdeas.setCredit(habit(pool, "elsewhere"), t.snapshot("elsewhere"));
 
-        behavior(new Config(), pool, 1).notifyCodelet();
+        behavior(withoutBorrowing(new Config()), pool, 1).notifyCodelet();
         assertEquals("here", HabitIdeas.id(((Plan) planMO.getI()).habit()), "greedy: the best score");
-        behavior(new Config().withSelection("ucb"), pool, 1).notifyCodelet();
+        behavior(withoutBorrowing(new Config().withSelection("ucb")), pool, 1).notifyCodelet();
         assertEquals("elsewhere", HabitIdeas.id(((Plan) planMO.getI()).habit()),
                 "ucb: never run here, so tried here first");
     }
@@ -571,7 +579,9 @@ class CodeletsTest {
      * A habit whose results never vary cannot set the spread for the rest. Live (seed 3, 2026-10-16):
      * every habit tried once, then a no-op repeated 4978 times; the pooled spread came from the
      * no-op alone, ~0, and UCB never retried the others. Each habit now carries its own spread, the
-     * repertoire's reference until its own executions pull it away.
+     * repertoire's reference until its own executions pull it away. Borrowing off, to see the spread
+     * alone: with it on, the move's single execution counts as 1 + n0, its bonus is sqrt(3) smaller,
+     * and at 51 visits it is not yet retried.
      */
     @Test
     void aRepeatedNoOpDoesNotSilenceTheBonusOfHabitsTriedOnce() {
@@ -590,11 +600,64 @@ class CodeletsTest {
         HabitIdeas.setCredit(habit(pool, "noop"), t.snapshot("noop"));
         HabitIdeas.setCredit(habit(pool, "move"), t.snapshot("move"));
 
-        behavior(new Config(), pool, 1).notifyCodelet();
+        behavior(withoutBorrowing(new Config()), pool, 1).notifyCodelet();
         assertEquals("noop", HabitIdeas.id(((Plan) planMO.getI()).habit()), "greedy: the best score");
-        behavior(new Config().withSelection("ucb"), pool, 1).notifyCodelet();
+        behavior(withoutBorrowing(new Config().withSelection("ucb")), pool, 1).notifyCodelet();
         assertEquals("move", HabitIdeas.id(((Plan) planMO.getI()).habit()),
                 "ucb: one execution is not enough to give up on a habit");
+    }
+
+    /**
+     * The habits UCB (c = 1) starts here in 20 decisions, nothing running, with borrowing at n0. One
+     * generator for all 20: the first nextInt(2) of new Random(1), new Random(2), ... is nearly
+     * always the same, a known weakness of its generator with small seeds.
+     */
+    private java.util.Set<String> ucbChoices(MemoryContainer pool, double contextPriorWeight) {
+        Config config = new Config().withSelection("ucb");
+        config.contextPriorWeight = contextPriorWeight;
+        BehaviorGeneratorCodelet b = behavior(config, pool, 1);
+        java.util.Set<String> chosen = new java.util.HashSet<>();
+        for (int i = 0; i < 20; i++) {
+            b.notifyCodelet();
+            chosen.add(HabitIdeas.id(((Plan) planMO.getI()).habit()));
+        }
+        return chosen;
+    }
+
+    /**
+     * CRE-01, the forced draw: carrying the cube into a bin where none of the habits has run yet.
+     * Before, every habit was untried there and the start was a uniform draw, letting go of the cube
+     * included (P1: ~77% of grab_open picks while holding were such draws). Borrowing, each habit
+     * enters with its mean under "transport, holding" elsewhere and, the bin unvisited, no bonus: the
+     * best record starts. A habit never run anywhere is still tried before any other.
+     */
+    @Test
+    void borrowingRanksHabitsNewToAContextByTheirRecordElsewhere() {
+        MemoryContainer pool = pool("letGo", "carryOn");
+        goal(1, Goal.TASK, "transport", 2);
+        drives(0, 0.2, 0.5, 0, 0, 2, false);
+        sensoryMO.setI(Traj.obs(400).idea());
+        assertTrue(Observation.of(sensoryMO).holding(), "observation 400 carries the cube");
+        trackerMO.setI(TrackerState.idle(0));
+        String carryingElsewhere = "transport|e0,0,0c0,0,0h1k1d0";
+        CreditTable t = new CreditTable();
+        for (int i = 0; i < 4; i++) {
+            t.add("letGo", carryingElsewhere, new double[]{0, -0.2, 0, 0}, 1.0, true);
+            t.add("carryOn", carryingElsewhere, new double[]{0, 0.01 * (i % 2), 0, 0}, 1.0, true);
+        }
+        t.add("letGo", "reach|e0,0,0c0,0,0h0k0d0", new double[]{0, 0.3, 0, 0}, 1.0, true);
+        t.closeExecutions();
+        HabitIdeas.setCredit(habit(pool, "letGo"), t.snapshot("letGo"));
+        HabitIdeas.setCredit(habit(pool, "carryOn"), t.snapshot("carryOn"));
+
+        assertEquals(java.util.Set.of("letGo", "carryOn"), ucbChoices(pool, 0.0), "before: a draw");
+        assertEquals(java.util.Set.of("carryOn"), ucbChoices(pool, 2.0), "borrowing: the best record");
+
+        MemoryContainer withANewHabit = pool("letGo", "carryOn", "neverRun");
+        HabitIdeas.setCredit(habit(withANewHabit, "letGo"), t.snapshot("letGo"));
+        HabitIdeas.setCredit(habit(withANewHabit, "carryOn"), t.snapshot("carryOn"));
+        assertEquals(java.util.Set.of("neverRun"), ucbChoices(withANewHabit, 2.0),
+                "never run anywhere: first");
     }
 
     // --- Sensory -------------------------------------------------------------------------------

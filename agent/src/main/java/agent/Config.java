@@ -137,6 +137,18 @@ public final class Config {
      * no-op repeated thousands of times set it to ~0 for every habit.
      */
     public double spreadPriorWeight = 2.0;
+    /**
+     * n0 of vault spec CRE-01: how many executions' worth of weight a habit's record elsewhere has
+     * where it has few or none. A habit's value under (goal, state bin) is its mean there shrunk
+     * toward its mean under the same goal with the hand in the same state, holding the cube or not
+     * (CreditTable#middleContext), or toward its total where that has none: (sum here + n0 * that
+     * mean) / (executions here + n0). UCB's and Thompson's counts add n0 too, so a habit that ran
+     * elsewhere is no longer untried here: only a habit never run anywhere is. 0 = the rule before
+     * CRE-01: the context's mean, else the total, and every habit not yet run in a context tried
+     * there first, in random order. In P1 those forced draws were 55-79% of the choices with the cube
+     * held (22-39% late), and ~77% of grab_open picks while holding. Needs creditRead MEAN.
+     */
+    public double contextPriorWeight = 2.0;
 
     // --- HabitLearner (cap4 4.4) -------------------------------------------------
     /** False in C4 and C6: the pool stays the primitives. Credit is still copied in (C4). */
@@ -147,6 +159,21 @@ public final class Config {
     // --- buffers -------------------------------------------------------------------
     public int sensoryBufferSize = 64;
     public int executionBufferSize = 4096;
+
+    /** Refuse settings that mean nothing, when a mind starts rather than at its first cycle. */
+    public void validate() {
+        if (!(taskStageWeight >= 0)) {
+            throw new IllegalArgumentException("taskStageWeight needs >= 0, got " + taskStageWeight);
+        }
+        if (!(contextPriorWeight >= 0)) {
+            throw new IllegalArgumentException("contextPriorWeight needs >= 0, got "
+                    + contextPriorWeight);
+        }
+        if (contextPriorWeight > 0 && creditRead == CreditSnapshot.Read.SUM) {
+            throw new IllegalArgumentException("contextPriorWeight " + contextPriorWeight
+                    + " shrinks a mean toward a mean, and creditRead SUM reads none: set it to 0");
+        }
+    }
 
     /** Set the Curiosity yield by name, refusing a bad name now rather than at the first cycle. */
     public Config withCuriosity(String name) {

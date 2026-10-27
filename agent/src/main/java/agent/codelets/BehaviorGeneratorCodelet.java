@@ -100,7 +100,7 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
             Idea habit = habits.get(i);
             CreditSnapshot habitCredit = habitCredits.get(i);
             Candidate candidate = new Candidate(habit, score(habitCredit, creditContext, driveLevels),
-                    habitCredit.count(creditContext),
+                    habitCredit.count(creditContext), habitCredit.priorCount(cfg.contextPriorWeight),
                     habitCredit.spread(referenceSpread, driveLevels, cfg.spreadPriorWeight));
             if (planRunning && HabitIdeas.id(habit).equals(trackerState.habit())) {
                 runningCandidate = candidate;
@@ -151,9 +151,13 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
         return referenceSpread;
     }
 
-    /** E(h), eq. (4.1): each drive's level times the habit's credit for that drive, summed. */
+    /**
+     * E(h), eq. (4.1): each drive's level times the habit's credit for that drive, summed. The
+     * credit borrows from the middle context where the habit has few executions here (CRE-01).
+     */
     double score(CreditSnapshot habitCredit, String creditContext, double[] driveLevels) {
-        double[] creditByDrive = habitCredit.value(creditContext, cfg.creditRead);
+        double[] creditByDrive = habitCredit.value(creditContext, cfg.creditRead,
+                cfg.contextPriorWeight);
         double score = 0.0;
         for (int drive = 0; drive < Drives.N; drive++) {
             score += driveLevels[drive] * creditByDrive[drive];

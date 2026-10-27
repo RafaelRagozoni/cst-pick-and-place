@@ -54,7 +54,8 @@ import java.util.zip.GZIPOutputStream;
  */
 public final class Checkpoint {
 
-    public static final int FORMAT = 1;
+    /** 2 since CRE-01: the credit table keeps each habit's middle contexts too. */
+    public static final int FORMAT = 2;
     private static final Gson GSON = new GsonBuilder().serializeNulls()
             .serializeSpecialFloatingPointValues().create();
 
