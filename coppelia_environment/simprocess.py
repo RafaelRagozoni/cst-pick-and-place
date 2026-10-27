@@ -12,6 +12,7 @@ under MuJoCo, ODE or Newton all six were identical (test_fresh_process.py, agent
 The install is found from --coppelia-root, else $COPPELIASIM_ROOT (the variable CoppeliaSim's own
 tooling uses), else the one ~/CoppeliaSim* directory if there is exactly one.
 """
+import fcntl
 import glob
 import os
 import signal
@@ -19,6 +20,9 @@ import socket
 import subprocess
 import tempfile
 import time
+
+# Held while one CoppeliaSim starts, by every SimProcess of this user (SimProcess.start).
+START_LOCK = os.path.join(tempfile.gettempdir(), 'coppeliasim-start-%d.lock' % os.getuid())
 
 def find_root(explicit=None):
     root = explicit or os.environ.get('COPPELIASIM_ROOT')
@@ -57,27 +61,42 @@ class SimProcess:
                                                delete=False)
 
     def start(self, timeout=90):
-        if _listening(self.rpc_port):
-            # Waiting for the port would "succeed" at once, against whatever holds it.
-            raise RuntimeError('port %d is already in use' % self.rpc_port)
-        cmd = [os.path.join(self.root, 'coppeliaSim.sh')]
-        if not self.gui:
-            cmd.append('-h')
-        cmd += ['-GzmqRemoteApi.rpcPort=%d' % self.rpc_port,
-                '-GwsRemoteApi.port=%d' % free_port()]
-        # stdin stays open: headless CoppeliaSim quits when its stdin closes. A new session, so
-        # stop() can signal the script and the simulator it spawns together.
-        self.proc = subprocess.Popen(cmd, cwd=self.root, stdin=subprocess.PIPE, stdout=self.log,
-                                     stderr=subprocess.STDOUT, start_new_session=True)
-        t0 = time.time()
-        while not _listening(self.rpc_port):
-            if self.proc.poll() is not None:
-                raise RuntimeError('CoppeliaSim exited at startup:\n' + self.tail())
-            if time.time() - t0 > timeout:
-                self.stop()
-                raise RuntimeError('CoppeliaSim did not open port %d in %d s:\n%s'
-                                   % (self.rpc_port, timeout, self.tail()))
-            time.sleep(0.2)
+        """Start CoppeliaSim and wait for its remote API port; `timeout` counts once it is our turn.
+
+        One start at a time on this machine (START_LOCK): at startup CoppeliaSim deletes the old
+        folders in ~/.config/.CoppeliaSim/autoSavedScenes, and processes starting together delete
+        the same folder and abort ("cannot remove all: No such file or directory"). Every launched
+        process leaves its folder there, being stopped by a signal, so the first batch after some
+        days without runs met it: 3 of 9 aborted on 2026-10-27, the other 6 did not open their port
+        in 90 s. 40 planted folders of 9 MB each, aged 8 days, made 6 of 9 abort without the lock
+        and none with it. A CoppeliaSim opened by hand does not take the lock.
+        """
+        with open(START_LOCK, 'w') as start_lock:
+            # flock rather than a lock file of our own: the kernel lets go when the holder dies,
+            # however it dies, so a crashed run cannot leave the next one waiting forever.
+            fcntl.flock(start_lock, fcntl.LOCK_EX)
+            if _listening(self.rpc_port):
+                # Waiting for the port would "succeed" at once, against whatever holds it.
+                raise RuntimeError('port %d is already in use' % self.rpc_port)
+            cmd = [os.path.join(self.root, 'coppeliaSim.sh')]
+            if not self.gui:
+                cmd.append('-h')
+            cmd += ['-GzmqRemoteApi.rpcPort=%d' % self.rpc_port,
+                    '-GwsRemoteApi.port=%d' % free_port()]
+            # stdin stays open: headless CoppeliaSim quits when its stdin closes. A new session,
+            # so stop() can signal the script and the simulator it spawns together.
+            self.proc = subprocess.Popen(cmd, cwd=self.root, stdin=subprocess.PIPE,
+                                         stdout=self.log, stderr=subprocess.STDOUT,
+                                         start_new_session=True)
+            started = time.time()
+            while not _listening(self.rpc_port):
+                if self.proc.poll() is not None:
+                    raise RuntimeError('CoppeliaSim exited at startup:\n' + self.tail())
+                if time.time() - started > timeout:
+                    self.stop()
+                    raise RuntimeError('CoppeliaSim did not open port %d in %d s:\n%s'
+                                       % (self.rpc_port, timeout, self.tail()))
+                time.sleep(0.2)
         return self
 
     def stop(self, timeout=15):
