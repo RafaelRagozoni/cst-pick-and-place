@@ -22,6 +22,16 @@ public final class Config {
     public double effortRefineGain = 1.0;
     /** Task level = target distance / this, capped at 1. Meters; ~ the arm's reach across the table. */
     public double taskDistanceScale = 0.5;
+    /**
+     * w of vault spec CRE-01: what one task stage weighs in the Task level, against the current
+     * stage's distance, which weighs 1. Task = (w * stages left, the current one counted, + distance
+     * term) / (4w + 1), and 0 when done (TaskStages#taskLevel). Completing a stage lowers it by
+     * w / (4w + 1), and undoing one raises it as much, so Credit Assignment credits the jump: letting
+     * the cube go mid-transport is charged the progress it undoes. 0 = the Task before CRE-01,
+     * distance only: its target moves at each stage change, Credit zeroes that jump, and dropping the
+     * cube cost nothing (P1: 95% of grasps ended with the cube dropped away from the pad).
+     */
+    public double taskStageWeight = 1.0;
     /** Safety rises as a joint comes within this many radians of its limit. */
     public double safetyMargin = Math.toRadians(15);
     /** Effort level = cycles on the current goal / this. */

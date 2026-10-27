@@ -12,7 +12,9 @@ import agent.selection.Selector;
 import agent.selection.Selector.Candidate;
 import agent.selection.Selectors;
 import agent.sim.Observation;
+import agent.task.TaskStages;
 import br.unicamp.cst.representation.idea.Idea;
+import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -363,5 +365,78 @@ class UnitsTest {
         }
         assertEquals(a, b, "a seed reproduces the draws");
         assertTrue(new java.util.HashSet<>(a).size() > 3, "equal scores: the choice varies");
+    }
+
+    // --- the Task level (vault spec CRE-01) ---------------------------------------------
+    private static double taskLevel(Observation observation, double stageWeight) {
+        int stage = TaskStages.infer(observation);
+        return TaskStages.taskLevel(stage, TaskStages.targetDistance(stage, observation), 0.5,
+                stageWeight);
+    }
+
+    /** At stage weight 0 the level is the Task before CRE-01, to the bit; done is 0 at any weight. */
+    @Test
+    void taskLevelAtStageWeightZeroIsTheDistanceAlone() {
+        for (int stage = 0; stage < TaskStages.DONE; stage++) {
+            for (double distance : new double[]{0.0, 0.013, 0.05, 0.3, 0.5, 0.9}) {
+                assertEquals(Math.min(1.0, distance / 0.5),
+                        TaskStages.taskLevel(stage, distance, 0.5, 0.0), 0.0);
+                if (stage + 1 < TaskStages.DONE) {
+                    assertEquals(0.2, TaskStages.taskLevel(stage, distance, 0.5, 1.0)
+                            - TaskStages.taskLevel(stage + 1, distance, 0.5, 1.0), 1e-12,
+                            "at weight 1 a stage is worth 1 / (4 + 1)");
+                }
+            }
+        }
+        assertEquals(0.0, TaskStages.taskLevel(TaskStages.DONE, 0.3, 0.5, 0.0));
+        assertEquals(0.0, TaskStages.taskLevel(TaskStages.DONE, 0.3, 0.5, 1.0));
+    }
+
+    /**
+     * On the expert trajectory, at stage weight 1, no stage advance raises the Task: entering a stage
+     * costs at most its distance term, 1, and gains a stage, 1. At weight 0 the grasp does raise it --
+     * from the hand at the cube to the cube far from the pad -- which is why Credit zeroes the jump
+     * there.
+     */
+    @Test
+    void onTheExpertTrajectoryNoStageAdvanceRaisesTheTask() {
+        int advances = 0;
+        boolean anAdvanceRaisedItAtWeightZero = false;
+        for (int i = 1; i < Traj.json().size(); i++) {
+            int stageBefore = TaskStages.infer(Traj.obs(i - 1));
+            int stageNow = TaskStages.infer(Traj.obs(i));
+            if (stageNow > stageBefore) {
+                advances++;
+                assertTrue(taskLevel(Traj.obs(i), 1.0) <= taskLevel(Traj.obs(i - 1), 1.0),
+                        "advance to " + TaskStages.name(stageNow) + " at observation " + i);
+                anAdvanceRaisedItAtWeightZero |=
+                        taskLevel(Traj.obs(i), 0.0) > taskLevel(Traj.obs(i - 1), 0.0);
+            }
+        }
+        assertTrue(advances >= 4, "reach, grasp, transport and release seen: " + advances);
+        assertTrue(anAdvanceRaisedItAtWeightZero);
+        assertTrue(taskLevel(Traj.obs(0), 1.0) > 0.9, "the start is nearly all the way back");
+        assertEquals(0.0, taskLevel(Traj.obs(Traj.json().size() - 1), 1.0), "done");
+    }
+
+    /**
+     * Letting the cube go mid-transport (expert observation 520: held 0.34 m from the pad, 0.24 m up)
+     * puts the Task back a stage. At weight 1 it rises; at weight 0 it falls, to the hand-to-cube
+     * distance, and the drop looked like progress -- the reason that jump was zeroed.
+     */
+    @Test
+    void lettingTheCubeGoMidTransportRaisesTheTask() {
+        Observation held = Traj.obs(520);
+        assertEquals(2, TaskStages.infer(held), "transport");
+        JsonObject letGo = Traj.copy(520);
+        JsonObject gripper = letGo.getAsJsonObject("innerSense").getAsJsonObject("gripper");
+        gripper.addProperty("isHolding", false);
+        gripper.addProperty("commanded_open", true);
+        Idea letGoIdea = Observation.toIdea(letGo, 521, 0, false, false);
+        Observation.setCarry(letGoIdea, true, false, 0);
+        Observation dropped = new Observation(letGoIdea);
+        assertEquals(1, TaskStages.infer(dropped), "back to grasp: the hand is still at the cube");
+        assertTrue(taskLevel(dropped, 1.0) - taskLevel(held, 1.0) > 0.05);
+        assertTrue(taskLevel(dropped, 0.0) < taskLevel(held, 0.0));
     }
 }

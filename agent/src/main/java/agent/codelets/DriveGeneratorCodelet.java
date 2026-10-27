@@ -111,8 +111,9 @@ public final class DriveGeneratorCodelet extends AgentCodelet {
         rawDriveLevels[Drives.CURIOSITY] = boredom * yieldFactor;
 
         int stage = TaskStages.infer(observation);
-        rawDriveLevels[Drives.TASK] = Math.min(1.0,
-                TaskStages.targetDistance(stage, observation) / cfg.taskDistanceScale);
+        rawDriveLevels[Drives.TASK] = TaskStages.taskLevel(stage,
+                TaskStages.targetDistance(stage, observation), cfg.taskDistanceScale,
+                cfg.taskStageWeight);
 
         double safety = (observation.envCollision() || observation.selfCollision()) ? 1.0 : 0.0;
         for (double jointMargin : observation.jointLimitMargin()) {

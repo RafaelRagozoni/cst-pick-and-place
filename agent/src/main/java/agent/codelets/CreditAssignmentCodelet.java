@@ -145,7 +145,12 @@ public final class CreditAssignmentCodelet extends AgentCodelet {
                         : 0.0;
             }
             if (drives.taskStage() != previousTaskStage) {
-                driveChange[Drives.TASK] = 0.0;
+                // At taskStageWeight 0 the Task's target moves with the stage and its level jumps
+                // with it, which no habit earned: zeroed. Above 0 the jump is mostly the stage gained
+                // or undone (CRE-01) and is credited as it is, outside the progress window.
+                if (cfg.taskStageWeight == 0.0) {
+                    driveChange[Drives.TASK] = 0.0;
+                }
                 recentTaskLevels.clear();
             } else if (cfg.progressWindow > 0) {
                 boolean taskRetreated = driveLevels[Drives.TASK] > previousDriveLevels[Drives.TASK];

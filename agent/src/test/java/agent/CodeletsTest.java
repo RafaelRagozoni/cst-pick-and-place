@@ -283,6 +283,7 @@ class CodeletsTest {
 
     /** One habit per cycle, one-step credit; Task levels as given; each habit's Task credit. */
     private double[] taskCreditPerStep(int progressWindow, boolean chargeRetreat, double... levels) {
+        executionMO.setI(new ExecutionBuffer(100));     // a test may call this twice
         Config cfg = new Config();
         cfg.lambda = 0.0;
         cfg.progressWindow = progressWindow;
@@ -327,6 +328,59 @@ class CodeletsTest {
     void progressWindowZeroIsThePlainChange() {
         assertArrayEquals(new double[]{0.1, -0.1, 0.1, 0.1},
                 taskCreditPerStep(0, false, 0.5, 0.4, 0.5, 0.4, 0.3), 1e-9);
+    }
+
+    /**
+     * One habit per cycle, one-step credit, at this stage weight; each cycle's stage and the
+     * distance to its target set the Task level as the Drive Generator would. Each habit's Task credit.
+     */
+    private double[] taskCreditAcrossStages(double taskStageWeight, int[] stages, double[] distances) {
+        executionMO.setI(new ExecutionBuffer(100));     // a fresh run: a test calls this several times
+        Config cfg = new Config();
+        cfg.lambda = 0.0;
+        cfg.taskStageWeight = taskStageWeight;
+        CreditAssignmentCodelet c = credit(cfg);
+        double[] out = new double[stages.length - 1];
+        for (int k = 0; k < stages.length; k++) {
+            if (k > 0) {
+                buffer().addStep("h" + k, k, 0, 1, List.of(), k - 1, k, "done", "transport", 1, "ctx",
+                        0);
+            }
+            sensoryMO.setI(at(k, Traj.obs(0).q(), false));
+            drives(k, 0, TaskStages.taskLevel(stages[k], distances[k], cfg.taskDistanceScale,
+                    taskStageWeight), 0, 0, stages[k], k == 0);
+            c.notifyCodelet();
+            if (k > 0) {
+                out[k - 1] = c.table().snapshot("h" + k).value("ctx", CreditSnapshot.Read.SUM)[Drives.TASK];
+            }
+        }
+        return out;
+    }
+
+    /**
+     * CRE-01. Letting the cube go mid-transport undoes a stage: above stage weight 0 the habit that
+     * let go is charged the Task's rise, and grasping again is paid it back; at 0 both are zeroed
+     * with the stage change, as before, and dropping the cube was free. Going in and out of reach
+     * pays nothing overall at either weight: the Task is a potential, and its changes telescope.
+     */
+    @Test
+    void aStageUndoneIsChargedAndCrossingBackAndForthPaysNothing() {
+        int[] dropAndRegrasp = {2, 1, 2};                 // transport, let go at the hand, grasp again
+        double[] distances = {0.2, 0.01, 0.2};
+        double[] weightOne = taskCreditAcrossStages(1.0, dropAndRegrasp, distances);
+        assertEquals((2 + 0.4) / 5 - (3 + 0.02) / 5, weightOne[0], 1e-12, "letting go is charged");
+        assertEquals(-weightOne[0], weightOne[1], 1e-12, "grasping again is paid as much");
+        assertArrayEquals(new double[]{0.0, 0.0},
+                taskCreditAcrossStages(0.0, dropAndRegrasp, distances), 0.0);
+
+        int[] inAndOutOfReach = {0, 1, 0};
+        double[] acrossTheBorder = {0.051, 0.049, 0.051};
+        for (double taskStageWeight : new double[]{0.0, 1.0}) {
+            double[] crossing = taskCreditAcrossStages(taskStageWeight, inAndOutOfReach, acrossTheBorder);
+            assertEquals(0.0, crossing[0] + crossing[1], 1e-12, "weight " + taskStageWeight);
+        }
+        assertTrue(taskCreditAcrossStages(1.0, inAndOutOfReach, acrossTheBorder)[0] > 0.19,
+                "reaching pays a stage");
     }
 
     /** A new stage is a new target: the best of the last one is no reference for it. */

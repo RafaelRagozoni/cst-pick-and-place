@@ -62,6 +62,7 @@ class GoldenTrajectoryTest {
                                                 String curiosity, int seed, int episodes,
                                                 int stepLimit) throws IOException {
         Config config = Config.forCondition(condition).withSelection(selection).withCuriosity(curiosity);
+        config.taskStageWeight = 0.0;           // CRE-01 part 1 off: the agent the files recorded
         FakeEnvironment environment = FakeEnvironment.startingOverTheCube(stepLimit);
         AgentMind mind = new AgentMind(config, environment, seed);
         for (int episode = 0; episode < episodes; episode++) {
