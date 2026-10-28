@@ -106,7 +106,7 @@ public final class DriveGeneratorCodelet extends AgentCodelet {
         double[] characterizationVector = Characterization.vector(observation, cfg.salience);   // b, cap4 4.3.1
         double novelty = archive.visit(characterizationVector, binKey, observation.cycle());
         double boredom = 1.0 / (1.0 + novelty / cfg.noveltyScale);
-        double yieldFactor = yield.observe(observation, binKey, characterizationVector,   // y, CUR-01
+        double yieldFactor = yield.recordCycleAndGetYield(observation, binKey, characterizationVector,   // y, CUR-01
                 habitThatRan(observation));
         rawDriveLevels[Drives.CURIOSITY] = boredom * yieldFactor;
 

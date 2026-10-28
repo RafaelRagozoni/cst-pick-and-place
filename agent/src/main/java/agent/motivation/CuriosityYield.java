@@ -21,7 +21,7 @@ public interface CuriosityYield {
      * them), and the habit whose commands produced it -- the one in execution last cycle, or null when
      * none ran. Returns y for this cycle.
      */
-    double observe(Observation o, String bin, double[] b, String habit);
+    double recordCycleAndGetYield(Observation o, String bin, double[] b, String habit);
 
     /** What outlives an episode, for a checkpoint. */
     JsonObject state();

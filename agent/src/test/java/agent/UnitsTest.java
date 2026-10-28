@@ -94,8 +94,8 @@ class UnitsTest {
     @Test
     void yieldsByNameAndNoneIsCuriosityAsBefore() {
         CuriosityYield none = Yields.byName("none");
-        assertEquals(1.0, none.observe(obs(0, true), "A", B, null));
-        assertEquals(1.0, none.observe(obs(1, false), "B", B, "h"));
+        assertEquals(1.0, none.recordCycleAndGetYield(obs(0, true), "A", B, null));
+        assertEquals(1.0, none.recordCycleAndGetYield(obs(1, false), "B", B, "h"));
         for (String bad : new String[]{"count:0.5", "count:", "lp:x", "lp:Infinity", "none:5", "rnd"}) {
             assertThrows(IllegalArgumentException.class, () -> Yields.byName(bad), bad);
         }
@@ -110,30 +110,30 @@ class UnitsTest {
     @Test
     void countPaysEntriesIntoABinNotCyclesSpentInIt() {
         CuriosityYield c = Yields.byName("count:1");     // W = 1: y is this cycle's signal itself
-        assertEquals(1.0, c.observe(obs(0, true), "A", B, null));
-        assertEquals(1.0, c.observe(obs(1, false), "A", B, "h"), "staying is not entering");
-        assertEquals(1.0, c.observe(obs(2, false), "B", B, "h"));
-        assertEquals(1 / Math.sqrt(2), c.observe(obs(3, false), "A", B, "h"), 1e-12);
-        c.observe(obs(4, false), "B", B, "h");
-        assertEquals(1 / Math.sqrt(3), c.observe(obs(5, false), "A", B, "h"), 1e-12);
-        assertEquals(0.5, c.observe(obs(6, true), "A", B, null), 1e-12, "a reset into A enters it");
+        assertEquals(1.0, c.recordCycleAndGetYield(obs(0, true), "A", B, null));
+        assertEquals(1.0, c.recordCycleAndGetYield(obs(1, false), "A", B, "h"), "staying is not entering");
+        assertEquals(1.0, c.recordCycleAndGetYield(obs(2, false), "B", B, "h"));
+        assertEquals(1 / Math.sqrt(2), c.recordCycleAndGetYield(obs(3, false), "A", B, "h"), 1e-12);
+        c.recordCycleAndGetYield(obs(4, false), "B", B, "h");
+        assertEquals(1 / Math.sqrt(3), c.recordCycleAndGetYield(obs(5, false), "A", B, "h"), 1e-12);
+        assertEquals(0.5, c.recordCycleAndGetYield(obs(6, true), "A", B, null), 1e-12, "a reset into A enters it");
         for (long t = 7; t < 20007; t++) {
-            c.observe(obs(t, false), "C", B, "h");
+            c.recordCycleAndGetYield(obs(t, false), "C", B, "h");
         }
-        assertEquals(1 / Math.sqrt(5), c.observe(obs(20007, false), "A", B, "h"), 1e-12,
+        assertEquals(1 / Math.sqrt(5), c.recordCycleAndGetYield(obs(20007, false), "A", B, "h"), 1e-12,
                 "20000 cycles away: still remembered");
 
         CuriosityYield m = Yields.byName("count:4");
-        double y = m.observe(obs(0, true), "A", B, null);
+        double y = m.recordCycleAndGetYield(obs(0, true), "A", B, null);
         assertEquals(1.0, y, "starts at 1: nothing is known");
         for (int t = 1; t <= 6; t++) {                      // A entered 4 times in all
-            y = m.observe(obs(t, false), t % 2 == 0 ? "A" : "B", B, "h");
+            y = m.recordCycleAndGetYield(obs(t, false), t % 2 == 0 ? "A" : "B", B, "h");
         }
         double before = y;
-        y = m.observe(obs(7, false), "A", B, "h");          // x = 1/sqrt(4) while it stays
+        y = m.recordCycleAndGetYield(obs(7, false), "A", B, "h");          // x = 1/sqrt(4) while it stays
         assertEquals(before + (0.5 - before) / 4, y, 1e-12, "a running mean over W = 4 cycles");
         for (int t = 8; t < 200; t++) {
-            y = m.observe(obs(t, false), "A", B, "h");
+            y = m.recordCycleAndGetYield(obs(t, false), "A", B, "h");
         }
         assertEquals(0.5, y, 1e-9);
     }
@@ -141,14 +141,14 @@ class UnitsTest {
     /** lp, W = 1, from bin S with habit h: the y of each of n cycles moving b by step(t). */
     private static double[] lpRun(CuriosityYield lp, int n, java.util.function.IntFunction<double[]> step) {
         double[] b = new double[9];
-        lp.observe(obs(0, true), "S", b.clone(), null);
+        lp.recordCycleAndGetYield(obs(0, true), "S", b.clone(), null);
         double[] ys = new double[n + 1];
         for (int t = 1; t <= n; t++) {
             double[] d = step.apply(t);
             for (int i = 0; i < 9; i++) {
                 b[i] += d[i];
             }
-            ys[t] = lp.observe(obs(t, false), "S", b.clone(), "h");
+            ys[t] = lp.recordCycleAndGetYield(obs(t, false), "S", b.clone(), "h");
         }
         return ys;
     }
@@ -204,9 +204,9 @@ class UnitsTest {
         assertEquals(0.0, learned, 1e-9);
         double[] jump = new double[9];
         jump[2] = 50;
-        assertEquals(learned, lp.observe(obs(100, true), "S", jump.clone(), "h"), "a reset is no effect");
+        assertEquals(learned, lp.recordCycleAndGetYield(obs(100, true), "S", jump.clone(), "h"), "a reset is no effect");
         jump[2] = 90;
-        assertEquals(learned, lp.observe(obs(101, false), "S", jump.clone(), null), "nor is idling");
+        assertEquals(learned, lp.recordCycleAndGetYield(obs(101, false), "S", jump.clone(), null), "nor is idling");
     }
 
     @Test

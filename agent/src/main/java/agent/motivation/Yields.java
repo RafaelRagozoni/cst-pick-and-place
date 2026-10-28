@@ -69,7 +69,7 @@ public final class Yields {
     static final class None implements CuriosityYield {
 
         @Override
-        public double observe(Observation o, String bin, double[] b, String habit) {
+        public double recordCycleAndGetYield(Observation o, String bin, double[] b, String habit) {
             return 1.0;
         }
 
@@ -124,7 +124,7 @@ public final class Yields {
         }
 
         @Override
-        public double observe(Observation o, String bin, double[] b, String habit) {
+        public double recordCycleAndGetYield(Observation o, String bin, double[] b, String habit) {
             if (o.episodeStart()) {
                 last = null;                    // the reset puts the arm somewhere: an entry
             }
@@ -189,7 +189,7 @@ public final class Yields {
         }
 
         @Override
-        public double observe(Observation o, String bin, double[] b, String habit) {
+        public double recordCycleAndGetYield(Observation o, String bin, double[] b, String habit) {
             if (!o.episodeStart() && lastBin != null && habit != null) {
                 learn(lastBin, habit, lastB, b);
             }
