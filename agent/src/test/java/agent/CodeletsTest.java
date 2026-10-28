@@ -536,19 +536,14 @@ class CodeletsTest {
         assertTrue(first.stream().distinct().count() > 1, "ties spread over the pool");
     }
 
-    /** Borrowing off (CRE-01's contextPriorWeight 0): a context's own record, else the total. */
-    private static Config withoutBorrowing(Config config) {
-        config.contextPriorWeight = 0.0;
-        return config;
-    }
-
     /**
      * UCB weighs what is known about a habit in THIS context. A habit that ran 50 times elsewhere and
      * never here is untried here and goes first. Counting its 50 instead left it a near-zero bonus
      * and gave the habit tried here once the largest: the 2026-10-15 baseline repeated a habit that
-     * had already run in the bin in 99% of its choices. This is the rule with borrowing off; with it
-     * on, a habit that ran elsewhere is no longer untried here, on purpose
-     * (borrowingRanksHabitsNewToAContextByTheirRecordElsewhere).
+     * had already run in the bin in 99% of its choices. The hand is empty, so this holds with
+     * borrowing on (CRE-01 borrows only with the cube in the hand: borrowing here too ended these
+     * draws, and with them the agent's exploration). With the cube, a habit that ran elsewhere is no
+     * longer untried, on purpose (borrowingRanksHabitsNewToAContextByTheirRecordElsewhere).
      */
     @Test
     void ucbTriesAHabitNeverRunHereBeforeRepeatingOneThatRan() {
@@ -568,9 +563,10 @@ class CodeletsTest {
         HabitIdeas.setCredit(habit(pool, "here"), t.snapshot("here"));
         HabitIdeas.setCredit(habit(pool, "elsewhere"), t.snapshot("elsewhere"));
 
-        behavior(withoutBorrowing(new Config()), pool, 1).notifyCodelet();
+        assertTrue(new Config().contextPriorWeight > 0, "borrowing on, as it runs");
+        behavior(new Config(), pool, 1).notifyCodelet();
         assertEquals("here", HabitIdeas.id(((Plan) planMO.getI()).habit()), "greedy: the best score");
-        behavior(withoutBorrowing(new Config().withSelection("ucb")), pool, 1).notifyCodelet();
+        behavior(new Config().withSelection("ucb"), pool, 1).notifyCodelet();
         assertEquals("elsewhere", HabitIdeas.id(((Plan) planMO.getI()).habit()),
                 "ucb: never run here, so tried here first");
     }
@@ -579,9 +575,9 @@ class CodeletsTest {
      * A habit whose results never vary cannot set the spread for the rest. Live (seed 3, 2026-10-16):
      * every habit tried once, then a no-op repeated 4978 times; the pooled spread came from the
      * no-op alone, ~0, and UCB never retried the others. Each habit now carries its own spread, the
-     * repertoire's reference until its own executions pull it away. Borrowing off, to see the spread
-     * alone: with it on, the move's single execution counts as 1 + n0, its bonus is sqrt(3) smaller,
-     * and at 51 visits it is not yet retried.
+     * repertoire's reference until its own executions pull it away. The hand is empty, so borrowing
+     * leaves this alone. With the cube in the hand it would not: the move's single execution would
+     * count as 1 + n0, its bonus sqrt(3) smaller, and at 51 visits it would not yet be retried.
      */
     @Test
     void aRepeatedNoOpDoesNotSilenceTheBonusOfHabitsTriedOnce() {
@@ -600,9 +596,9 @@ class CodeletsTest {
         HabitIdeas.setCredit(habit(pool, "noop"), t.snapshot("noop"));
         HabitIdeas.setCredit(habit(pool, "move"), t.snapshot("move"));
 
-        behavior(withoutBorrowing(new Config()), pool, 1).notifyCodelet();
+        behavior(new Config(), pool, 1).notifyCodelet();
         assertEquals("noop", HabitIdeas.id(((Plan) planMO.getI()).habit()), "greedy: the best score");
-        behavior(withoutBorrowing(new Config().withSelection("ucb")), pool, 1).notifyCodelet();
+        behavior(new Config().withSelection("ucb"), pool, 1).notifyCodelet();
         assertEquals("move", HabitIdeas.id(((Plan) planMO.getI()).habit()),
                 "ucb: one execution is not enough to give up on a habit");
     }

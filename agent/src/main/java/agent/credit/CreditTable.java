@@ -122,6 +122,18 @@ public final class CreditTable {
     }
 
     /**
+     * Whether the hand holds the cube in this context: its middle context ends in "h1". Only such a
+     * context borrows (vault spec CRE-01, amended 2026-10-28). Letting go of the cube drops it
+     * wherever the arm is, so a habit's record with the cube held elsewhere tells about it here.
+     * Without the cube, which move helps depends on where the arm is, and UCB's draw among the habits
+     * not yet run in the bin is what explored: borrowing there too, the draws ended and 7 of 9 P1
+     * seeds never reached a first success. A context with no "h" flag holds nothing.
+     */
+    public static boolean holdsTheCube(String context) {
+        return middleContext(context).endsWith("|h1");
+    }
+
+    /**
      * Credit {@code weight * delta} to the habit under {@code context}. {@code execution} marks the
      * start of one execution of the habit, which is what the per-execution mean divides by.
      */

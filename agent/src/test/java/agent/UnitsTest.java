@@ -26,6 +26,7 @@ import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -446,19 +447,22 @@ class UnitsTest {
     // --- borrowed credit (vault spec CRE-01) --------------------------------------------
     /**
      * The middle context is read back from the state key's holding flag. If Characterization.key
-     * changed its format, the middle would silently become the whole context and borrowing would
-     * fall back to the total: this pins the two together.
+     * changed its format, the middle would silently become the whole context, no context would hold
+     * the cube, and borrowing would stop without a word: this pins the two together.
      */
     @Test
     void middleContextIsTheGoalAndWhetherTheHandHoldsTheCube() {
         Observation holding = Traj.obs(400);
         Observation notHolding = Traj.obs(0);
         assertTrue(holding.holding());
-        assertEquals("transport|h1", CreditTable.middleContext(
-                CreditTable.context("transport", Characterization.key(holding))));
-        assertEquals("reach|h0", CreditTable.middleContext(
-                CreditTable.context("reach", Characterization.key(notHolding))));
+        String carrying = CreditTable.context("transport", Characterization.key(holding));
+        String reaching = CreditTable.context("reach", Characterization.key(notHolding));
+        assertEquals("transport|h1", CreditTable.middleContext(carrying));
+        assertEquals("reach|h0", CreditTable.middleContext(reaching));
         assertEquals("ctx", CreditTable.middleContext("ctx"), "a hand-made context is its own");
+        assertTrue(CreditTable.holdsTheCube(carrying));
+        assertFalse(CreditTable.holdsTheCube(reaching));
+        assertFalse(CreditTable.holdsTheCube("ctx"), "no flag: holds nothing");
     }
 
     /**
@@ -507,34 +511,60 @@ class UnitsTest {
         assertEquals(state, restored.state());
     }
 
+    /** One habit's record: twice with the cube in the hand (0.5 and -0.1), once without (-0.6). */
+    private static CreditSnapshot carriedTwiceReachedOnce() {
+        CreditTable t = new CreditTable();
+        t.add("h", "transport|e1c1h1k0d0", new double[]{0.5, 0, 0, 0}, 1.0, true);
+        t.add("h", "transport|e2c2h1k0d0", new double[]{-0.1, 0, 0, 0}, 1.0, true);
+        t.add("h", "transport|e9c9h0k0d0", new double[]{-0.6, 0, 0, 0}, 1.0, true);
+        t.closeExecutions();
+        return t.snapshot("h");
+    }
+
     /**
-     * The borrowed value: a context's mean shrunk toward the middle's by n0 pseudo-executions; the
-     * middle's mean where the context has none; the total where the middle has none either; and at
-     * n0 = 0, or for a habit never run, the rule before CRE-01.
+     * The borrowed value, with the cube in the hand: a context's mean shrunk toward the middle's by
+     * n0 pseudo-executions; the middle's mean where the context has none; the total where the middle
+     * has none either; and at n0 = 0, or for a habit never run, the rule before CRE-01.
      */
     @Test
     void borrowedValueShrinksTowardTheMiddleThenTheTotal() {
-        CreditTable t = new CreditTable();
-        t.add("h", "reach|e1c1h0k0d0", new double[]{0.5, 0, 0, 0}, 1.0, true);
-        t.add("h", "reach|e2c2h0k0d0", new double[]{-0.1, 0, 0, 0}, 1.0, true);
-        t.add("h", "reach|e9c9h1k0d0", new double[]{-0.6, 0, 0, 0}, 1.0, true);
-        t.closeExecutions();
-        CreditSnapshot s = t.snapshot("h");
+        CreditSnapshot s = carriedTwiceReachedOnce();
         var mean = CreditSnapshot.Read.MEAN;
         double total = (0.5 - 0.1 - 0.6) / 3;
-        assertEquals((0.5 + 2 * 0.2) / (1 + 2), s.value("reach|e1c1h0k0d0", mean, 2.0)[0], 1e-12,
-                "its own mean, shrunk toward reach|h0's 0.2");
-        assertEquals(0.2, s.value("reach|e5c5h0k0d0", mean, 2.0)[0], 1e-12, "none here: the middle");
-        assertEquals(-0.6, s.value("reach|e5c5h1k0d0", mean, 2.0)[0], 1e-12, "the other hand");
-        assertEquals(total, s.value("grasp|e1c1h0k0d0", mean, 2.0)[0], 1e-12, "no middle: the total");
-        assertEquals(total, s.value("reach|e5c5h0k0d0", mean, 0.0)[0], 1e-12, "n0 = 0: as before");
-        assertArrayEquals(s.value("reach|e1c1h0k0d0", mean), s.value("reach|e1c1h0k0d0", mean, 0.0));
-        assertEquals(2.0, s.priorCount(2.0));
-        assertEquals(0.0, s.priorCount(0.0));
-        assertArrayEquals(new double[4], CreditSnapshot.EMPTY.value("reach|e1c1h0k0d0", mean, 2.0));
-        assertEquals(0.0, CreditSnapshot.EMPTY.priorCount(2.0), "never run: still untried");
+        assertEquals((0.5 + 2 * 0.2) / (1 + 2), s.value("transport|e1c1h1k0d0", mean, 2.0)[0], 1e-12,
+                "its own mean, shrunk toward transport|h1's 0.2");
+        assertEquals(0.2, s.value("transport|e5c5h1k0d0", mean, 2.0)[0], 1e-12,
+                "none here: the middle");
+        assertEquals(total, s.value("release|e1c1h1k0d0", mean, 2.0)[0], 1e-12,
+                "no middle: the total");
+        assertEquals(total, s.value("transport|e5c5h1k0d0", mean, 0.0)[0], 1e-12, "n0 = 0: as before");
+        assertArrayEquals(s.value("transport|e1c1h1k0d0", mean),
+                s.value("transport|e1c1h1k0d0", mean, 0.0));
+        assertEquals(2.0, s.priorCount("transport|e5c5h1k0d0", 2.0));
+        assertEquals(0.0, s.priorCount("transport|e5c5h1k0d0", 0.0));
+        assertArrayEquals(new double[4], CreditSnapshot.EMPTY.value("transport|e1c1h1k0d0", mean, 2.0));
+        assertEquals(0.0, CreditSnapshot.EMPTY.priorCount("transport|e1c1h1k0d0", 2.0),
+                "never run: still untried");
         assertThrows(IllegalArgumentException.class,
-                () -> s.value("reach|e1c1h0k0d0", CreditSnapshot.Read.SUM, 2.0));
+                () -> s.value("transport|e1c1h1k0d0", CreditSnapshot.Read.SUM, 2.0));
+    }
+
+    /**
+     * Without the cube in the hand nothing is borrowed (spec CRE-01, amended 2026-10-28): the value
+     * is the context's own mean, else the total, and the habit not yet run there counts as untried,
+     * as before CRE-01. Borrowing there too ended UCB's draw among such habits, the agent's
+     * exploration, and 7 of 9 P1 seeds never reached a first success.
+     */
+    @Test
+    void aContextWithoutTheCubeBorrowsNothing() {
+        CreditSnapshot s = carriedTwiceReachedOnce();
+        var mean = CreditSnapshot.Read.MEAN;
+        assertEquals((0.5 - 0.1 - 0.6) / 3, s.value("transport|e5c5h0k0d0", mean, 2.0)[0], 1e-12,
+                "none here: the total, not transport|h0's -0.6");
+        for (String context : List.of("transport|e9c9h0k0d0", "transport|e5c5h0k0d0", "ctx")) {
+            assertArrayEquals(s.value(context, mean), s.value(context, mean, 2.0), context);
+            assertEquals(0.0, s.priorCount(context, 2.0), context);
+        }
     }
 
     /** UCB with a prior: a context never visited gives no bonus; n is executions plus priorCount. */

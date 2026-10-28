@@ -13,7 +13,7 @@ import java.util.Map;
  * context (goal, holding or not; CreditTable#middleContext), each as a sum of credited drive changes
  * and a count of executions. {@link #value(String, Read)} returns c(h | g, s), or the total where
  * the habit has no record under that context yet; {@link #value(String, Read, double)} borrows
- * from the middle context instead (vault spec CRE-01).
+ * from the middle context instead where the hand holds the cube (vault spec CRE-01).
  */
 public final class CreditSnapshot {
 
@@ -146,11 +146,12 @@ public final class CreditSnapshot {
     }
 
     /**
-     * c(h | context) per drive, borrowing (vault spec CRE-01): the mean here shrunk toward the
-     * habit's mean in the middle context, or toward its total where the middle has no execution, by
-     * priorWeight pseudo-executions: (sum here + priorWeight * that mean) / (executions here +
-     * priorWeight). With nothing here it is that mean; with many executions here, nearly its own.
-     * priorWeight 0, or a habit never run anywhere, reads as {@link #value(String, Read)} does.
+     * c(h | context) per drive, borrowing (vault spec CRE-01) where the hand holds the cube
+     * (CreditTable#holdsTheCube): the mean here shrunk toward the habit's mean in the middle context,
+     * or toward its total where the middle has no execution, by priorWeight pseudo-executions: (sum
+     * here + priorWeight * that mean) / (executions here + priorWeight). With nothing here it is that
+     * mean; with many executions here, nearly its own. A context without the cube, priorWeight 0, or
+     * a habit never run anywhere reads as {@link #value(String, Read)} does.
      */
     public double[] value(String context, Read read, double priorWeight) {
         if (priorWeight == 0.0 || totalCount == 0) {
@@ -158,6 +159,9 @@ public final class CreditSnapshot {
         }
         if (read != Read.MEAN) {
             throw new IllegalArgumentException("borrowing shrinks a mean: read " + read);
+        }
+        if (!CreditTable.holdsTheCube(context)) {
+            return value(context, read);
         }
         CreditTable.Cell middle = byMiddle.get(CreditTable.middleContext(context));
         double[] priorMean = middle != null && middle.count > 0
@@ -174,12 +178,14 @@ public final class CreditSnapshot {
 
     /**
      * The pseudo-executions {@link #value(String, Read, double)} adds to a context's count: the
-     * prior's weight once the habit has run anywhere, 0 for a habit never run, which UCB still tries
-     * before any other. The same for every habit with a record, so none gets a larger bonus here for
-     * having run more elsewhere (the 2026-10-16 bug, see {@link #count}).
+     * prior's weight once the habit has run anywhere, where the context borrows (the cube in the
+     * hand). 0 for a habit never run, which UCB still tries before any other, and 0 without the
+     * cube, where a habit not yet run in the context is tried there first, as before CRE-01. The same
+     * for every habit with a record, so none gets a larger bonus here for having run more elsewhere
+     * (the 2026-10-16 bug, see {@link #count}).
      */
-    public double priorCount(double priorWeight) {
-        return totalCount > 0 ? priorWeight : 0.0;
+    public double priorCount(String context, double priorWeight) {
+        return totalCount > 0 && CreditTable.holdsTheCube(context) ? priorWeight : 0.0;
     }
 
     public double[] total(Read read) {

@@ -139,15 +139,17 @@ public final class Config {
     public double spreadPriorWeight = 2.0;
     /**
      * n0 of vault spec CRE-01: how many executions' worth of weight a habit's record elsewhere has
-     * where it has few or none. A habit's value under (goal, state bin) is its mean there shrunk
-     * toward its mean under the same goal with the hand in the same state, holding the cube or not
-     * (CreditTable#middleContext), or toward its total where that has none: (sum here + n0 * that
-     * mean) / (executions here + n0). UCB's and Thompson's counts add n0 too, so a habit that ran
-     * elsewhere is no longer untried here: only a habit never run anywhere is. 0 = the rule before
-     * CRE-01: the context's mean, else the total, and every habit not yet run in a context tried
-     * there first, in random order. In P1 those forced draws were 61% of the choices with the cube
-     * held in the first 500 episodes (24-35% after), and 53-87% of the grab_open picks while holding
-     * (tools/carry_report.py). Needs creditRead MEAN.
+     * where it has few or none, in a context with the cube in the hand (CreditTable#holdsTheCube).
+     * There a habit's value under (goal, state bin) is its mean there shrunk toward its mean under
+     * the same goal holding the cube (CreditTable#middleContext), or toward its total where that has
+     * none: (sum here + n0 * that mean) / (executions here + n0). UCB's and Thompson's counts add n0
+     * too, so a habit that ran elsewhere is no longer untried there: only a habit never run anywhere
+     * is. In P1 the forced draws were 61% of the choices with the cube held in the first 500 episodes
+     * (24-35% after), and 53-87% of the grab_open picks while holding (tools/carry_report.py).
+     * Without the cube, and everywhere at 0, the rule before CRE-01: the context's mean, else the
+     * total, and every habit not yet run in a context tried there first, in random order. Borrowing
+     * without the cube too (commit 8253182) ended those draws, the agent's exploration, and 7 of 9
+     * P1 seeds never reached a first success (spec amendment, 2026-10-28). Needs creditRead MEAN.
      */
     public double contextPriorWeight = 2.0;
 

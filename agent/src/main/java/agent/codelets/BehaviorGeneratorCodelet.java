@@ -111,7 +111,8 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
             Idea habit = habits.get(i);
             CreditSnapshot habitCredit = habitCredits.get(i);
             Candidate candidate = new Candidate(habit, score(habitCredit, creditContext, driveLevels),
-                    habitCredit.count(creditContext), habitCredit.priorCount(cfg.contextPriorWeight),
+                    habitCredit.count(creditContext),
+                    habitCredit.priorCount(creditContext, cfg.contextPriorWeight),
                     habitCredit.spread(referenceSpread, driveLevels, cfg.spreadPriorWeight));
             if (planRunning && HabitIdeas.id(habit).equals(trackerState.habit())) {
                 runningCandidate = candidate;

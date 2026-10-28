@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -162,11 +163,18 @@ class AgentMindTest {
         }
     }
 
-    /** The choice of every plan, logged with each of its steps, from a fresh UCB 0.1 mind. */
+    /**
+     * The choice of every plan, logged with each of its steps, from a fresh UCB 0.1 mind that starts
+     * each episode over the cube, so it chooses both with the hand empty and with the cube held.
+     */
     private static List<JsonObject> choices(double contextPriorWeight) {
         Config config = Config.forCondition("C4").withSelection("ucb:0.1").withCuriosity("lp");
         config.contextPriorWeight = contextPriorWeight;
-        FakeEnvironment env = run(config, 6, 4, 150);
+        FakeEnvironment env = FakeEnvironment.startingOverTheCube(150);
+        AgentMind mind = new AgentMind(config, env, 6);
+        for (int episode = 0; episode < 4; episode++) {
+            mind.runEpisode(6, episode);
+        }
         List<JsonObject> out = new ArrayList<>();
         long lastPlan = -1;
         for (JsonObject a : env.annotations) {
@@ -185,8 +193,9 @@ class AgentMindTest {
     /**
      * The log says what was known when each plan was chosen (CRE-01's measure of UCB's forced draw).
      * Without borrowing, a mind's first choice has all 14 habits untried, and whenever some are, UCB
-     * starts one of them, a draw. Borrowing, a habit counts as tried once it ran anywhere: the
-     * draws end within the first choices.
+     * starts one of them, a draw. Borrowing happens only with the cube in the hand (spec amended
+     * 2026-10-28): a choice that borrowed (priorCount n0) was made holding it, where a habit counts as
+     * tried once it ran anywhere, so it was no draw; with the hand empty the draws go on.
      */
     @Test
     void theLogSaysWhatWasKnownWhenEachPlanWasChosen() {
@@ -202,14 +211,24 @@ class AgentMindTest {
             }
         }
         int drawsBorrowing = 0;
+        int borrowed = 0;
         for (JsonObject c : choices(2.0)) {
             double priorCount = c.get("priorCount").getAsDouble();
             assertTrue(priorCount == 0.0 || priorCount == 2.0, "n0 or nothing: " + priorCount);
-            drawsBorrowing += c.get("untried").getAsInt() > 0 ? 1 : 0;
+            boolean draw = c.get("untried").getAsInt() > 0;
+            drawsBorrowing += draw ? 1 : 0;
+            if (priorCount == 2.0) {
+                borrowed++;
+                assertFalse(draw, "a choice that borrowed was no draw: " + c);
+            }
         }
-        assertTrue(drawsBorrowing <= 14, "at most one per habit: " + drawsBorrowing);
-        assertTrue(drawsBefore > 5 * drawsBorrowing, drawsBefore + " draws against " + drawsBorrowing);
+        assertTrue(borrowed >= MIN_BORROWED_CHOICES, "choices that borrowed, holding: " + borrowed);
+        assertTrue(drawsBorrowing > 14, "with the hand empty, draws beyond one per habit: "
+                + drawsBorrowing + " (" + drawsBefore + " without borrowing)");
     }
+
+    /** The run above holds the cube for this many choices at least, or it says nothing of borrowing. */
+    private static final int MIN_BORROWED_CHOICES = 10;
 
     @Test
     void refinementRaisesEffortsGain() {
