@@ -54,8 +54,9 @@ public final class Selectors {
     static final double EPS = 1e-12;
 
     /**
-     * UCB's value for a habit never executed: above any other, and equal among such habits, so they
-     * are tried first, in random order. Finite, so that ties among them still compare equal.
+     * UCB's value for a habit never executed here and with no borrowed record (priorCount 0): above
+     * any other, and equal among such habits, so they are tried first, in random order. Finite, so
+     * that ties among them still compare equal.
      */
     static final double UNTRIED = Double.MAX_VALUE;
 
@@ -72,11 +73,14 @@ public final class Selectors {
 
     /**
      * UCB1 (Auer et al. 2002) per context: rank by score + c * spread * sqrt(2 ln N / n), n the
-     * habit's executions under the current goal and state bin and N the sum of n over the pool, the
+     * habit's executions under the current goal and state bin plus the pseudo-executions its
+     * borrowed mean weighs as (priorCount, CRE-01), and N the sum of executions over the pool, the
      * context's visits. A habit tried less than the rest here gets a bonus that grows slowly while it
-     * is passed over, so one unlucky early result is retried rather than believed forever; a habit
-     * never executed here is tried before any other. The noise scale is the habit's spread, in the
-     * units of the score, so c = 1 needs no calibration to the units of the drives.
+     * is passed over, so one unlucky early result is retried rather than believed forever. A habit
+     * with n = 0 -- never executed here, nothing borrowed -- is tried before any other; in a context
+     * never visited (N = 0) every bonus is 0, and the best borrowed score starts. The noise scale is
+     * the habit's spread, in the units of the score, so c = 1 needs no calibration to the units of
+     * the drives.
      */
     public static Selector ucb(double c) {
         return (candidates, running, rng) -> {
@@ -85,16 +89,17 @@ public final class Selectors {
                 total += k.count();
             }
             double logN = Math.log(Math.max(total, 1));
-            return argmax(candidates, running, rng, k -> k.count() == 0 ? UNTRIED
-                    : k.score() + c * k.spread() * Math.sqrt(2.0 * logN / k.count()));
+            return argmax(candidates, running, rng, k -> k.count() + k.priorCount() == 0 ? UNTRIED
+                    : k.score() + c * k.spread()
+                        * Math.sqrt(2.0 * logN / (k.count() + k.priorCount())));
         };
     }
 
     /**
      * Gaussian Thompson sampling (Agrawal and Goyal 2013): rank by a draw from each habit's posterior,
-     * score + spread / sqrt(n + 1) * z with z ~ N(0, 1). A habit is chosen with the probability that
-     * it is the best, given how often it was tried; a never-executed one draws around 0 with the full
-     * spread. No parameter.
+     * score + spread / sqrt(n + 1) * z with z ~ N(0, 1), n as UCB's (executions here plus
+     * priorCount). A habit is chosen with the probability that it is the best, given how often it was
+     * tried; a never-executed one draws around 0 with the full spread. No parameter.
      *
      * <p>One draw per decision: z is drawn for every habit when nothing is running, and held while
      * the plan runs. Drawing anew every cycle would let some habit's lucky draw preempt the running
@@ -111,7 +116,8 @@ public final class Selectors {
                 z.computeIfAbsent(HabitIdeas.id(k.habit()), id -> rng.nextGaussian());
             }
             return argmax(candidates, running, rng, k -> k.score()
-                    + k.spread() / Math.sqrt(k.count() + 1.0) * z.get(HabitIdeas.id(k.habit())));
+                    + k.spread() / Math.sqrt(k.count() + k.priorCount() + 1.0)
+                        * z.get(HabitIdeas.id(k.habit())));
         };
     }
 

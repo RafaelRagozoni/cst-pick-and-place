@@ -28,7 +28,15 @@ public final class FakeEnvironment implements Environment {
     static final double CLOSED = 0.0045;
     static final double ON_CUBE = 0.05;
 
+    /**
+     * A start with the gripper 3 cm over the cube: joints 1 and 2 at -0.3 and 0.3 put the
+     * end-effector at (0.796, 0, 0.774). From HOME the cube is ~0.28 m away, and a short run never
+     * grasps it.
+     */
+    static final double[] OVER_THE_CUBE = {0.0, -0.3, 0.3, 0.0, 0.0, 0.0};
+
     private final int stepLimit;
+    private final boolean startOverTheCube;
     private double[] q;
     private double[] qd = new double[6];
     private double width;
@@ -41,13 +49,24 @@ public final class FakeEnvironment implements Environment {
     private double t;
     private boolean done;
 
-    /** Every step's records and annotation, in order, for assertions. */
+    /** Every step's records, annotation and reply, in order, for assertions. */
     public final List<JsonArray> records = new ArrayList<>();
     public final List<JsonObject> annotations = new ArrayList<>();
+    public final List<JsonObject> stepReplies = new ArrayList<>();
     public int resets;
 
     public FakeEnvironment(int stepLimit) {
+        this(stepLimit, false);
+    }
+
+    private FakeEnvironment(int stepLimit, boolean startOverTheCube) {
         this.stepLimit = stepLimit;
+        this.startOverTheCube = startOverTheCube;
+    }
+
+    /** Each episode starts with the gripper over the cube, so a short run grasps and carries. */
+    public static FakeEnvironment startingOverTheCube(int stepLimit) {
+        return new FakeEnvironment(stepLimit, true);
     }
 
     @Override
@@ -80,14 +99,21 @@ public final class FakeEnvironment implements Environment {
     @Override
     public JsonObject reset(int seed, int episode) {
         resets++;
-        q = HOME.clone();
+        q = (startOverTheCube ? OVER_THE_CUBE : HOME).clone();
         qd = new double[6];
         width = OPEN;
         commandedOpen = true;
         holding = false;
         // The cube's position depends on (seed, episode) only, as the bridge's placements do.
         java.util.Random r = new java.util.Random(seed * 1000003L + episode);
-        cube = new double[]{0.6 + 0.05 * r.nextDouble(), 0.05 + 0.05 * r.nextDouble(), TABLE + 0.025};
+        if (startOverTheCube) {
+            double[] gripper = eef();
+            cube = new double[]{gripper[0] + 0.02 * (r.nextDouble() - 0.5),
+                    gripper[1] + 0.02 * (r.nextDouble() - 0.5), TABLE + 0.025};
+        } else {
+            cube = new double[]{0.6 + 0.05 * r.nextDouble(), 0.05 + 0.05 * r.nextDouble(),
+                    TABLE + 0.025};
+        }
         prevCube = cube.clone();
         steps = 0;
         t = 0.0;
@@ -143,7 +169,9 @@ public final class FakeEnvironment implements Environment {
         t += DT;
         boolean success = onPad() && !holding;
         done = success || steps >= stepLimit;
-        return reply(success);
+        JsonObject stepReply = reply(success);
+        stepReplies.add(stepReply);
+        return stepReply;
     }
 
     private boolean onPad() {

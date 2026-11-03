@@ -112,6 +112,10 @@ def main():
         check('--step-limit is named as the flag it is',
               refused(protocol.check_start, good, p, 'C4', ['step_limit'], [], 'S3',
                       says='--step-limit'))
+        check('CRE-01\'s weights are the protocol\'s too (the agent\'s defaults)',
+              'task_stage_weight' in protocol.FIXED and 'context_prior_weight' in protocol.FIXED
+              and refused(protocol.check_start, good, p, 'C4', ['context_prior_weight'], [], 'S3',
+                          says='--context-prior-weight'))
         check('a condition the protocol does not list is refused',
               refused(protocol.check_start, good, p, 'C6', [], [], 'S3', says='C0 or C4'))
         check('no --condition is refused', refused(protocol.check_start, good, p, None, [], [], 'S3'))

@@ -20,7 +20,12 @@ different condition label than the one it runs. `--selection` (greedy, ucb, ucb:
 default greedy) is the selection mechanism. Every logged step records `selection` and the `spread`
 it used, and `metrics.py` reports the selection (two names means two runs went into one log).
 `--curiosity` (none, count, count:<W>, lp, lp:<W>; default none) is the Curiosity yield ("Curiosity
-that runs out"); every logged step records `curiosity` and the `yield`.
+that runs out"); every logged step records `curiosity` and the `yield`. `--task-stage-weight` and
+`--context-prior-weight` (vault spec CRE-01; defaults 1 and 2, 0 turns each off) are for runs that
+test one change without the other. Every step of a plan logs its `choice`: the chosen habit's
+executions in its context, the `priorCount` its score borrowed (n0 with the cube in the hand, else
+0), and how many habits were `untried` there (no execution, nothing borrowed; UCB starts one of
+those at random while there are any), out of the `candidates`. A misspelt flag is refused, not ignored.
 
 Long runs go through `../tools/run_live.py`, which also checkpoints and resumes them (below).
 
@@ -118,11 +123,40 @@ exactly.
 - **Credit is read per execution** (`Config.creditRead = MEAN`). cap4 says credit "accumulates";
   read as a sum, a habit's score grows with how often it ran, and a context's sum and the total it
   falls back to are on different scales. Both sums and counts are stored; `SUM` is one setting away.
+- **A habit new to a context borrows, with the cube in the hand** (since 2026-10-27, amended
+  2026-10-28, vault spec CRE-01). In a context that holds the cube (`CreditTable.holdsTheCube`) a
+  habit's value under (goal, state bin) is its mean there shrunk toward its mean under the same goal
+  holding the cube (`CreditTable.middleContext`), or toward its total where that has none, by n0
+  pseudo-executions: (sum here + n0 · that mean) / (executions here + n0), n0 =
+  `Config.contextPriorWeight` = 2. UCB and Thompson add n0 to the count, so a habit that ran
+  elsewhere is no longer untried there; only a habit never run anywhere is, and goes first. Before,
+  every habit not yet run in a bin was tried there first, in random order: with the cube held that
+  was 61 % of P1's choices in its first 500 episodes (24–35 % after), and 53–87 % of its `grab_open`
+  picks while holding (`tools/carry_report.py`). In a bin never visited every bonus is 0
+  (ln 1 = 0), and the best borrowed record starts. Every habit with a record adds the same n0, so
+  none gets a larger bonus for having run more elsewhere (the 2026-10-16 bug). The cost: n0 counts
+  as evidence in visited bins too, so a habit tried once there has its bonus √3 smaller than before.
+  **Without the cube nothing is borrowed**, and that random draw stays: it is how the agent
+  explores. Borrowing there too (commit `8253182`), the draws ended, the choice in a new bin became
+  the best borrowed record every time, and 7 of 9 P1 seeds never reached a first success (2 seeds
+  of 3 never grasped with borrowing alone). n0 = 0 is the rule before, to the bit
+  (`GoldenTrajectoryTest`); `creditRead = SUM` with n0 > 0 is refused when the mind starts.
 - **Novelty is per cycle**, not per completed habit as §4.3.1 says: the archive and the bin counts
   update every cycle, and the displacement dimension is the per-tick cube displacement — the same
   bins `metrics.characterise` uses for metric 5, which `ParityTest` holds together.
 - **Task stage regression**: if the current stage's precondition stops holding (cube dropped), the
   Goal Generator falls back to the stage perception shows. TROCA only advances.
+- **The Task counts its stage** (since 2026-10-27, vault spec CRE-01): Task = (w · stages left, the
+  current one counted, + min(1, distance / `taskDistanceScale`)) / (4w + 1), and 0 when done
+  (`TaskStages.taskLevel`; w = `Config.taskStageWeight`, 1). cap4 has the Task rise with the
+  distance to "that stage's target" alone, and that target moves at every stage change, so Credit
+  zeroed the jump: completing a stage paid nothing, and letting the cube go mid-transport cost
+  nothing (P1: 93–97 % of grasps ended with the cube dropped away from the pad, every one right after
+  a `grab_open`).
+  Now a stage gained lowers the Task by w / (4w + 1) = 0.2 and a stage undone raises it as much, and
+  Credit credits the jump: letting go is charged the progress it undoes, and success pays a stage.
+  Going in and out of a stage still pays nothing overall. w = 0 is the Task before, to the bit
+  (`GoldenTrajectoryTest`).
 - **Release ends on the agent's own strict success test** (since 2026-10-20, vault spec BAS-01): the
   cube let go over the pad after a transport, then still for 10 observations, as goals.py's success
   test (version `SUCCESS_TEST`, S3 since the transport lift went from 0.03 to 0.05). That needs
@@ -336,6 +370,16 @@ diffing the logs, and held since by every older test passing unchanged. **Not ru
   `count:200` and `lp:200` falling under 0.9 in the small fake world; UCB and Thompson closed-loop trying all 14 habits, reproducing per
   seed, logging their name and σ, and with σ > 0 — at σ = 0 both silently rank by score alone, like GREEDY. Mutation-checked:
   dropping the sample recording fails three tests.
+- `GoldenTrajectoryTest` — golden master: a fixed seed reproduces, step for step, the trajectory in
+  `src/test/resources/golden` (habit, goal, the four drives, novelty, yield, σ, holding, success,
+  then every habit's credit), for the P1 setting (C4, `ucb:0.1`, `lp`) and for C0 with Thompson and
+  `count:200`. It pins today's behaviour before a change meant to leave it alone at some setting
+  (vault spec CRE-01). The fake starts each episode with the gripper over the cube
+  (`FakeEnvironment.startingOverTheCube`): from its usual start a short run never grasps, and the pin
+  would guard the reach stage only; the test fails if a pinned run grasps fewer than 3 times or holds
+  fewer than 50 steps. A missing file fails rather than being written. Rewrite on purpose with
+  `./gradlew test --offline -PgoldenUpdate=true --tests agent.GoldenTrajectoryTest` and read the diff.
+  Mutation-checked: not zeroing the Task change at a stage change fails both pins.
 
 - `CheckpointTest` — a run paused after episode 3, saved to a file and resumed in a new mind is the
   run that never stopped: every command and every logged decision (habit, goal, drive levels,
@@ -461,6 +505,8 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
 | **The agent knowing it succeeded** (2026-10-20, BAS-01): read the environment's success, as RL benchmarks do (Gymnasium's `info["is_success"]`, the bridge's `success`) | Zero code, and never disagrees with the experiment | A robot outside the simulator has no such signal, and cap4 has the agent perceive its task (`TaskStages`). Ours, `task.Carry`, ports goals.py's carry instead. What it loses: two copies of one rule, kept equal only by `ParityTest`; and the bridge also needs its four steps fired in order, which `Carry` does not track (they part only on a carry transported in its first two held observations alone) |
 | **Credit that tells habits apart** (2026-10-16): a shorter eligibility trace (TD(λ)'s λ); credit as progress beyond the recent best, close to the competence progress of SAGG-RIAC (Baranes and Oudeyer 2013); an advantage baseline (REINFORCE with baseline, Sutton and Barto §13.4); larger steps or action repeat (frame skip in Atari agents) | Each is a standard answer to one measured flaw: credit diluted by later habits, back-and-forth, drift every habit is charged, effects too small to see | All three credit changes implemented as `Config` settings and run live ("Credit, round 1"): λ 0.5 kept; progress lost the sign of moving away and was worse; the baseline is near ranking-neutral under per-context UCB. Action repeat changes the primitives, not credit — WP3's mutation of a habit's angle is where it would come from |
 | **Curiosity that runs out** (2026-10-17, vault spec CUR-01): count-based bonuses (MBIE-EB, Strehl and Littman 2008; pseudo-counts, Bellemare et al. 2016; #Exploration, Tang et al. 2017); learning progress (IAC, Oudeyer, Kaplan and Hafner 2007; R-IAC, Baranes and Oudeyer 2009); RND (Burda et al. 2018), ICM (Pathak et al. 2017); an annealed intrinsic weight, or Agent57's bandit over it (Badia et al. 2020); RLeXplore (rllte, 2024), a library of eight intrinsic rewards | Ways for exploration to stop paying once the world is known | Count and learning progress built, as `count` and `lp` yields. RND/ICM exist for spaces that cannot be counted, and these bins can; ICM also chases noise, and Bullet's contacts are noise. Annealing hands over by the clock, not by exploration; Agent57 needs task return to tune it, and there are no successes. RLeXplore is Python/PyTorch, per-step rewards for an RL learner, no learning progress. What ours loses against the strongest (a count bonus added to the reward, as published): the evidence is for that form; a running mean used as a drive's urgency is our adaptation, untested, with one more parameter (W) |
+| **The Task counts its stage** (2026-10-27, vault spec CRE-01): potential-based shaping (Ng, Harada and Russell 1999) and its dynamic form (Devlin and Kudenko 2012); a staged dense reward, stage plus bounded distance (DrS, Mu et al. 2024; robosuite's PickPlace, staged 0.1/0.35/0.5/0.7 with a max); reward machines with Φ(u) = −v*(u) (Toro Icarte et al. 2022); protecting the stage instead (STRIPS goal protection, BDI maintenance goals, action masking) | The standard ways to make progress through stages pay and undoing it cost | Adopted as the stage-plus-distance form, in the Task drive: the Task already is a potential, credit being its drop. Reward machines would compute the stage values by value iteration over an automaton that `TaskStages` already is with four stages in a line, so the answer is one weight, w. Protecting the stage forbids `grab_open` while carrying, which the agent must learn, and release needs it. What this loses against reward machines: w is chosen by hand (Okudo and Yamada 2021 warn it is hard to choose), not derived |
+| **A habit new to a context borrows** (2026-10-27, vault spec CRE-01): partial pooling / shrinkage of a context's mean toward its parent's (empirical Bayes); hierarchical Bayesian bandits (HierTS, Hong, Kveton et al. 2022); cold-start priors for new arms (a dynamic prior in Thompson sampling); a coarser or tiled state (tile coding / CMAC, Sutton 1996; Soar-RL summing the preferences of every matching rule); Thompson with a prior | Standard ways for an arm with no data in one context to start from what is known in related ones | Adopted as one fixed level of pooling, (sum + n0 · parent mean) / (n + n0), with the parent goal + hand: the same pseudo-count form the spread already uses (`spreadPriorWeight`). HierTS learns how far contexts differ from their parent instead of fixing n0, and samples; it is Thompson-only and needs a model of the between-context variance this table does not keep. A coarser key would change Curiosity's novelty and metric 5, which share `Characterization.key`. What this loses against HierTS: n0 is chosen by hand, and the same for every context. Amended 2026-10-28: only contexts holding the cube borrow. UCB in a new bin, with every habit at the same pseudo-count, is greedy whatever its c; without the cube that ended the random draw that explored. Thompson would keep sampling around the borrowed value, but it is not C4's selector |
 | Bandit libraries: MABWiser (Python), Vowpal Wabbit's contextual-bandit exploration (C++, JNI binding) | Tested rules: UCB1, Thompson, softmax, ε-greedy, LinUCB (MABWiser); ε-greedy, softmax, bagging, cover (VW) | Each learns its own reward estimate; here the estimate is the credit table (per-drive late fusion, eligibility traces), and only the ~20-line ranking rule would be reused. Python or native code inside a CST codelet for that is the worse trade |
 
 What building our own gains: the habit is a CST Idea end to end, every cap4 component is a codelet

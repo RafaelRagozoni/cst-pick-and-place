@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Runs the agent against the simulation bridge, in the two phases of cap4 4.6.2.
@@ -31,6 +32,9 @@ import java.util.Map;
  * mechanism; every logged step records it and the spread it used. C6 is the random baseline and
  * refuses any other. {@code --curiosity} (none, count, count:&lt;W&gt;, lp, lp:&lt;W&gt;; default none)
  * picks the Curiosity yield; every logged step records it and the yield's value.
+ * {@code --task-stage-weight W} and {@code --context-prior-weight N} set the two weights of vault
+ * spec CRE-01 (Config.taskStageWeight, contextPriorWeight; 0 turns each off), for the runs that
+ * test one change without the other; agent.json records them either way.
  *
  * <p>Checkpoints ({@link Checkpoint}): {@code --checkpoint FILE} saves the agent after every
  * episode, overwriting; {@code --keep-every N} also keeps a copy every N episodes beside it, in
@@ -55,6 +59,13 @@ public final class AgentMain {
         if (a.containsKey("curiosity")) {
             cfg.withCuriosity(a.get("curiosity"));
         }
+        if (a.containsKey("task-stage-weight")) {
+            cfg.taskStageWeight = Double.parseDouble(a.get("task-stage-weight"));
+        }
+        if (a.containsKey("context-prior-weight")) {
+            cfg.contextPriorWeight = Double.parseDouble(a.get("context-prior-weight"));
+        }
+        cfg.validate();
         int seed = Integer.parseInt(a.getOrDefault("seed", "1"));
         int emax = Integer.parseInt(a.getOrDefault("emax", "50"));
         int eref = Integer.parseInt(a.getOrDefault("eref", "20"));
@@ -180,13 +191,24 @@ public final class AgentMain {
         return e == null || e.isJsonNull() ? "none" : e.getAsString();
     }
 
-    private static Map<String, String> parse(String[] args) {
+    /** Every flag main() reads. A name outside it is a typo, refused rather than ignored. */
+    static final Set<String> FLAGS = Set.of("host", "port", "condition", "selection", "curiosity",
+            "task-stage-weight", "context-prior-weight", "seed", "emax", "eref", "checkpoint",
+            "keep-every", "describe", "resume", "shutdown");
+
+    static Map<String, String> parse(String[] args) {
         Map<String, String> m = new HashMap<>();
         for (int i = 0; i < args.length; i++) {
             if (!args[i].startsWith("--") || i + 1 >= args.length) {
                 throw new IllegalArgumentException("expected --name value pairs, got " + args[i]);
             }
-            m.put(args[i].substring(2), args[++i]);
+            String name = args[i].substring(2);
+            if (!FLAGS.contains(name)) {
+                // Ignored, --context-prior-weigth 0 would run with the default and say nothing.
+                throw new IllegalArgumentException("unknown flag --" + name + "; known: "
+                        + new java.util.TreeSet<>(FLAGS));
+            }
+            m.put(name, args[++i]);
         }
         return m;
     }

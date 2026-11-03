@@ -8,6 +8,7 @@ python3 tools/run_live.py --resume runs/<batch> --emax 2000 # 1000 more, from th
 python3 tools/run_live.py --protocol bench/P1.json --condition C4   # a baseline batch (BAS-01)
 python3 tools/bench.py score runs/<batch>                   # its scorecard; also mid-run
 python3 tools/bench.py compare runs/<A> runs/<B>            # C0 against C4, or the track
+python3 tools/carry_report.py runs/<batch>                  # how carries end (CRE-01)
 ```
 
 | script | does |
@@ -17,6 +18,7 @@ python3 tools/bench.py compare runs/<A> runs/<B>            # C0 against C4, or 
 | `replay.py` | Shows chosen episodes (`--ep 5`, `--ep 100-119`, `--every 1000`) in the CoppeliaSim window at 1× = real time or faster, with a panel: episode, step, habit, goal, drives. Kinematic: it puts things where the log says, so it shows what happened even though Bullet would not repeat it. |
 | `runlog.py` | Shared log reading (tolerates an unfinished log); cuts a log back to a checkpoint. `test_runlog.py` checks both, offline. |
 | `bench.py` | The scorecard of a batch (BAS-01's M1–M5 and its sanity checks) as `scorecard.md` and `.json` in the batch; `table` prints the track, `bench/ledger.csv`, one line per finished protocol batch; `compare` tests two batches and refuses what BAS-01's rules 5 and 6 refuse. Needs SciPy (`requirements-tools.txt`). `test_bench.py` checks it offline on fake batches. |
+| `carry_report.py` | What happens to the cube once grasped (vault spec CRE-01), per seed and block of episodes: grasps; carries ending with the cube dropped away from the pad, and how many by `grab_open`; choices with the cube held, how many were `grab_open`, new to their bin (rebuilt from the observation, so old batches have it) or UCB's forced draw (from the agent's `choice` field, `-` before it); transports per 100 episodes. A release is charged to the action before the observation that shows it. `test_carry_report.py` checks it on a hand-made log. |
 | `protocol.py` | Protocol batches (vault spec BAS-01): the fingerprint every `run.json` records, the protocol file, and the refusals (below). `test_protocol.py` checks the refusals offline, on throwaway repositories. |
 
 Batches go to `runs/` (git-ignored): `runs/<date>_<cond>_<sel>[_tag]/{agent/, [protocol.json], s<seed>/{log.jsonl.gz, checkpoint.json.gz, checkpoints/, agent.out, bridge.out, run.json, agent.json, summary.md}}`.
@@ -100,6 +102,7 @@ Log: ~0.2 MB per 500-step episode (gzip), so ~200 MB per 1000 episodes. `summari
 | CoppeliaSim's video recorder | Needs the GUI during the run (same cost as a live view). |
 | Sacred (`--enforce_clean`), MLflow, W&B for the fingerprint and refusals | They record a run's commit, and Sacred refuses a dirty tree; none knows the `cst` submodule, the scene or the CoppeliaSim install, and none refuses a resume on other code or a budget that differs from a protocol file. ~150 lines here; vault spec BAS-01 weighs them. |
 | `lifelines` for Kaplan–Meier; `statsmodels` for Holm | SciPy alone gives Kaplan–Meier with its band, log-rank, Mann–Whitney and the bootstrap; lifelines would be a second dependency for one of those, and Holm is six lines against statsmodels' size. What it loses: lifelines' median CI is built in; here it is read off SciPy's log-log band, tested on a case worked by hand. |
+| `metrics.py` (cap4's five metrics) or a column in `summarize_run.py` for the carry numbers | `metrics.py` is the ablation grid's fixed definition, and the summary's size is fixed by design; how a carry ends is a diagnostic for one spec, read next to them. It reuses `runlog` for reading and `metrics.characterise` for the bin, so nothing is defined twice. |
 | Resume as a new batch (a second log beside the first) | No log rewrite on resume, ever. But `metrics.py`, `summarize_run.py` and `replay.py` would each have to learn to stitch segments; one file keeps every reader as it is, and the rewrite only happens after a stop mid-episode. |
 
 What the own scripts lose against the strongest alternative (a TensorBoard dashboard): no interactive plots. What they gain: nothing new to run or install, and a summary Claude can read cheaply.

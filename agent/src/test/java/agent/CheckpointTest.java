@@ -106,6 +106,24 @@ class CheckpointTest {
         assertEquals(info, d.getAsJsonObject("bridge"));
     }
 
+    /** Every flag main() reads is known to parse(), and a misspelt one is refused, not ignored. */
+    @Test
+    void agentMainRefusesAFlagItDoesNotRead() throws java.io.IOException {
+        String source = java.nio.file.Files.readString(
+                Path.of("src/main/java/agent/AgentMain.java"));
+        java.util.regex.Matcher read = java.util.regex.Pattern
+                .compile("a\\.(?:get|containsKey|getOrDefault)\\(\"([a-z-]+)\"").matcher(source);
+        java.util.Set<String> readByMain = new java.util.TreeSet<>();
+        while (read.find()) {
+            readByMain.add(read.group(1));
+        }
+        assertEquals(readByMain, new java.util.TreeSet<>(AgentMain.FLAGS));
+        assertEquals("0", AgentMain.parse(new String[]{"--context-prior-weight", "0"})
+                .get("context-prior-weight"));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> AgentMain.parse(new String[]{"--context-prior-weigth", "0"}));
+    }
+
     @Test
     void refusesACheckpointFromAnotherConfigOrMidEpisode() {
         AgentMind m = new AgentMind(Config.forCondition("C0").withSelection("ucb"),

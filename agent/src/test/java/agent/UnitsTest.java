@@ -5,6 +5,7 @@ import agent.credit.CreditTable;
 import agent.habit.Command;
 import agent.habit.HabitIdeas;
 import agent.memory.ExecutionBuffer;
+import agent.motivation.Characterization;
 import agent.motivation.CuriosityYield;
 import agent.motivation.NoveltyArchive;
 import agent.motivation.Yields;
@@ -12,15 +13,20 @@ import agent.selection.Selector;
 import agent.selection.Selector.Candidate;
 import agent.selection.Selectors;
 import agent.sim.Observation;
+import agent.task.TaskStages;
 import br.unicamp.cst.representation.idea.Idea;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -88,8 +94,8 @@ class UnitsTest {
     @Test
     void yieldsByNameAndNoneIsCuriosityAsBefore() {
         CuriosityYield none = Yields.byName("none");
-        assertEquals(1.0, none.observe(obs(0, true), "A", B, null));
-        assertEquals(1.0, none.observe(obs(1, false), "B", B, "h"));
+        assertEquals(1.0, none.recordCycleAndGetYield(obs(0, true), "A", B, null));
+        assertEquals(1.0, none.recordCycleAndGetYield(obs(1, false), "B", B, "h"));
         for (String bad : new String[]{"count:0.5", "count:", "lp:x", "lp:Infinity", "none:5", "rnd"}) {
             assertThrows(IllegalArgumentException.class, () -> Yields.byName(bad), bad);
         }
@@ -104,30 +110,30 @@ class UnitsTest {
     @Test
     void countPaysEntriesIntoABinNotCyclesSpentInIt() {
         CuriosityYield c = Yields.byName("count:1");     // W = 1: y is this cycle's signal itself
-        assertEquals(1.0, c.observe(obs(0, true), "A", B, null));
-        assertEquals(1.0, c.observe(obs(1, false), "A", B, "h"), "staying is not entering");
-        assertEquals(1.0, c.observe(obs(2, false), "B", B, "h"));
-        assertEquals(1 / Math.sqrt(2), c.observe(obs(3, false), "A", B, "h"), 1e-12);
-        c.observe(obs(4, false), "B", B, "h");
-        assertEquals(1 / Math.sqrt(3), c.observe(obs(5, false), "A", B, "h"), 1e-12);
-        assertEquals(0.5, c.observe(obs(6, true), "A", B, null), 1e-12, "a reset into A enters it");
+        assertEquals(1.0, c.recordCycleAndGetYield(obs(0, true), "A", B, null));
+        assertEquals(1.0, c.recordCycleAndGetYield(obs(1, false), "A", B, "h"), "staying is not entering");
+        assertEquals(1.0, c.recordCycleAndGetYield(obs(2, false), "B", B, "h"));
+        assertEquals(1 / Math.sqrt(2), c.recordCycleAndGetYield(obs(3, false), "A", B, "h"), 1e-12);
+        c.recordCycleAndGetYield(obs(4, false), "B", B, "h");
+        assertEquals(1 / Math.sqrt(3), c.recordCycleAndGetYield(obs(5, false), "A", B, "h"), 1e-12);
+        assertEquals(0.5, c.recordCycleAndGetYield(obs(6, true), "A", B, null), 1e-12, "a reset into A enters it");
         for (long t = 7; t < 20007; t++) {
-            c.observe(obs(t, false), "C", B, "h");
+            c.recordCycleAndGetYield(obs(t, false), "C", B, "h");
         }
-        assertEquals(1 / Math.sqrt(5), c.observe(obs(20007, false), "A", B, "h"), 1e-12,
+        assertEquals(1 / Math.sqrt(5), c.recordCycleAndGetYield(obs(20007, false), "A", B, "h"), 1e-12,
                 "20000 cycles away: still remembered");
 
         CuriosityYield m = Yields.byName("count:4");
-        double y = m.observe(obs(0, true), "A", B, null);
+        double y = m.recordCycleAndGetYield(obs(0, true), "A", B, null);
         assertEquals(1.0, y, "starts at 1: nothing is known");
         for (int t = 1; t <= 6; t++) {                      // A entered 4 times in all
-            y = m.observe(obs(t, false), t % 2 == 0 ? "A" : "B", B, "h");
+            y = m.recordCycleAndGetYield(obs(t, false), t % 2 == 0 ? "A" : "B", B, "h");
         }
         double before = y;
-        y = m.observe(obs(7, false), "A", B, "h");          // x = 1/sqrt(4) while it stays
+        y = m.recordCycleAndGetYield(obs(7, false), "A", B, "h");          // x = 1/sqrt(4) while it stays
         assertEquals(before + (0.5 - before) / 4, y, 1e-12, "a running mean over W = 4 cycles");
         for (int t = 8; t < 200; t++) {
-            y = m.observe(obs(t, false), "A", B, "h");
+            y = m.recordCycleAndGetYield(obs(t, false), "A", B, "h");
         }
         assertEquals(0.5, y, 1e-9);
     }
@@ -135,14 +141,14 @@ class UnitsTest {
     /** lp, W = 1, from bin S with habit h: the y of each of n cycles moving b by step(t). */
     private static double[] lpRun(CuriosityYield lp, int n, java.util.function.IntFunction<double[]> step) {
         double[] b = new double[9];
-        lp.observe(obs(0, true), "S", b.clone(), null);
+        lp.recordCycleAndGetYield(obs(0, true), "S", b.clone(), null);
         double[] ys = new double[n + 1];
         for (int t = 1; t <= n; t++) {
             double[] d = step.apply(t);
             for (int i = 0; i < 9; i++) {
                 b[i] += d[i];
             }
-            ys[t] = lp.observe(obs(t, false), "S", b.clone(), "h");
+            ys[t] = lp.recordCycleAndGetYield(obs(t, false), "S", b.clone(), "h");
         }
         return ys;
     }
@@ -198,9 +204,9 @@ class UnitsTest {
         assertEquals(0.0, learned, 1e-9);
         double[] jump = new double[9];
         jump[2] = 50;
-        assertEquals(learned, lp.observe(obs(100, true), "S", jump.clone(), "h"), "a reset is no effect");
+        assertEquals(learned, lp.recordCycleAndGetYield(obs(100, true), "S", jump.clone(), "h"), "a reset is no effect");
         jump[2] = 90;
-        assertEquals(learned, lp.observe(obs(101, false), "S", jump.clone(), null), "nor is idling");
+        assertEquals(learned, lp.recordCycleAndGetYield(obs(101, false), "S", jump.clone(), null), "nor is idling");
     }
 
     @Test
@@ -363,5 +369,233 @@ class UnitsTest {
         }
         assertEquals(a, b, "a seed reproduces the draws");
         assertTrue(new java.util.HashSet<>(a).size() > 3, "equal scores: the choice varies");
+    }
+
+    // --- the Task level (vault spec CRE-01) ---------------------------------------------
+    private static double taskLevel(Observation observation, double stageWeight) {
+        int stage = TaskStages.infer(observation);
+        return TaskStages.taskLevel(stage, TaskStages.targetDistance(stage, observation), 0.5,
+                stageWeight);
+    }
+
+    /** At stage weight 0 the level is the Task before CRE-01, to the bit; done is 0 at any weight. */
+    @Test
+    void taskLevelAtStageWeightZeroIsTheDistanceAlone() {
+        for (int stage = 0; stage < TaskStages.DONE; stage++) {
+            for (double distance : new double[]{0.0, 0.013, 0.05, 0.3, 0.5, 0.9}) {
+                assertEquals(Math.min(1.0, distance / 0.5),
+                        TaskStages.taskLevel(stage, distance, 0.5, 0.0), 0.0);
+                if (stage + 1 < TaskStages.DONE) {
+                    assertEquals(0.2, TaskStages.taskLevel(stage, distance, 0.5, 1.0)
+                            - TaskStages.taskLevel(stage + 1, distance, 0.5, 1.0), 1e-12,
+                            "at weight 1 a stage is worth 1 / (4 + 1)");
+                }
+            }
+        }
+        assertEquals(0.0, TaskStages.taskLevel(TaskStages.DONE, 0.3, 0.5, 0.0));
+        assertEquals(0.0, TaskStages.taskLevel(TaskStages.DONE, 0.3, 0.5, 1.0));
+    }
+
+    /**
+     * On the expert trajectory, at stage weight 1, no stage advance raises the Task: entering a stage
+     * costs at most its distance term, 1, and gains a stage, 1. At weight 0 the grasp does raise it --
+     * from the hand at the cube to the cube far from the pad -- which is why Credit zeroes the jump
+     * there.
+     */
+    @Test
+    void onTheExpertTrajectoryNoStageAdvanceRaisesTheTask() {
+        int advances = 0;
+        boolean anAdvanceRaisedItAtWeightZero = false;
+        for (int i = 1; i < Traj.json().size(); i++) {
+            int stageBefore = TaskStages.infer(Traj.obs(i - 1));
+            int stageNow = TaskStages.infer(Traj.obs(i));
+            if (stageNow > stageBefore) {
+                advances++;
+                assertTrue(taskLevel(Traj.obs(i), 1.0) <= taskLevel(Traj.obs(i - 1), 1.0),
+                        "advance to " + TaskStages.name(stageNow) + " at observation " + i);
+                anAdvanceRaisedItAtWeightZero |=
+                        taskLevel(Traj.obs(i), 0.0) > taskLevel(Traj.obs(i - 1), 0.0);
+            }
+        }
+        assertTrue(advances >= 4, "reach, grasp, transport and release seen: " + advances);
+        assertTrue(anAdvanceRaisedItAtWeightZero);
+        assertTrue(taskLevel(Traj.obs(0), 1.0) > 0.9, "the start is nearly all the way back");
+        assertEquals(0.0, taskLevel(Traj.obs(Traj.json().size() - 1), 1.0), "done");
+    }
+
+    /**
+     * Letting the cube go mid-transport (expert observation 520: held 0.34 m from the pad, 0.24 m up)
+     * puts the Task back a stage. At weight 1 it rises; at weight 0 it falls, to the hand-to-cube
+     * distance, and the drop looked like progress -- the reason that jump was zeroed.
+     */
+    @Test
+    void lettingTheCubeGoMidTransportRaisesTheTask() {
+        Observation held = Traj.obs(520);
+        assertEquals(2, TaskStages.infer(held), "transport");
+        JsonObject letGo = Traj.copy(520);
+        JsonObject gripper = letGo.getAsJsonObject("innerSense").getAsJsonObject("gripper");
+        gripper.addProperty("isHolding", false);
+        gripper.addProperty("commanded_open", true);
+        Idea letGoIdea = Observation.toIdea(letGo, 521, 0, false, false);
+        Observation.setCarry(letGoIdea, true, false, 0);
+        Observation dropped = new Observation(letGoIdea);
+        assertEquals(1, TaskStages.infer(dropped), "back to grasp: the hand is still at the cube");
+        assertTrue(taskLevel(dropped, 1.0) - taskLevel(held, 1.0) > 0.05);
+        assertTrue(taskLevel(dropped, 0.0) < taskLevel(held, 0.0));
+    }
+
+    // --- borrowed credit (vault spec CRE-01) --------------------------------------------
+    /**
+     * The middle context is read back from the state key's holding flag. If Characterization.key
+     * changed its format, the middle would silently become the whole context, no context would hold
+     * the cube, and borrowing would stop without a word: this pins the two together.
+     */
+    @Test
+    void middleContextIsTheGoalAndWhetherTheHandHoldsTheCube() {
+        Observation holding = Traj.obs(400);
+        Observation notHolding = Traj.obs(0);
+        assertTrue(holding.holding());
+        String carrying = CreditTable.context("transport", Characterization.key(holding));
+        String reaching = CreditTable.context("reach", Characterization.key(notHolding));
+        assertEquals("transport|h1", CreditTable.middleContext(carrying));
+        assertEquals("reach|h0", CreditTable.middleContext(reaching));
+        assertEquals("ctx", CreditTable.middleContext("ctx"), "a hand-made context is its own");
+        assertTrue(CreditTable.holdsTheCube(carrying));
+        assertFalse(CreditTable.holdsTheCube(reaching));
+        assertFalse(CreditTable.holdsTheCube("ctx"), "no flag: holds nothing");
+    }
+
+    /**
+     * Each middle cell is the sum of the context cells under it, kept as the credit arrives; the
+     * table's state carries them through a checkpoint as they are.
+     */
+    @Test
+    void middleCellsAddUpTheirContextsAndSurviveACheckpoint() {
+        Random rng = new Random(5);
+        CreditTable t = new CreditTable();
+        String[] goals = {"reach", "transport"};
+        for (int i = 0; i < 2000; i++) {
+            String context = CreditTable.context(goals[rng.nextInt(2)],
+                    "e" + rng.nextInt(4) + ",0,0c0,0,0h" + rng.nextInt(2) + "k0d0");
+            double[] delta = {rng.nextGaussian(), rng.nextGaussian(), 0, rng.nextGaussian()};
+            t.add("h" + rng.nextInt(3), context, delta, rng.nextDouble(), rng.nextBoolean());
+        }
+        t.closeExecutions();
+        JsonObject state = t.state();
+        for (Map.Entry<String, JsonElement> row : state.getAsJsonObject("rows").entrySet()) {
+            JsonObject contexts = row.getValue().getAsJsonObject().getAsJsonObject("contexts");
+            JsonObject middles = row.getValue().getAsJsonObject().getAsJsonObject("middles");
+            Map<String, double[]> summed = new java.util.HashMap<>();
+            Map<String, Long> counted = new java.util.HashMap<>();
+            for (Map.Entry<String, JsonElement> cell : contexts.entrySet()) {
+                String middle = CreditTable.middleContext(cell.getKey());
+                double[] sum = summed.computeIfAbsent(middle, k -> new double[4]);
+                JsonObject c = cell.getValue().getAsJsonObject();
+                for (int d = 0; d < 4; d++) {
+                    sum[d] += c.getAsJsonArray("sum").get(d).getAsDouble();
+                }
+                counted.merge(middle, c.get("count").getAsLong(), Long::sum);
+            }
+            assertEquals(summed.keySet(), middles.keySet(), row.getKey());
+            for (String middle : summed.keySet()) {
+                JsonObject m = middles.getAsJsonObject(middle);
+                assertEquals(counted.get(middle), m.get("count").getAsLong());
+                for (int d = 0; d < 4; d++) {
+                    assertEquals(summed.get(middle)[d], m.getAsJsonArray("sum").get(d).getAsDouble(),
+                            1e-9, row.getKey() + " " + middle);
+                }
+            }
+        }
+        CreditTable restored = new CreditTable();
+        restored.restore(state);
+        assertEquals(state, restored.state());
+    }
+
+    /** One habit's record: twice with the cube in the hand (0.5 and -0.1), once without (-0.6). */
+    private static CreditSnapshot carriedTwiceReachedOnce() {
+        CreditTable t = new CreditTable();
+        t.add("h", "transport|e1c1h1k0d0", new double[]{0.5, 0, 0, 0}, 1.0, true);
+        t.add("h", "transport|e2c2h1k0d0", new double[]{-0.1, 0, 0, 0}, 1.0, true);
+        t.add("h", "transport|e9c9h0k0d0", new double[]{-0.6, 0, 0, 0}, 1.0, true);
+        t.closeExecutions();
+        return t.snapshot("h");
+    }
+
+    /**
+     * The borrowed value, with the cube in the hand: a context's mean shrunk toward the middle's by
+     * n0 pseudo-executions; the middle's mean where the context has none; the total where the middle
+     * has none either; and at n0 = 0, or for a habit never run, the rule before CRE-01.
+     */
+    @Test
+    void borrowedValueShrinksTowardTheMiddleThenTheTotal() {
+        CreditSnapshot s = carriedTwiceReachedOnce();
+        var mean = CreditSnapshot.Read.MEAN;
+        double total = (0.5 - 0.1 - 0.6) / 3;
+        assertEquals((0.5 + 2 * 0.2) / (1 + 2), s.value("transport|e1c1h1k0d0", mean, 2.0)[0], 1e-12,
+                "its own mean, shrunk toward transport|h1's 0.2");
+        assertEquals(0.2, s.value("transport|e5c5h1k0d0", mean, 2.0)[0], 1e-12,
+                "none here: the middle");
+        assertEquals(total, s.value("release|e1c1h1k0d0", mean, 2.0)[0], 1e-12,
+                "no middle: the total");
+        assertEquals(total, s.value("transport|e5c5h1k0d0", mean, 0.0)[0], 1e-12, "n0 = 0: as before");
+        assertArrayEquals(s.value("transport|e1c1h1k0d0", mean),
+                s.value("transport|e1c1h1k0d0", mean, 0.0));
+        assertEquals(2.0, s.priorCount("transport|e5c5h1k0d0", 2.0));
+        assertEquals(0.0, s.priorCount("transport|e5c5h1k0d0", 0.0));
+        assertArrayEquals(new double[4], CreditSnapshot.EMPTY.value("transport|e1c1h1k0d0", mean, 2.0));
+        assertEquals(0.0, CreditSnapshot.EMPTY.priorCount("transport|e1c1h1k0d0", 2.0),
+                "never run: still untried");
+        assertThrows(IllegalArgumentException.class,
+                () -> s.value("transport|e1c1h1k0d0", CreditSnapshot.Read.SUM, 2.0));
+    }
+
+    /**
+     * Without the cube in the hand nothing is borrowed (spec CRE-01, amended 2026-10-28): the value
+     * is the context's own mean, else the total, and the habit not yet run there counts as untried,
+     * as before CRE-01. Borrowing there too ended UCB's draw among such habits, the agent's
+     * exploration, and 7 of 9 P1 seeds never reached a first success.
+     */
+    @Test
+    void aContextWithoutTheCubeBorrowsNothing() {
+        CreditSnapshot s = carriedTwiceReachedOnce();
+        var mean = CreditSnapshot.Read.MEAN;
+        assertEquals((0.5 - 0.1 - 0.6) / 3, s.value("transport|e5c5h0k0d0", mean, 2.0)[0], 1e-12,
+                "none here: the total, not transport|h0's -0.6");
+        for (String context : List.of("transport|e9c9h0k0d0", "transport|e5c5h0k0d0", "ctx")) {
+            assertArrayEquals(s.value(context, mean), s.value(context, mean, 2.0), context);
+            assertEquals(0.0, s.priorCount(context, 2.0), context);
+        }
+    }
+
+    /** UCB with a prior: a context never visited gives no bonus; n is executions plus priorCount. */
+    @Test
+    void ucbAddsThePriorCountAndGivesNoBonusInANewContext() {
+        Candidate better = new Candidate(new Idea("better"), 0.2, 0, 2.0, 1.0);
+        Candidate worse = new Candidate(new Idea("worse"), -0.1, 0, 2.0, 1.0);
+        Candidate untried = new Candidate(new Idea("untried"), 0.0, 0, 0.0, 1.0);
+        Random rng = new Random(1);
+        assertSame(better, Selectors.ucb(1.0).select(List.of(worse, better), null, rng));
+        assertSame(untried, Selectors.ucb(1.0).select(List.of(worse, better, untried), null, rng));
+        // visited 10 times by "worse": "better", with only its prior here, gets the larger bonus
+        Candidate worseHere = new Candidate(new Idea("worse"), 0.25, 10, 2.0, 1.0);
+        assertSame(better, Selectors.ucb(1.0).select(List.of(worseHere, better), null, rng),
+                "0.2 + sqrt(2 ln 10 / 2) beats 0.25 + sqrt(2 ln 10 / 12)");
+    }
+
+    /** Settings that mean nothing are refused when a mind starts. */
+    @Test
+    void aMindRefusesBorrowingWithSummedCreditAndNegativeWeights() {
+        Config summed = new Config();
+        summed.creditRead = CreditSnapshot.Read.SUM;
+        assertThrows(IllegalArgumentException.class,
+                () -> new AgentMind(summed, new FakeEnvironment(5), 1));
+        summed.contextPriorWeight = 0.0;
+        new AgentMind(summed, new FakeEnvironment(5), 1);
+        Config negative = new Config();
+        negative.taskStageWeight = -1.0;
+        assertThrows(IllegalArgumentException.class, negative::validate);
+        negative.taskStageWeight = 1.0;
+        negative.contextPriorWeight = Double.NaN;
+        assertThrows(IllegalArgumentException.class, negative::validate);
     }
 }

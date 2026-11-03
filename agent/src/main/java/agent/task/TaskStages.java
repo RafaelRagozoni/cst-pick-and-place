@@ -138,6 +138,21 @@ public final class TaskStages {
         }
     }
 
+    /**
+     * The Task drive's level, vault spec CRE-01: the stages left, the current one counted, each
+     * weighing stageWeight, plus the current stage's distance term min(1, distance / distanceScale),
+     * over the most that sum can be. Counting the current stage makes success (release to done) pay
+     * a whole stage. stageWeight 0 leaves the distance term alone: the Task before CRE-01. Done is 0.
+     */
+    public static double taskLevel(int stage, double distance, double distanceScale,
+                                   double stageWeight) {
+        if (stage >= DONE) {
+            return 0.0;
+        }
+        double distanceTerm = Math.min(1.0, distance / distanceScale);
+        return (stageWeight * (DONE - stage) + distanceTerm) / (stageWeight * DONE + 1.0);
+    }
+
     /** Where the stage's target is, for GoalMO. */
     public static double[] target(int stage, Observation o) {
         if (stage <= 1) {

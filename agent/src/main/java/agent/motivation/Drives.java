@@ -11,8 +11,9 @@ import br.unicamp.cst.representation.idea.Idea;
  *     cycle
  *     curiosity, task, safety, effort   levels after the Drive Generator's gains -- what D_d means
  *     raw       curiosity, task, safety, effort   the same before the gains
- *     taskStage        the stage the Task drive inferred (Credit Assignment ignores Task's change
- *                      across a stage switch: that is a new target, not the habit's doing)
+ *     taskStage        the stage the Task drive inferred (at Config.taskStageWeight 0, Credit
+ *                      Assignment ignores Task's change across a stage switch: a new target, not
+ *                      the habit's doing; above 0 the change counts, CRE-01)
  *     effortRestarted  Effort restarted this cycle because a new goal was set (likewise ignored)
  *     novelty          the novelty Curiosity was computed from, for inspection
  *     boredom          Curiosity's first factor, 1 / (1 + novelty / scale): what its goal is met by

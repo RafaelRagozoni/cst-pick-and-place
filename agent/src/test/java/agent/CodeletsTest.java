@@ -283,6 +283,7 @@ class CodeletsTest {
 
     /** One habit per cycle, one-step credit; Task levels as given; each habit's Task credit. */
     private double[] taskCreditPerStep(int progressWindow, boolean chargeRetreat, double... levels) {
+        executionMO.setI(new ExecutionBuffer(100));     // a test may call this twice
         Config cfg = new Config();
         cfg.lambda = 0.0;
         cfg.progressWindow = progressWindow;
@@ -327,6 +328,59 @@ class CodeletsTest {
     void progressWindowZeroIsThePlainChange() {
         assertArrayEquals(new double[]{0.1, -0.1, 0.1, 0.1},
                 taskCreditPerStep(0, false, 0.5, 0.4, 0.5, 0.4, 0.3), 1e-9);
+    }
+
+    /**
+     * One habit per cycle, one-step credit, at this stage weight; each cycle's stage and the
+     * distance to its target set the Task level as the Drive Generator would. Each habit's Task credit.
+     */
+    private double[] taskCreditAcrossStages(double taskStageWeight, int[] stages, double[] distances) {
+        executionMO.setI(new ExecutionBuffer(100));     // a fresh run: a test calls this several times
+        Config cfg = new Config();
+        cfg.lambda = 0.0;
+        cfg.taskStageWeight = taskStageWeight;
+        CreditAssignmentCodelet c = credit(cfg);
+        double[] out = new double[stages.length - 1];
+        for (int k = 0; k < stages.length; k++) {
+            if (k > 0) {
+                buffer().addStep("h" + k, k, 0, 1, List.of(), k - 1, k, "done", "transport", 1, "ctx",
+                        0);
+            }
+            sensoryMO.setI(at(k, Traj.obs(0).q(), false));
+            drives(k, 0, TaskStages.taskLevel(stages[k], distances[k], cfg.taskDistanceScale,
+                    taskStageWeight), 0, 0, stages[k], k == 0);
+            c.notifyCodelet();
+            if (k > 0) {
+                out[k - 1] = c.table().snapshot("h" + k).value("ctx", CreditSnapshot.Read.SUM)[Drives.TASK];
+            }
+        }
+        return out;
+    }
+
+    /**
+     * CRE-01. Letting the cube go mid-transport undoes a stage: above stage weight 0 the habit that
+     * let go is charged the Task's rise, and grasping again is paid it back; at 0 both are zeroed
+     * with the stage change, as before, and dropping the cube was free. Going in and out of reach
+     * pays nothing overall at either weight: the Task is a potential, and its changes telescope.
+     */
+    @Test
+    void aStageUndoneIsChargedAndCrossingBackAndForthPaysNothing() {
+        int[] dropAndRegrasp = {2, 1, 2};                 // transport, let go at the hand, grasp again
+        double[] distances = {0.2, 0.01, 0.2};
+        double[] weightOne = taskCreditAcrossStages(1.0, dropAndRegrasp, distances);
+        assertEquals((2 + 0.4) / 5 - (3 + 0.02) / 5, weightOne[0], 1e-12, "letting go is charged");
+        assertEquals(-weightOne[0], weightOne[1], 1e-12, "grasping again is paid as much");
+        assertArrayEquals(new double[]{0.0, 0.0},
+                taskCreditAcrossStages(0.0, dropAndRegrasp, distances), 0.0);
+
+        int[] inAndOutOfReach = {0, 1, 0};
+        double[] acrossTheBorder = {0.051, 0.049, 0.051};
+        for (double taskStageWeight : new double[]{0.0, 1.0}) {
+            double[] crossing = taskCreditAcrossStages(taskStageWeight, inAndOutOfReach, acrossTheBorder);
+            assertEquals(0.0, crossing[0] + crossing[1], 1e-12, "weight " + taskStageWeight);
+        }
+        assertTrue(taskCreditAcrossStages(1.0, inAndOutOfReach, acrossTheBorder)[0] > 0.19,
+                "reaching pays a stage");
     }
 
     /** A new stage is a new target: the best of the last one is no reference for it. */
@@ -486,7 +540,10 @@ class CodeletsTest {
      * UCB weighs what is known about a habit in THIS context. A habit that ran 50 times elsewhere and
      * never here is untried here and goes first. Counting its 50 instead left it a near-zero bonus
      * and gave the habit tried here once the largest: the 2026-10-15 baseline repeated a habit that
-     * had already run in the bin in 99% of its choices.
+     * had already run in the bin in 99% of its choices. The hand is empty, so this holds with
+     * borrowing on (CRE-01 borrows only with the cube in the hand: borrowing here too ended these
+     * draws, and with them the agent's exploration). With the cube, a habit that ran elsewhere is no
+     * longer untried, on purpose (borrowingRanksHabitsNewToAContextByTheirRecordElsewhere).
      */
     @Test
     void ucbTriesAHabitNeverRunHereBeforeRepeatingOneThatRan() {
@@ -506,6 +563,7 @@ class CodeletsTest {
         HabitIdeas.setCredit(habit(pool, "here"), t.snapshot("here"));
         HabitIdeas.setCredit(habit(pool, "elsewhere"), t.snapshot("elsewhere"));
 
+        assertTrue(new Config().contextPriorWeight > 0, "borrowing on, as it runs");
         behavior(new Config(), pool, 1).notifyCodelet();
         assertEquals("here", HabitIdeas.id(((Plan) planMO.getI()).habit()), "greedy: the best score");
         behavior(new Config().withSelection("ucb"), pool, 1).notifyCodelet();
@@ -517,7 +575,9 @@ class CodeletsTest {
      * A habit whose results never vary cannot set the spread for the rest. Live (seed 3, 2026-10-16):
      * every habit tried once, then a no-op repeated 4978 times; the pooled spread came from the
      * no-op alone, ~0, and UCB never retried the others. Each habit now carries its own spread, the
-     * repertoire's reference until its own executions pull it away.
+     * repertoire's reference until its own executions pull it away. The hand is empty, so borrowing
+     * leaves this alone. With the cube in the hand it would not: the move's single execution would
+     * count as 1 + n0, its bonus sqrt(3) smaller, and at 51 visits it would not yet be retried.
      */
     @Test
     void aRepeatedNoOpDoesNotSilenceTheBonusOfHabitsTriedOnce() {
@@ -541,6 +601,59 @@ class CodeletsTest {
         behavior(new Config().withSelection("ucb"), pool, 1).notifyCodelet();
         assertEquals("move", HabitIdeas.id(((Plan) planMO.getI()).habit()),
                 "ucb: one execution is not enough to give up on a habit");
+    }
+
+    /**
+     * The habits UCB (c = 1) starts here in 20 decisions, nothing running, with borrowing at n0. One
+     * generator for all 20: the first nextInt(2) of new Random(1), new Random(2), ... is nearly
+     * always the same, a known weakness of its generator with small seeds.
+     */
+    private java.util.Set<String> ucbChoices(MemoryContainer pool, double contextPriorWeight) {
+        Config config = new Config().withSelection("ucb");
+        config.contextPriorWeight = contextPriorWeight;
+        BehaviorGeneratorCodelet b = behavior(config, pool, 1);
+        java.util.Set<String> chosen = new java.util.HashSet<>();
+        for (int i = 0; i < 20; i++) {
+            b.notifyCodelet();
+            chosen.add(HabitIdeas.id(((Plan) planMO.getI()).habit()));
+        }
+        return chosen;
+    }
+
+    /**
+     * CRE-01, the forced draw: carrying the cube into a bin where none of the habits has run yet.
+     * Before, every habit was untried there and the start was a uniform draw, letting go of the cube
+     * included (P1: ~77% of grab_open picks while holding were such draws). Borrowing, each habit
+     * enters with its mean under "transport, holding" elsewhere and, the bin unvisited, no bonus: the
+     * best record starts. A habit never run anywhere is still tried before any other.
+     */
+    @Test
+    void borrowingRanksHabitsNewToAContextByTheirRecordElsewhere() {
+        MemoryContainer pool = pool("letGo", "carryOn");
+        goal(1, Goal.TASK, "transport", 2);
+        drives(0, 0.2, 0.5, 0, 0, 2, false);
+        sensoryMO.setI(Traj.obs(400).idea());
+        assertTrue(Observation.of(sensoryMO).holding(), "observation 400 carries the cube");
+        trackerMO.setI(TrackerState.idle(0));
+        String carryingElsewhere = "transport|e0,0,0c0,0,0h1k1d0";
+        CreditTable t = new CreditTable();
+        for (int i = 0; i < 4; i++) {
+            t.add("letGo", carryingElsewhere, new double[]{0, -0.2, 0, 0}, 1.0, true);
+            t.add("carryOn", carryingElsewhere, new double[]{0, 0.01 * (i % 2), 0, 0}, 1.0, true);
+        }
+        t.add("letGo", "reach|e0,0,0c0,0,0h0k0d0", new double[]{0, 0.3, 0, 0}, 1.0, true);
+        t.closeExecutions();
+        HabitIdeas.setCredit(habit(pool, "letGo"), t.snapshot("letGo"));
+        HabitIdeas.setCredit(habit(pool, "carryOn"), t.snapshot("carryOn"));
+
+        assertEquals(java.util.Set.of("letGo", "carryOn"), ucbChoices(pool, 0.0), "before: a draw");
+        assertEquals(java.util.Set.of("carryOn"), ucbChoices(pool, 2.0), "borrowing: the best record");
+
+        MemoryContainer withANewHabit = pool("letGo", "carryOn", "neverRun");
+        HabitIdeas.setCredit(habit(withANewHabit, "letGo"), t.snapshot("letGo"));
+        HabitIdeas.setCredit(habit(withANewHabit, "carryOn"), t.snapshot("carryOn"));
+        assertEquals(java.util.Set.of("neverRun"), ucbChoices(withANewHabit, 2.0),
+                "never run anywhere: first");
     }
 
     // --- Sensory -------------------------------------------------------------------------------

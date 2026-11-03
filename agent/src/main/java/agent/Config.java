@@ -22,6 +22,16 @@ public final class Config {
     public double effortRefineGain = 1.0;
     /** Task level = target distance / this, capped at 1. Meters; ~ the arm's reach across the table. */
     public double taskDistanceScale = 0.5;
+    /**
+     * w of vault spec CRE-01: what one task stage weighs in the Task level, against the current
+     * stage's distance, which weighs 1. Task = (w * stages left, the current one counted, + distance
+     * term) / (4w + 1), and 0 when done (TaskStages#taskLevel). Completing a stage lowers it by
+     * w / (4w + 1), and undoing one raises it as much, so Credit Assignment credits the jump: letting
+     * the cube go mid-transport is charged the progress it undoes. 0 = the Task before CRE-01,
+     * distance only: its target moves at each stage change, Credit zeroes that jump, and dropping the
+     * cube cost nothing (P1: 95% of grasps ended with the cube dropped away from the pad).
+     */
+    public double taskStageWeight = 1.0;
     /** Safety rises as a joint comes within this many radians of its limit. */
     public double safetyMargin = Math.toRadians(15);
     /** Effort level = cycles on the current goal / this. */
@@ -127,6 +137,21 @@ public final class Config {
      * no-op repeated thousands of times set it to ~0 for every habit.
      */
     public double spreadPriorWeight = 2.0;
+    /**
+     * n0 of vault spec CRE-01: how many executions' worth of weight a habit's record elsewhere has
+     * where it has few or none, in a context with the cube in the hand (CreditTable#holdsTheCube).
+     * There a habit's value under (goal, state bin) is its mean there shrunk toward its mean under
+     * the same goal holding the cube (CreditTable#middleContext), or toward its total where that has
+     * none: (sum here + n0 * that mean) / (executions here + n0). UCB's and Thompson's counts add n0
+     * too, so a habit that ran elsewhere is no longer untried there: only a habit never run anywhere
+     * is. In P1 the forced draws were 61% of the choices with the cube held in the first 500 episodes
+     * (24-35% after), and 53-87% of the grab_open picks while holding (tools/carry_report.py).
+     * Without the cube, and everywhere at 0, the rule before CRE-01: the context's mean, else the
+     * total, and every habit not yet run in a context tried there first, in random order. Borrowing
+     * without the cube too (commit 8253182) ended those draws, the agent's exploration, and 7 of 9
+     * P1 seeds never reached a first success (spec amendment, 2026-10-28). Needs creditRead MEAN.
+     */
+    public double contextPriorWeight = 2.0;
 
     // --- HabitLearner (cap4 4.4) -------------------------------------------------
     /** False in C4 and C6: the pool stays the primitives. Credit is still copied in (C4). */
@@ -137,6 +162,21 @@ public final class Config {
     // --- buffers -------------------------------------------------------------------
     public int sensoryBufferSize = 64;
     public int executionBufferSize = 4096;
+
+    /** Refuse settings that mean nothing, when a mind starts rather than at its first cycle. */
+    public void validate() {
+        if (!(taskStageWeight >= 0)) {
+            throw new IllegalArgumentException("taskStageWeight needs >= 0, got " + taskStageWeight);
+        }
+        if (!(contextPriorWeight >= 0)) {
+            throw new IllegalArgumentException("contextPriorWeight needs >= 0, got "
+                    + contextPriorWeight);
+        }
+        if (contextPriorWeight > 0 && creditRead == CreditSnapshot.Read.SUM) {
+            throw new IllegalArgumentException("contextPriorWeight " + contextPriorWeight
+                    + " shrinks a mean toward a mean, and creditRead SUM reads none: set it to 0");
+        }
+    }
 
     /** Set the Curiosity yield by name, refusing a bad name now rather than at the first cycle. */
     public Config withCuriosity(String name) {
