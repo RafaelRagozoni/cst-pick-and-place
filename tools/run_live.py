@@ -6,13 +6,15 @@
     python3 tools/run_live.py --protocol bench/P1.json --condition C4   # a baseline batch (BAS-01)
     python3 tools/run_live.py --condition C4 --selection ucb:0.1 --curiosity lp --seeds 1 2 3 \
         --emax 500 --context-prior-weight 0          # CRE-01: the Task change alone
+    python3 tools/run_live.py --condition C0 --selection ucb:0.1 --curiosity lp --seeds 1 2 3 \
+        --emax 500 --macro sum                       # MAC-01: macros by the sum rule
 
 Each seed gets its own CoppeliaSim (bridge.py --launch headless), its own bridge and its own agent:
 nothing is shared, so the seeds are independent samples. Seeds beyond --jobs wait their turn.
 
-Everything lands in runs/<date>_<condition>_<selection>[_<curiosity>][_stage<w>][_prior<n0>][_<tag>]/
+Everything lands in runs/<date>_<condition>_<selection>[_<curiosity>][_stage<w>][_prior<n0>][_macro-<rule>][_<tag>]/
 (the curiosity yield named only when it is not none; --task-stage-weight and --context-prior-weight,
-vault spec CRE-01, only when given):
+vault spec CRE-01, and --macro, vault spec MAC-01, only when given):
     agent/                 the compiled agent this batch ran -- a snapshot, so editing or
                            rebuilding the code while a run goes cannot change it halfway
     s<seed>/log.jsonl.gz   the bridge's run log (metrics.py, summarize_run.py, replay.py read it)
@@ -31,7 +33,7 @@ checkpoint's episode if the run was stopped mid-way.
 
 --protocol FILE runs a protocol batch (vault spec BAS-01, tools/protocol.py): selection, Curiosity,
 seeds, E_max, E_ref and step limit come from the file and cannot be given, nor CRE-01's two weights
-(the agent's defaults run, and agent.json records them), --condition must be one it
+nor MAC-01's --macro (the agent's defaults run, and agent.json records them), --condition must be one it
 lists, and the tree must be clean, scene and cst included. Resuming one refuses another fingerprint
 and any budget. Without --protocol nothing is refused, and the fingerprint is recorded all the same.
 
@@ -124,7 +126,8 @@ def run_seed(a, seed, batch, agent_bin, fp, lock, resume):
     else:
         os.makedirs(d)
         meta = {'condition': a.condition, 'selection': a.selection, 'curiosity': a.curiosity,
-                **cre01_weights_given(a), 'seed': seed, 'emax': a.emax,
+                **cre01_weights_given(a), **({'macro': a.macro} if a.macro else {}),
+                'seed': seed, 'emax': a.emax,
                 'eref': a.eref, 'stepLimit': a.step_limit, 'commit': git_commit(fp),
                 'protocol': fp['protocol'] and fp['protocol']['name'], 'fingerprint': fp,
                 'start': now(), 'keepEvery': a.keep_every, 'pid': os.getpid()}
@@ -147,6 +150,8 @@ def run_seed(a, seed, batch, agent_bin, fp, lock, resume):
             # Only batches that set them (CRE-01's runs of one change alone) have these keys.
             + [arg for key, flag in CRE01_WEIGHTS for arg in
                ((flag, str(meta[key])) if key in meta else ())]
+            # Only batches that set it (MAC-01's exploratory runs) have this key.
+            + (['--macro', meta['macro']] if 'macro' in meta else [])
             + (['--resume', ckpt] if resume else ['--describe', os.path.join(d, 'agent.json')]),
             stdout=aout, stderr=subprocess.STDOUT)
         CHILDREN.append(agent)
@@ -224,6 +229,9 @@ def main():
                     help='w of vault spec CRE-01 (0: the Task before it); default the agent\'s, 1')
     ap.add_argument('--context-prior-weight', type=float,
                     help='n0 of vault spec CRE-01 (0: no borrowing); default the agent\'s, 2')
+    ap.add_argument('--macro', choices=('none', 'copy', 'sum'),
+                    help='how a Task goal\'s steps become a macro (vault spec MAC-01); default the '
+                         'agent\'s, none')
     ap.add_argument('--seeds', type=int, nargs='+', help='default 1; with --resume, every seed')
     ap.add_argument('--emax', type=int, help='Phase 1 episodes at most, in total; default 1000, '
                                              'or with --resume the batch\'s own')
@@ -243,9 +251,9 @@ def main():
     try:
         if a.resume:
             if (a.condition or a.selection or a.curiosity or a.step_limit or a.tag or a.protocol
-                    or cre01_weights_given(a)):
+                    or cre01_weights_given(a) or a.macro):
                 ap.error('--resume continues a batch with its own condition, selection, curiosity, '
-                         'CRE-01 weights, step limit and protocol')
+                         'CRE-01 weights, macro rule, step limit and protocol')
             batch = os.path.abspath(a.resume)
             agent_bin = os.path.join(batch, 'agent', 'bin', 'agent')
             p_file = os.path.join(batch, 'protocol.json')
@@ -283,7 +291,7 @@ def main():
         a.eref = 0 if a.eref is None else a.eref
         weights = ''.join('_%s%g' % (label, v) for label, v in
                           (('stage', a.task_stage_weight), ('prior', a.context_prior_weight))
-                          if v is not None)
+                          if v is not None) + ('_macro-' + a.macro if a.macro else '')
         name = '%s_%s_%s%s%s%s' % (datetime.datetime.now().strftime('%Y-%m-%d_%H%M'), a.condition,
                                    a.selection, '' if a.curiosity == 'none' else '_' + a.curiosity,
                                    weights, '_' + a.tag if a.tag else '')
