@@ -1,6 +1,7 @@
 package agent;
 
 import agent.credit.CreditSnapshot;
+import agent.habit.MacroRule;
 import agent.motivation.Drives;
 import agent.motivation.Yields;
 import agent.selection.Selectors;
@@ -158,6 +159,20 @@ public final class Config {
     public boolean generation = true;
     /** False in C2: no parallel fusion and no macros. */
     public boolean fusion = true;
+    /**
+     * How the steps that led to a Task goal become a macro (vault spec MAC-01), by name
+     * (MacroRule.byName): "none" builds none, the agent before MAC-01; "copy" keeps every step (the
+     * control); "sum" each joint's net turn between gripper events, as one parallel step. Needs
+     * generation and fusion on, so C2, C4 and C6 refuse any other than none. --macro on the command
+     * line; a protocol batch refuses the flag and runs this default.
+     */
+    public String macroRule = "none";
+    /**
+     * Most macros the pool holds at once, retired ones not counted (MAC-01 D10): a guard until
+     * culling (REM-01) exists. P1's stretches would make ~41 per seed in 2000 episodes. A macro
+     * refused for it is logged (macro event "refused").
+     */
+    public int maxActiveMacros = 100;
 
     // --- buffers -------------------------------------------------------------------
     public int sensoryBufferSize = 64;
@@ -172,6 +187,14 @@ public final class Config {
             throw new IllegalArgumentException("contextPriorWeight needs >= 0, got "
                     + contextPriorWeight);
         }
+        if (!macroRule.equals("none") && !(generation && fusion)) {
+            throw new IllegalArgumentException("macro rule '" + macroRule + "' needs generation and "
+                    + "fusion on, and " + condition + " turns " + (generation ? "fusion" : "generation")
+                    + " off: the rule would build nothing");
+        }
+        if (maxActiveMacros < 0) {
+            throw new IllegalArgumentException("maxActiveMacros needs >= 0, got " + maxActiveMacros);
+        }
         if (contextPriorWeight > 0 && creditRead == CreditSnapshot.Read.SUM) {
             throw new IllegalArgumentException("contextPriorWeight " + contextPriorWeight
                     + " shrinks a mean toward a mean, and creditRead SUM reads none: set it to 0");
@@ -182,6 +205,15 @@ public final class Config {
     public Config withCuriosity(String name) {
         Yields.byName(name);
         curiosityYield = name;
+        return this;
+    }
+
+    /** Set the macro rule by name ("none", or one MacroRule.byName knows), refusing a bad one now. */
+    public Config withMacroRule(String name) {
+        if (!name.equals("none")) {
+            MacroRule.byName(name);
+        }
+        macroRule = name;
         return this;
     }
 

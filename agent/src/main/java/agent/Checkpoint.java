@@ -34,6 +34,8 @@ import java.util.zip.GZIPOutputStream;
  * last.pt). There are no weights here; what the agent has learned is
  * <ul>
  *   <li>the credit table (Credit Assignment), and the credit copied from it into the pool;</li>
+ *   <li>the habits the HabitLearner built (macros, vault spec MAC-01), retired ones too, with their
+ *       numbering;</li>
  *   <li>the novelty archive and the decaying visit counts, and the yield's history -- entry counts,
  *       or effect model and errors (Curiosity);</li>
  *   <li>the Behavior Generator's random generator, mid-sequence;</li>
@@ -47,15 +49,18 @@ import java.util.zip.GZIPOutputStream;
  * holds a resumed run to the run that never stopped, decision for decision, which is what catches
  * state left out of here.
  *
- * <p>Not saved, and refused rather than resumed wrong: a pool that is not the primary repertoire
- * (WP3's generated habits are not written yet), and a run whose Config differs from the one saved.
+ * <p>Refused rather than resumed wrong: a pool whose primary repertoire is not this agent's, and a
+ * run whose Config differs from the one saved.
  *
  * <p>Format: JSON, gzipped when the path ends in {@code .gz}; readable with {@code zcat | jq}.
  */
 public final class Checkpoint {
 
-    /** 2 since CRE-01: the credit table keeps each habit's middle contexts too. */
-    public static final int FORMAT = 2;
+    /**
+     * 2 since CRE-01: the credit table keeps each habit's middle contexts too. 3 since MAC-01: the
+     * HabitLearner's built habits.
+     */
+    public static final int FORMAT = 3;
     private static final Gson GSON = new GsonBuilder().serializeNulls()
             .serializeSpecialFloatingPointValues().create();
 
@@ -93,6 +98,7 @@ public final class Checkpoint {
         c.add("goal", m.goal.state());
         c.add("credit", m.credit.state());
         c.add("behavior", m.behavior.state());
+        c.add("learner", m.learner.state());
         return c;
     }
 
@@ -120,13 +126,14 @@ public final class Checkpoint {
             throw new IllegalArgumentException("the checkpoint was saved with another Config: "
                     + String.join(", ", diff));
         }
+        m.learner.restore(c.getAsJsonObject("learner"));
         List<String> pool = new ArrayList<>();
         c.getAsJsonArray("pool").forEach(e -> pool.add(e.getAsString()));
         List<String> mine = new ArrayList<>(m.learner.habits().keySet());
         if (!pool.equals(mine)) {
             throw new IllegalArgumentException("the checkpoint's pool (" + pool.size()
-                    + " habits) is not this agent's (" + mine.size() + "): another repertoire, or "
-                    + "generated habits, which checkpoints do not hold yet (WP3)");
+                    + " habits) is not this agent's with the habits it built (" + mine.size()
+                    + "): another primary repertoire");
         }
 
         m.link.resumeAt(c.get("cycle").getAsLong());

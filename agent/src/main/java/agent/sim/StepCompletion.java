@@ -47,6 +47,19 @@ public final class StepCompletion {
         return records;
     }
 
+    /**
+     * The records as far as they ran: each MOVE's angle replaced by the angle its joint has turned
+     * since the step started. Not part of the Python original: only the PlanTracker's record of a
+     * step uses it (ExecutionBuffer.Step#executedCommands).
+     */
+    public List<Command> executed(Observation obs) {
+        List<Command> out = new ArrayList<>();
+        for (Command rec : records) {
+            out.add(rec.isMove() ? rec.withAngle(obs.q()[rec.joint()] - q0[rec.joint()]) : rec);
+        }
+        return out;
+    }
+
     /** Signed angle the record's joint still has to turn. */
     public double remaining(Command rec, Observation obs) {
         double turned = obs.q()[rec.joint()] - q0[rec.joint()];

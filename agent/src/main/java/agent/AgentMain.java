@@ -34,7 +34,9 @@ import java.util.Set;
  * picks the Curiosity yield; every logged step records it and the yield's value.
  * {@code --task-stage-weight W} and {@code --context-prior-weight N} set the two weights of vault
  * spec CRE-01 (Config.taskStageWeight, contextPriorWeight; 0 turns each off), for the runs that
- * test one change without the other; agent.json records them either way.
+ * test one change without the other; agent.json records them either way. {@code --macro} (none, copy,
+ * sum; default none) picks how a Task goal's steps become a macro (vault spec MAC-01,
+ * Config.macroRule); C2, C4 and C6 refuse any but none.
  *
  * <p>Checkpoints ({@link Checkpoint}): {@code --checkpoint FILE} saves the agent after every
  * episode, overwriting; {@code --keep-every N} also keeps a copy every N episodes beside it, in
@@ -65,6 +67,9 @@ public final class AgentMain {
         if (a.containsKey("context-prior-weight")) {
             cfg.contextPriorWeight = Double.parseDouble(a.get("context-prior-weight"));
         }
+        if (a.containsKey("macro")) {
+            cfg.withMacroRule(a.get("macro"));
+        }
         cfg.validate();
         int seed = Integer.parseInt(a.getOrDefault("seed", "1"));
         int emax = Integer.parseInt(a.getOrDefault("emax", "50"));
@@ -81,8 +86,9 @@ public final class AgentMain {
                 write(Path.of(a.get("describe")), describe(cfg, info));
             }
             AgentMind m = new AgentMind(cfg, bridge, seed);
-            System.out.printf("agent %s seed %d selection %s curiosity %s: %d habits, step limit %d, "
-                    + "log %s%n", cfg.condition, seed, cfg.selection, cfg.curiosityYield,
+            System.out.printf("agent %s seed %d selection %s curiosity %s macro %s: %d habits, "
+                    + "step limit %d, log %s%n", cfg.condition, seed, cfg.selection, cfg.curiosityYield,
+                    cfg.macroRule,
                     m.pool.getAllMemories().size(),
                     info.get("stepLimit").getAsInt(), str(info.get("log")));
 
@@ -193,7 +199,7 @@ public final class AgentMain {
 
     /** Every flag main() reads. A name outside it is a typo, refused rather than ignored. */
     static final Set<String> FLAGS = Set.of("host", "port", "condition", "selection", "curiosity",
-            "task-stage-weight", "context-prior-weight", "seed", "emax", "eref", "checkpoint",
+            "task-stage-weight", "context-prior-weight", "macro", "seed", "emax", "eref", "checkpoint",
             "keep-every", "describe", "resume", "shutdown");
 
     static Map<String, String> parse(String[] args) {

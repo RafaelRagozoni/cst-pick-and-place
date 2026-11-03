@@ -159,8 +159,9 @@ public final class PlanTrackerCodelet extends AgentCodelet {
             return;
         }
         executionBuffer.addStep(HabitIdeas.id(plan.habit()), plan.serial(), stepIndex, planSteps.size(),
-                stepCompletion.records(), stepStartCycle, observation.cycle(), stepOutcome, plan.goal(),
-                plan.goalId(), plan.context(), observation.episode());
+                stepCompletion.records(), stepCompletion.executed(observation), stepStartCycle,
+                observation.cycle(), stepOutcome, plan.goal(), plan.goalId(), plan.context(),
+                observation.episode());
     }
 
     private TrackerState state(Observation observation) {
