@@ -1,3 +1,4 @@
 batch,date,protocol,condition,commit,cst,n,m1_median,m1_low,m1_high,censored,m2_jumpstart,m2_time_to_theta,m2_final,m2_plateau,m3_steps,m3_energy,m4_bins_p1,m4_bins_p2,valid
 2026-10-21_0842_C4_ucb-0.1_lp_P1,2026-10-21,P1,C4,b590ea9,3ae65c8,9,727.0,550.0,968.0,0,0.011,,0.011,True,290.5,3.967,3091.0,4407.0,True
 2026-10-27_1851_C4_ucb-0.1_lp_P1,2026-10-27,P1,C4,8253182,3ae65c8,9,,670.0,,7,0.01,,0.008,True,331.5,5.304,3262.0,9238.5,True
+2026-10-28_1803_C4_ucb-0.1_lp_P1,2026-10-28,P1,C4,2ac8e29,3ae65c8,9,631.0,195.0,,3,0.07,,0.002,True,358.0,5.552,3934.0,5867.5,True
