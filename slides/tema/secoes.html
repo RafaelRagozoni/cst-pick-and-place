@@ -1,0 +1,44 @@
+<style>
+  /* decks live one level below the project root (reunioes/, _revisao/, teste/); _quarto.yml copies tema/fontes to the output */
+  @font-face { font-family: Inter; font-weight: 400; src: url("../tema/fontes/Inter-Regular.otf"); }
+  @font-face { font-family: Inter; font-weight: 500; src: url("../tema/fontes/Inter-Medium.otf"); }
+  @font-face { font-family: Inter; font-weight: 600; src: url("../tema/fontes/Inter-SemiBold.otf"); }
+  @font-face { font-family: Inter; font-weight: 700; src: url("../tema/fontes/Inter-Bold.otf"); }
+  @font-face { font-family: Inter; font-weight: 800; src: url("../tema/fontes/Inter-ExtraBold.otf"); }
+</style>
+<script>
+// Draws the colour band, the section strip (top right), the footer with the source (data-fonte)
+// and the "n / N" number (bottom right) inside the scaled slide area, so it follows the 1280x720 layout.
+(function () {
+  const SECS = [['ctx', 'Contexto'], ['prob', 'Problema'], ['sol', 'Solução'], ['res', 'Resultado'], ['prox', 'Próximos']];
+  function build() {
+    const slides = document.querySelector('.reveal .slides');
+    if (!slides || !window.Reveal) return;
+    const chrome = document.createElement('div');
+    chrome.className = 'apr-chrome';
+    chrome.innerHTML = '<div class="band"></div><div class="secs"></div><div class="foot"><span class="fonte"></span><span class="num"></span></div>';
+    slides.appendChild(chrome);
+    const num = document.querySelector('.reveal .slide-number');
+    if (num) chrome.querySelector('.num').appendChild(num);
+    function sectionOf(el) {
+      if (el.classList.contains('prob')) return 'prob';
+      if (el.classList.contains('sol')) return 'sol';
+      if (el.classList.contains('res')) return 'res';
+      return el.classList.contains('proximos') ? 'prox' : 'ctx';
+    }
+    function update() {
+      const el = Reveal.getCurrentSlide();
+      if (!el) return;
+      const sec = sectionOf(el);
+      slides.style.setProperty('--sec', 'var(--' + (sec === 'prox' ? 'ctx' : sec) + ')');
+      chrome.querySelector('.secs').innerHTML = SECS.map(s => '<span' + (s[0] === sec ? ' class="on"' : '') + '>' + s[1] + '</span>').join('');
+      const fonte = el.getAttribute('data-fonte');
+      chrome.querySelector('.fonte').textContent = fonte ? 'fonte: ' + fonte : '';
+    }
+    Reveal.on('slidechanged', update);
+    Reveal.on('ready', update);
+    update();
+  }
+  if (window.Reveal && Reveal.isReady && Reveal.isReady()) build(); else window.addEventListener('load', () => Reveal.on('ready', build));
+})();
+</script>

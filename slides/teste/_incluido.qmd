@@ -1,0 +1,5 @@
+## Slide incluído com imagem a partir da raiz do projeto {.sol fonte="teste"}
+
+::: {style="width: 120px"}
+![pixel de teste](/teste/media/pixel.png)
+:::

@@ -22,3 +22,11 @@ runs/
 # IDE build output: VS Code's Java extension compiles to agent/bin/. Untracked files make the tree
 # dirty, and run_live.py --protocol refuses a dirty tree.
 agent/bin/
+
+# Quarto slides (APR-01): saídas e mídia geradas
+slides/_saida/
+slides/_revisao/
+slides/_cache/
+slides/.quarto/
+slides/mudancas/*/media/
+slides/reunioes/*/media/

@@ -1,0 +1,21 @@
+---
+fatos:
+  - fatos.json
+---
+
+## O CRE-01 acabou com as quedas do cubo, mas a taxa de sucesso não subiu {.ctx fonte="entrada 40 · ledger 0071a5f"}
+
+::: eb
+Reunião de teste · sobretítulo
+:::
+
+::: kv
+::: what
+taxa de sucesso no fim da Fase 2
+:::
+::: to
+{{< fato teste.m2 >}}
+:::
+:::
+
+{{< include _incluido.qmd >}}

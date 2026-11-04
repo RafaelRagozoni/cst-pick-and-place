@@ -1,0 +1,26 @@
+project:
+  type: default
+  output-dir: _saida
+  render:
+    - reunioes/*.qmd
+    - _revisao/*.qmd
+    - teste/exemplo.qmd
+  resources:
+    - tema/fontes/*.otf
+
+lang: pt-BR
+
+format:
+  revealjs:
+    width: 1280
+    height: 720
+    margin: 0
+    center: false
+    transition: none
+    hash: true
+    slide-number: c/t
+    controls: false
+    menu: false
+    progress: false
+    theme: [default, tema/apr.scss]
+    include-after-body: tema/secoes.html

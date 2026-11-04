@@ -1,0 +1,7 @@
+title: fato
+author: APR-01
+version: 1.0.0
+quarto-required: ">=1.10.0"
+contributes:
+  shortcodes:
+    - fato.lua
