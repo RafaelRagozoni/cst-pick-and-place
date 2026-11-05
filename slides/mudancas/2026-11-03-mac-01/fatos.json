@@ -81,6 +81,126 @@
    "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-10-28_1803_C4_ucb-0.1_lp_P1, coluna reach ticks, seeds 1 / 2 / 3",
    "manual": false
   },
+  "mac01.reach_soma_s1": {
+   "valor": 407.0,
+   "texto": "407",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum, coluna reach ticks, s1",
+   "manual": false
+  },
+  "mac01.h_reach_soma_s1": {
+   "valor": null,
+   "texto": "91.9%",
+   "fonte": "altura da barra: mac01.reach_soma_s1 sobre a maior",
+   "manual": false
+  },
+  "mac01.reach_soma_s2": {
+   "valor": 173.0,
+   "texto": "173",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum, coluna reach ticks, s2",
+   "manual": false
+  },
+  "mac01.h_reach_soma_s2": {
+   "valor": null,
+   "texto": "39.1%",
+   "fonte": "altura da barra: mac01.reach_soma_s2 sobre a maior",
+   "manual": false
+  },
+  "mac01.reach_soma_s3": {
+   "valor": 356.0,
+   "texto": "356",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum, coluna reach ticks, s3",
+   "manual": false
+  },
+  "mac01.h_reach_soma_s3": {
+   "valor": null,
+   "texto": "80.4%",
+   "fonte": "altura da barra: mac01.reach_soma_s3 sobre a maior",
+   "manual": false
+  },
+  "mac01.reach_copia_s1": {
+   "valor": null,
+   "texto": "travou",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-copy, coluna reach ticks, s1",
+   "manual": false
+  },
+  "mac01.h_reach_copia_s1": {
+   "valor": null,
+   "texto": "0%",
+   "fonte": "altura da barra: mac01.reach_copia_s1 sobre a maior",
+   "manual": false
+  },
+  "mac01.reach_copia_s2": {
+   "valor": 403.0,
+   "texto": "403",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-copy, coluna reach ticks, s2",
+   "manual": false
+  },
+  "mac01.h_reach_copia_s2": {
+   "valor": null,
+   "texto": "91.0%",
+   "fonte": "altura da barra: mac01.reach_copia_s2 sobre a maior",
+   "manual": false
+  },
+  "mac01.reach_copia_s3": {
+   "valor": 443.0,
+   "texto": "443",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-copy, coluna reach ticks, s3",
+   "manual": false
+  },
+  "mac01.h_reach_copia_s3": {
+   "valor": null,
+   "texto": "100.0%",
+   "fonte": "altura da barra: mac01.reach_copia_s3 sobre a maior",
+   "manual": false
+  },
+  "mac01.reach_c4_s1": {
+   "valor": 93,
+   "texto": "93",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-10-28_1803_C4_ucb-0.1_lp_P1, coluna reach ticks, s1",
+   "manual": false
+  },
+  "mac01.h_reach_c4_s1": {
+   "valor": null,
+   "texto": "21.0%",
+   "fonte": "altura da barra: mac01.reach_c4_s1 sobre a maior",
+   "manual": false
+  },
+  "mac01.reach_c4_s2": {
+   "valor": 95,
+   "texto": "95",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-10-28_1803_C4_ucb-0.1_lp_P1, coluna reach ticks, s2",
+   "manual": false
+  },
+  "mac01.h_reach_c4_s2": {
+   "valor": null,
+   "texto": "21.4%",
+   "fonte": "altura da barra: mac01.reach_c4_s2 sobre a maior",
+   "manual": false
+  },
+  "mac01.reach_c4_s3": {
+   "valor": 100.5,
+   "texto": "100",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-10-28_1803_C4_ucb-0.1_lp_P1, coluna reach ticks, s3",
+   "manual": false
+  },
+  "mac01.h_reach_c4_s3": {
+   "valor": null,
+   "texto": "22.7%",
+   "fonte": "altura da barra: mac01.reach_c4_s3 sobre a maior",
+   "manual": false
+  },
+  "mac01.h_prev_soma": {
+   "valor": null,
+   "texto": "6.8%",
+   "fonte": "altura da linha: o topo do previsto para a soma (spec MAC-01, Testing 2) sobre a maior barra",
+   "manual": false
+  },
+  "mac01.h_prev_copia": {
+   "valor": null,
+   "texto": "20.3%",
+   "fonte": "altura da linha: o previsto para a cópia (spec MAC-01, Testing 2) sobre a maior barra",
+   "manual": false
+  },
   "mac01.copia_sem_reach": {
    "valor": [
     1
@@ -167,6 +287,78 @@
    "fonte": "runs/2026-10-28_1803_C4_ucb-0.1_lp_P1/s3, sucessos depois do 1º",
    "manual": false
   },
+  "mac01.taxa_depois_soma_s1": {
+   "valor": 0.824,
+   "texto": "82%",
+   "fonte": "runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum/s1, sucessos depois do 1º / episódios depois do 1º",
+   "manual": false
+  },
+  "mac01.h_taxa_depois_soma_s1": {
+   "valor": null,
+   "texto": "82.4%",
+   "fonte": "altura da barra: mac01.taxa_depois_soma_s1, eixo 0–100%",
+   "manual": false
+  },
+  "mac01.taxa_depois_soma_s2": {
+   "valor": null,
+   "texto": "nunca acertou em 500 ep.",
+   "fonte": "runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum/s2, sucessos depois do 1º / episódios depois do 1º",
+   "manual": false
+  },
+  "mac01.h_taxa_depois_soma_s2": {
+   "valor": null,
+   "texto": "0%",
+   "fonte": "altura da barra: mac01.taxa_depois_soma_s2, eixo 0–100%",
+   "manual": false
+  },
+  "mac01.taxa_depois_soma_s3": {
+   "valor": null,
+   "texto": "nunca acertou em 500 ep.",
+   "fonte": "runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum/s3, sucessos depois do 1º / episódios depois do 1º",
+   "manual": false
+  },
+  "mac01.h_taxa_depois_soma_s3": {
+   "valor": null,
+   "texto": "0%",
+   "fonte": "altura da barra: mac01.taxa_depois_soma_s3, eixo 0–100%",
+   "manual": false
+  },
+  "mac01.taxa_depois_c4_s1": {
+   "valor": null,
+   "texto": "nunca acertou em 2.000 ep.",
+   "fonte": "runs/2026-10-28_1803_C4_ucb-0.1_lp_P1/s1, sucessos depois do 1º / episódios depois do 1º",
+   "manual": false
+  },
+  "mac01.h_taxa_depois_c4_s1": {
+   "valor": null,
+   "texto": "0%",
+   "fonte": "altura da barra: mac01.taxa_depois_c4_s1, eixo 0–100%",
+   "manual": false
+  },
+  "mac01.taxa_depois_c4_s2": {
+   "valor": 0.02,
+   "texto": "2%",
+   "fonte": "runs/2026-10-28_1803_C4_ucb-0.1_lp_P1/s2, sucessos depois do 1º / episódios depois do 1º",
+   "manual": false
+  },
+  "mac01.h_taxa_depois_c4_s2": {
+   "valor": null,
+   "texto": "2.0%",
+   "fonte": "altura da barra: mac01.taxa_depois_c4_s2, eixo 0–100%",
+   "manual": false
+  },
+  "mac01.taxa_depois_c4_s3": {
+   "valor": 0.002,
+   "texto": "0,2%",
+   "fonte": "runs/2026-10-28_1803_C4_ucb-0.1_lp_P1/s3, sucessos depois do 1º / episódios depois do 1º",
+   "manual": false
+  },
+  "mac01.h_taxa_depois_c4_s3": {
+   "valor": null,
+   "texto": "0.2%",
+   "fonte": "altura da barra: mac01.taxa_depois_c4_s3, eixo 0–100%",
+   "manual": false
+  },
   "mac01.c4_n_seeds": {
    "valor": 9,
    "texto": "9",
@@ -232,6 +424,30 @@
    "valor": null,
    "texto": "3.2%",
    "fonte": "largura da barra: mac01.ep_ticks_release sobre o episódio",
+   "manual": false
+  },
+  "mac01.ep_garra_trocas": {
+   "valor": 8,
+   "texto": "8",
+   "fonte": "runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum/s1, ep. 172: trocas do comando da garra antes do reach",
+   "manual": false
+  },
+  "mac01.ep_garra_ticks": {
+   "valor": 337,
+   "texto": "337",
+   "fonte": "runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum/s1, ep. 172: ticks antes do reach com a abertura da garra mudando",
+   "manual": false
+  },
+  "mac01.ep_total": {
+   "valor": 474,
+   "texto": "474",
+   "fonte": "media/soma_s1.mp4.json: o último passo",
+   "manual": false
+  },
+  "mac01.ep_marca_base": {
+   "valor": null,
+   "texto": "19.6%",
+   "fonte": "posição da marca: mac01.reach_c4_s1 sobre o episódio",
    "manual": false
   },
   "mac01.video_ep": {

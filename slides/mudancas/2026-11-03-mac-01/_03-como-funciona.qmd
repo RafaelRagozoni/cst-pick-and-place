@@ -9,10 +9,10 @@ Como funciona · cópia e soma
 <span class="chipj">j0 −</span><span class="chipj">j1 −</span><span class="chipj">j0 −</span><span class="chipg">garra</span><span class="chipj">j2 −</span><span class="chipj">j3 +</span><span class="chipj">j2 −</span><span class="chipg">garra</span><span class="chipj">j0 −</span><span class="chipj">j2 −</span><span class="chipj">j3 +</span><span class="chipj">j1 −</span><span class="chipj">j0 +</span><span class="chipj">j2 −</span><span class="tiny" style="align-self:center">… dezenas de passos</span>
 </div></div>
 <div class="body" style="gap:20px;flex:none">
-<div class="row" style="flex:1"><h3>Cópia</h3>
+<div class="row" style="flex:1"><h3>Macro-cópia</h3>
 <div class="small" style="margin:8px 0">todos os passos, na mesma ordem</div>
 <div style="display:flex;gap:4px;flex-wrap:wrap"><span class="chipj">j0 −</span><span class="chipj">j1 −</span><span class="chipj">j0 −</span><span class="chipg">garra</span><span class="chipj">j2 −</span><span class="chipj">j3 +</span><span class="chipj">j2 −</span><span class="chipg">garra</span><span class="tiny" style="align-self:center">…</span></div></div>
-<div class="row after" style="flex:1"><h3>Soma</h3>
+<div class="row after" style="flex:1"><h3>Macro-soma</h3>
 <div class="small" style="margin:8px 0">entre dois eventos da garra, um passo só com o giro líquido</div>
 <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chipj" style="background:#2a78d6;color:#fff">{{< fato mac01.exemplo_giro >}}</span><span class="chipg">garra</span><span class="tiny" style="align-self:center">…</span></div></div>
 </div>

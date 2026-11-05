@@ -16,7 +16,7 @@ Reunião de 11/11 · semanas de 21/10 a 03/11
 <div class="col" style="flex:1.2">
 <div class="kv"><div class="what">CRE-01 · pegas que terminam com o cubo largado longe do pad</div><div class="from">{{< fato cre01.quedas_base >}} →</div><div class="to ok">{{< fato cre01.quedas_cre >}}</div><div class="mark ok">✓</div></div>
 <div class="kv"><div class="what">CRE-01 · taxa de sucesso no fim da Fase 2 <span class="tiny">(M2, a métrica principal: últimos {{< fato cre01.janela_m2 >}} episódios da Fase 2, média dos {{< fato cre01.n_seeds >}} seeds)</span></div><div class="from">{{< fato cre01.m2_base >}} →</div><div class="to no">{{< fato cre01.m2_cre >}}</div><div class="mark no">✗</div></div>
-<div class="kv"><div class="what">MAC-01 · ticks até o cubo, base → macro da soma <span class="tiny">(exploratória, {{< fato mac01.n_seeds >}} seeds)</span></div><div class="from">{{< fato mac01.reach_c4 >}} →</div><div class="to no">{{< fato mac01.reach_soma >}}</div><div class="mark no">✗</div></div>
+<div class="kv"><div class="what">MAC-01 · ticks até o cubo, agente base → macro-soma <span class="tiny">(exploratória, {{< fato mac01.n_seeds >}} seeds)</span></div><div class="from">{{< fato mac01.reach_c4 >}} →</div><div class="to no">{{< fato mac01.reach_soma >}}</div><div class="mark no">✗</div></div>
 <div class="hint">✓ ✗ = previsto antes de rodar · M2: p = {{< fato cre01.p_m2 >}}, pode ser acaso</div>
 </div>
 <div class="col manchete-fotos" style="gap:8px">

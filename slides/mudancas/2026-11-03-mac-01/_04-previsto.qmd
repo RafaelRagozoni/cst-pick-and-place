@@ -1,26 +1,36 @@
-## A soma não passou: o reach por macro ficou mais lento, não mais rápido {.res fonte="entrada 42 · macro_report.py --window 400 499 --seeds 1 2 3 · commit 33fa330"}
+## A soma não passou: com o macro, chegar ao cubo ficou mais lento, não mais rápido {.res fonte="entrada 42 · macro_report.py --window 400 499 --seeds 1 2 3 · commit 33fa330"}
 
 ::: eb
 Resultado · exploratória, {{< fato mac01.n_seeds >}} seeds, fora do protocolo
 :::
 
-<div class="body" style="gap:30px">
-<div class="col" style="flex:1.25">
-<table>
-<tr><th style="width:50%">previsto (antes de rodar)</th><th>aconteceu</th><th></th></tr>
-<tr><td>soma: macro de reach antes do ep. {{< fato mac01.prev_ep >}}</td><td>eps. {{< fato mac01.reach_eps >}}</td><td class="ok">✓</td></tr>
-<tr><td>soma: depois disso, reach em {{< fato mac01.prev_ticks_soma >}} ticks</td><td>{{< fato mac01.reach_soma_seeds >}}</td><td class="no">✗</td></tr>
-<tr><td>cópia: reach em {{< fato mac01.prev_ticks_copia >}} ticks</td><td>{{< fato mac01.reach_copia_seeds >}} (a {{< fato mac01.copia_sem_reach >}} travou)</td><td class="no">✗</td></tr>
-<tr><td>a parte do tempo dentro de macros cresce</td><td>{{< fato mac01.ticks_em_macro >}} dos ticks</td><td class="ok">✓</td></tr>
-<tr><td>macros de grasp falham mais que os de reach</td><td>os de grasp cumprem {{< fato mac01.grasp_cumpre >}}</td><td class="no">✗</td></tr>
-</table>
+<div class="body" style="gap:34px">
+<div class="col" style="flex:1.3">
+<div class="small muted" style="margin-bottom:28px">tempo até chegar ao cubo, em ticks (um tick = {{< fato mac01.tick >}}) · mediana dos episódios {{< fato mac01.janela >}}</div>
+<div class="gchart">
+<div class="ref" style="bottom:{{< fato mac01.h_prev_copia >}};border-color:#7fa9dc"></div>
+<div class="ref" style="bottom:{{< fato mac01.h_prev_soma >}};border-color:#2a78d6"></div>
+<div class="grp"><div class="b" style="height:{{< fato mac01.h_reach_c4_s1 >}};background:#9a9994"><span class="v">{{< fato mac01.reach_c4_s1 >}}</span></div><div class="b vazio" style="height:{{< fato mac01.h_reach_copia_s1 >}};background:#9fc0e8"><span class="v">{{< fato mac01.reach_copia_s1 >}}: nunca chegou</span></div><div class="b" style="height:{{< fato mac01.h_reach_soma_s1 >}};background:#2a78d6"><span class="v">{{< fato mac01.reach_soma_s1 >}}</span></div></div>
+<div class="grp"><div class="b" style="height:{{< fato mac01.h_reach_c4_s2 >}};background:#9a9994"><span class="v">{{< fato mac01.reach_c4_s2 >}}</span></div><div class="b" style="height:{{< fato mac01.h_reach_copia_s2 >}};background:#9fc0e8"><span class="v">{{< fato mac01.reach_copia_s2 >}}</span></div><div class="b" style="height:{{< fato mac01.h_reach_soma_s2 >}};background:#2a78d6"><span class="v">{{< fato mac01.reach_soma_s2 >}}</span></div></div>
+<div class="grp"><div class="b" style="height:{{< fato mac01.h_reach_c4_s3 >}};background:#9a9994"><span class="v">{{< fato mac01.reach_c4_s3 >}}</span></div><div class="b" style="height:{{< fato mac01.h_reach_copia_s3 >}};background:#9fc0e8"><span class="v">{{< fato mac01.reach_copia_s3 >}}</span></div><div class="b" style="height:{{< fato mac01.h_reach_soma_s3 >}};background:#2a78d6"><span class="v">{{< fato mac01.reach_soma_s3 >}}</span></div></div>
 </div>
-<div class="col">
-<div class="kv" style="flex-direction:column;align-items:flex-start;gap:4px"><div class="what">seeds em que a soma passou</div><div class="to no">{{< fato mac01.passam >}} de {{< fato mac01.n_seeds >}}</div></div>
-<div class="legend"><b>Passa</b> se, nas {{< fato mac01.n_seeds >}} seeds, nos episódios {{< fato mac01.janela >}}: cria e usa um macro de reach; o reach é mais rápido que o da cópia e o do agente base ({{< fato mac01.reach_c4 >}} ticks); grasps ≥ {{< fato mac01.limite_grasps >}}, transportes ≥ {{< fato mac01.limite_transp >}} e colisões ≤ {{< fato mac01.limite_colisoes >}} a cada 100 episódios (o pior seed do agente base). Fixado em 03/11, antes de rodar. Com {{< fato mac01.n_episodios >}} episódios não dá para medir a M2.</div>
+<div class="gxl"><span>seed 1</span><span>seed 2</span><span>seed 3</span></div>
+<div class="leg"><span><i style="background:#9a9994"></i>agente base, sem macros</span><span><i style="background:#9fc0e8"></i>macro-cópia: repete cada passo</span><span><i style="background:#2a78d6"></i>macro-soma: um passo com o giro líquido</span><span><i class="tracejado" style="border-color:#7fa9dc"></i>previsto para a cópia: {{< fato mac01.prev_ticks_copia >}}</span><span><i class="tracejado" style="border-color:#2a78d6"></i>previsto para a soma: {{< fato mac01.prev_ticks_soma >}}</span></div>
+</div>
+<div class="col" style="gap:12px">
+<div class="legend" style="margin-top:0"><b>Para passar</b>, nas {{< fato mac01.n_seeds >}} seeds a macro-soma tinha de chegar ao cubo <b>mais rápido</b> que a macro-cópia e que o agente base, sem piorar pegas (≥ {{< fato mac01.limite_grasps >}}), transportes (≥ {{< fato mac01.limite_transp >}}) e colisões (≤ {{< fato mac01.limite_colisoes >}}) a cada 100 episódios. Critério fixado em 03/11, antes de rodar.</div>
+<div class="kv" style="margin:0"><div class="what">seeds em que a macro-soma passou</div><div class="to no">{{< fato mac01.passam >}} de {{< fato mac01.n_seeds >}}</div><div class="mark no">✗</div></div>
+<div class="small" style="margin-top:4px"><b>As outras previsões</b></div>
+<table class="small">
+<tr><td>o macro de chegar ao cubo nasce cedo (antes do ep. {{< fato mac01.prev_ep >}})</td><td>eps. {{< fato mac01.reach_eps >}}</td><td class="ok">✓</td></tr>
+<tr><td>o tempo dentro de macros cresce</td><td>{{< fato mac01.ticks_em_macro >}} dos ticks</td><td class="ok">✓</td></tr>
+<tr><td>macros de pegar falham mais que os de chegar</td><td>cumprem {{< fato mac01.grasp_cumpre >}}</td><td class="no">✗</td></tr>
+</table>
 </div>
 </div>
 
 ::: notes
-**Se não passou, por que mostrar?** Porque errou de um jeito que ensina: as duas causas estão no log (próximos slides). E o critério foi fixado antes de rodar, então "não passa" é um resultado, não uma escolha. → entrada 42.
+**Por que a macro-cópia da seed 1 não tem barra?** O macro dela foi montado de um trecho que não cabe no episódio; repetido, nunca termina, e o agente não chega ao cubo nos episódios {{< fato mac01.janela >}}. → entrada 42, R9.
+
+**Se não passou, por que mostrar?** Porque errou de um jeito que ensina: as duas causas estão no log (dois slides adiante). E o critério foi fixado antes de rodar, então "não passa" é um resultado, não uma escolha. → entrada 42.
 :::

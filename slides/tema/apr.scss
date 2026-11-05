@@ -95,13 +95,15 @@ $presentation-heading-margin-bottom: 0;
   .tr .nd { position: absolute; top: 20px; width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 3px solid #b9b8b2; transform: translateX(-50%); }
   .tr .nl { position: absolute; top: 56px; transform: translateX(-50%); font-size: 17px; color: var(--ink2); white-space: nowrap; }
   .tr .cb { position: absolute; top: 15px; width: 36px; height: 36px; background: var(--cube); border-radius: 6px; transform: translateX(-50%);
-            animation: mv 8s infinite ease-in-out; box-shadow: 0 2px 4px rgba(0,0,0,.25); }
-  @keyframes mv { 0% { left: 0%; } 15% { left: 33.3%; } 32% { left: 66.6%; } 52% { left: 66.6%; } 58% { left: 33.3%; } 100% { left: 33.3%; } }
+            left: 0%; transition: left 1.4s ease-in-out; box-shadow: 0 2px 4px rgba(0,0,0,.25); }
+  /* the trail moves by clicks, so the presenter can stop on each state: empty fragments mark the
+     steps (.passo-leva: carry to the pad; .passo-larga: let go), and the cube follows them */
+  .marca { display: none; }
+  section:has(.passo-leva.visible) .tr .cb { left: 66.6%; }
+  section:has(.passo-larga.visible) .tr .cb { left: 33.3%; }
   .readout { display: flex; align-items: center; gap: 16px; font-size: 21px; min-height: 40px; }
-  .readout .ev { color: var(--cube); font-weight: 700; animation: fl 8s infinite; }
-  .readout .cr { animation: fl 8s infinite; }
+  .readout .ev { color: var(--cube); font-weight: 700; }
   .readout .big { font-size: 30px; font-weight: 800; }
-  @keyframes fl { 0%, 52% { opacity: 0; } 58%, 100% { opacity: 1; } }
   /* mechanism B: grid of situations */
   .gwrap { flex: 1; background: #fff; border: 1px solid var(--rule); border-radius: 12px; padding: 14px 18px; display: flex; flex-direction: column; }
   .gwrap.after { border: 2px solid var(--sol); }
@@ -110,11 +112,11 @@ $presentation-heading-margin-bottom: 0;
   .g { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
   .g div { aspect-ratio: 1.6; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 22px; color: #fff; }
   .g .q { background: #fff; border: 3px dashed #9a9994; color: var(--ink2); }
-  .before .g .q { animation: qb 7s infinite; } .after .g .q { animation: qa 7s infinite; }
-  @keyframes qb { 0%, 30% { background: #fff; border-color: #9a9994; } 38%, 100% { background: #f5c242; border-color: #f5c242; } }
-  @keyframes qa { 0%, 30% { background: #fff; border-color: #9a9994; } 38%, 100% { background: #d8735c; border-color: #d8735c; } }
-  .say { margin-top: 12px; font-size: 20px; animation: fl2 7s infinite; }
-  @keyframes fl2 { 0%, 34% { opacity: 0; } 42%, 100% { opacity: 1; } }
+  /* the grid also moves by a click (.passo-q): the new situation "?" gets its colour */
+  .g .q { transition: background .6s, border-color .6s; }
+  section:has(.passo-q.visible) .before .g .q { background: #f5c242; border-color: #f5c242; }
+  section:has(.passo-q.visible) .after .g .q { background: #d8735c; border-color: #d8735c; }
+  .say { margin-top: 12px; font-size: 20px; }
   /* table + charts */
   table { border-collapse: collapse; width: 100%; }
   td, th { padding: 9px 10px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
@@ -132,6 +134,28 @@ $presentation-heading-margin-bottom: 0;
   .disc ul { margin: 6px 0 0; padding-left: 24px; }
   /* two photos stacked beside the headline's numbers */
   .manchete-fotos img { height: 150px; object-fit: cover; object-position: center 60%; }
+  /* grouped bars (one group per seed), with dashed reference lines for what was predicted */
+  .gchart { position: relative; height: 270px; display: flex; gap: 30px; align-items: flex-end; border-bottom: 2px solid #b9b8b2; padding: 0 14px; }
+  .gchart .grp { flex: 1; height: 100%; display: flex; gap: 6px; align-items: flex-end; }
+  .gchart .b { flex: 1; position: relative; border-radius: 4px 4px 0 0; min-width: 0; }
+  .gchart .b .v { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 3px; font-size: 16px; font-weight: 700; white-space: nowrap; }
+  .gchart .b.vazio .v { white-space: normal; width: 76px; text-align: center; font-size: 13px; font-weight: 600; color: var(--ink3); line-height: 1.15; }
+  .gchart .ref { position: absolute; left: 0; right: 0; border-top: 2px dashed; z-index: 2; pointer-events: none; }
+  .gchart .ref span { position: absolute; left: 6px; bottom: 2px; font-size: 14px; font-weight: 700; background: rgba(251,251,249,.85); padding: 0 4px; }
+  .gxl { display: flex; gap: 30px; padding: 6px 14px 0; } .gxl span { flex: 1; text-align: center; font-size: 16px; color: var(--ink2); }
+  .leg { display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: 15px; color: var(--ink2); margin-top: 8px; }
+  .leg i.tracejado { width: 22px; height: 0; border-radius: 0; border-top: 2px dashed; vertical-align: 4px; }
+  .gchart .b.vazio .v { background: rgba(251,251,249,.92); z-index: 3; }
+  .leg i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
+  /* an episode as a time line, one colour per stage, with a marker for a reference tick */
+  .tl { position: relative; display: flex; height: 32px; margin-top: 30px; font-size: 14px; font-weight: 700; color: #fff; }
+  .tl .seg { display: flex; align-items: center; padding-left: 10px; white-space: nowrap; overflow: hidden; }
+  .tl .seg:first-child { border-radius: 8px 0 0 8px; } .tl .seg:last-child { border-radius: 0 8px 8px 0; }
+  .tl .mk { position: absolute; top: -10px; bottom: -6px; border-left: 3px dashed var(--ink); }
+  .tl .mk span { position: absolute; bottom: 100%; left: -8px; white-space: nowrap; font-size: 13px; font-weight: 700; color: var(--ink); }
+  .tl-pe { display: flex; justify-content: space-between; font-size: 14px; color: var(--ink3); margin-top: 4px; }
+  /* the positive next to the causes */
+  .cause.good { background: #e3f2e6; } .cause.good b.k { background: var(--good); }
   /* steps of a habit, as chips: a joint step and a gripper step */
   .chipj, .chipg { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 16px; font-weight: 600; }
   .chipj { background: #eef0f4; color: var(--ink2); } .chipg { background: #fff3ec; color: var(--prob); }

@@ -48,7 +48,11 @@ que é necessário. Os tempos da tabela são de referência, não um teto.
    traz entrada, commit, pasta do run.
 5. **Vídeo é exemplo, número é prova.** Ao lado do vídeo, o número agregado; na legenda, a **regra de
    escolha** do episódio (`episode_pick.py` a escreve).
-6. **Ilustração não é dado:** selo "ilustrativa" (no rodapé ou no desenho).
+6. **Ilustração não é dado:** selo "ilustrativa" (no rodapé ou no desenho). **Animação anda por
+   clique** (fragmentos), nunca em laço: quem apresenta para em cada estado para mostrar a diferença.
+   **Resultado se entende sozinho:** cada série nomeada no próprio slide (ex.: "macro-cópia: repete
+   cada passo"), o critério de "passou" escrito antes do placar, o previsto desenhado junto do
+   observado, e o positivo ao lado do negativo.
 7. **Vídeo curto ao lado dos números (30–45 s)**; a versão longa, se ajudar, vem no slide seguinte.
 8. **Código só como diagrama**; detalhes de log e de código ficam nas notas do apresentador.
 9. **Notas do apresentador** (`::: notes`) em todo slide: 1–3 perguntas prováveis, resposta curta e
@@ -116,11 +120,13 @@ mudancas/<data>-<id>/
 | tira de quadros (`.strip`, legenda `[1]{.n}texto`) | `mudancas/2026-10-27-cre-01/_01-problema.qmd` |
 | causas (`.cause` com `<b class="k">1</b>`) | o mesmo |
 | cartões de alternativa (`.alts`, `.alt.pick`, `.alt.fragment.riscar` com `.why`, `.plan.fragment`) | `mudancas/2026-10-27-cre-01/_02-alternativas.qmd` |
-| trilho de etapas animado (`.row`, `.tr`) | `mudancas/2026-10-27-cre-01/_03-como-a.qmd` |
-| grade de situações (`.gwrap`, `.g`, `.q`) | `mudancas/2026-10-27-cre-01/_04-como-b.qmd` |
+| trilho de etapas, **por clique** (`.row`, `.tr`; fragmentos vazios `.marca .passo-leva` / `.passo-larga` movem o cubo, o `.readout` aparece no 2º clique e fica parado) | `mudancas/2026-10-27-cre-01/_03-como-a.qmd` |
+| grade de situações, **por clique** (`.gwrap`, `.g`, `.q`; `.marca .passo-q` pinta o "?", `.say` é fragmento) | `mudancas/2026-10-27-cre-01/_04-como-b.qmd` |
 | tabela previsto × aconteceu + legenda da métrica (`table`, `.legend`) | `mudancas/2026-10-27-cre-01/_05-previsto.qmd` |
 | barras de comparação (`.chart`, `.bars`, alturas por fato) | `mudancas/2026-10-27-cre-01/_06-comparacao.qmd` |
 | passos como chips (`.chipj`, `.chipg`) | `mudancas/2026-11-03-mac-01/_03-como-funciona.qmd` |
+| barras agrupadas por seed, com o previsto tracejado (`.gchart`, `.grp`, `.b`, `.b.vazio`, `.ref`, `.gxl`, `.leg`, `.leg i.tracejado`) | `mudancas/2026-11-03-mac-01/_04-previsto.qmd`, `_05-seed1.qmd` |
+| linha do tempo de um episódio, uma cor por etapa, com marca de referência (`.tl`, `.seg`, `.mk`, `.tl-pe`) e a caixa do positivo (`.cause.good`) | `mudancas/2026-11-03-mac-01/_06-causas.qmd` |
 | barra horizontal por fato, "Para discutir" (`.disc`) | `mudancas/2026-11-03-mac-01/_06-causas.qmd` |
 
 ## Armadilhas já encontradas
