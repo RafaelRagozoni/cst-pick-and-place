@@ -52,6 +52,24 @@
    "fonte": "runs/2026-10-21_0842_C4_ucb-0.1_lp_P1/s1, sucessos depois do 1º (slide_facts.success_after_first)",
    "manual": false
   },
+  "reuniao.pega_inicio": {
+   "valor": 17.0,
+   "texto": "17%",
+   "fonte": "runs/2026-10-21_0842_C4_ucb-0.1_lp_P1/s1: blocos completos de 100 episódios (video.learning_blocks), as taxas do vídeo longo, o 1º bloco",
+   "manual": false
+  },
+  "reuniao.pega_max": {
+   "valor": 48.0,
+   "texto": "48%",
+   "fonte": "runs/2026-10-21_0842_C4_ucb-0.1_lp_P1/s1: blocos completos de 100 episódios (video.learning_blocks), as taxas do vídeo longo, o maior",
+   "manual": false
+  },
+  "reuniao.sucesso_max": {
+   "valor": 5.0,
+   "texto": "5%",
+   "fonte": "runs/2026-10-21_0842_C4_ucb-0.1_lp_P1/s1: blocos completos de 100 episódios (video.learning_blocks), as taxas do vídeo longo, o maior",
+   "manual": false
+  },
   "reuniao.video_curto_regra": {
    "valor": "um episódio a cada 300",
    "texto": "um episódio a cada 300",

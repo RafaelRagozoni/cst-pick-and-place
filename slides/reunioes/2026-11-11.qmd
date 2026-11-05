@@ -45,7 +45,7 @@ Ponto de partida
 
 <div class="body">
 <div class="col" style="flex:1.5"><video src="../reunioes/2026-11-11/media/aprendizado_curto.mp4" controls preload="metadata"></video>
-<figcaption>a base aprendendo, {{< fato reuniao.video_seed >}}: {{< fato reuniao.video_curto_regra >}} ({{< fato reuniao.video_curto_eps >}}) e, fora da amostra, o 1º sucesso · replay do log · {{< fato reuniao.video_curto_vel >}} · a versão de {{< fato reuniao.video_longo_seg >}} está no apêndice</figcaption></div>
+<figcaption>a base aprendendo, {{< fato reuniao.video_seed >}}: {{< fato reuniao.video_curto_regra >}} ({{< fato reuniao.video_curto_eps >}}) e, fora da amostra, o 1º sucesso · replay do log · {{< fato reuniao.video_curto_vel >}} · a versão inteira, de {{< fato reuniao.video_longo_seg >}}, vem no próximo slide</figcaption></div>
 <div class="col" style="gap:14px">
 <div class="kv" style="flex-direction:column;align-items:flex-start;gap:2px"><div class="what">episódios até o 1º acerto</div><div class="to">{{< fato reuniao.m1_mediana >}}</div><div class="tiny">mediana dos {{< fato reuniao.n_seeds >}} seeds · entre {{< fato reuniao.m1_faixa >}}</div></div>
 <div class="kv" style="flex-direction:column;align-items:flex-start;gap:2px"><div class="what">acertos depois do 1º</div><div class="to">{{< fato reuniao.fase2_pct >}}</div><div class="tiny">{{< fato reuniao.fase2_acertos >}} episódios da Fase 2 · não sobe com o tempo</div></div>
@@ -56,21 +56,22 @@ Ponto de partida
 **Esse vídeo é o melhor seed?** É o seed com mais acertos depois do 1º ({{< fato reuniao.video_seed_acertos >}}), escolhido por isso; os episódios do vídeo seguem a regra fixa ({{< fato reuniao.video_curto_regra >}}), não são os melhores. Os números à direita são dos {{< fato reuniao.n_seeds >}} seeds.
 :::
 
-{{< include /mudancas/2026-10-27-cre-01/_01-problema.qmd >}}
+## Bloco a bloco, a base passa de {{< fato reuniao.pega_inicio >}} a {{< fato reuniao.pega_max >}} de pegas, mas o sucesso não passa de {{< fato reuniao.sucesso_max >}} {.ctx fonte="runs/2026-10-21_0842_C4_ucb-0.1_lp_P1/s1 · replay do log"}
 
-{{< include /mudancas/2026-10-27-cre-01/_02-alternativas.qmd >}}
+::: eb
+Ponto de partida · o vídeo inteiro
+:::
 
-{{< include /mudancas/2026-10-27-cre-01/_05-previsto.qmd >}}
+<div style="width:62%;margin:0 auto"><video src="../reunioes/2026-11-11/media/aprendizado_longo.mp4" controls preload="metadata"></video>
+<figcaption>{{< fato reuniao.video_seed >}}: {{< fato reuniao.video_longo_regra >}} ({{< fato reuniao.video_longo_eps >}}) e, fora da amostra, o 1º sucesso · ao lado, as taxas do bloco de 100 episódios inteiro · {{< fato reuniao.video_longo_vel >}}</figcaption></div>
 
-{{< include /mudancas/2026-11-03-mac-01/_01-problema.qmd >}}
+::: notes
+**Por que mostrar o vídeo inteiro?** O curto mostra que a base acha a tarefa; este mostra o que muda ao longo do tempo: ela pega o cubo cada vez mais, mas não completa a tarefa. É o problema que o CRE-01 e o MAC-01 atacam. → entrada 29.
+:::
 
-{{< include /mudancas/2026-11-03-mac-01/_03-como-funciona.qmd >}}
+{{< include /mudancas/2026-10-27-cre-01/slides.qmd >}}
 
-{{< include /mudancas/2026-11-03-mac-01/_04-previsto.qmd >}}
-
-{{< include /mudancas/2026-11-03-mac-01/_05-seed1.qmd >}}
-
-{{< include /mudancas/2026-11-03-mac-01/_06-causas.qmd >}}
+{{< include /mudancas/2026-11-03-mac-01/slides.qmd >}}
 
 ## Terminamos com o cubo chegando ao pad e macros que encadeiam numa seed; falta o sucesso subir em todas {.ctx .proximos fonte="entradas 40 a 42 · PR #2"}
 
@@ -95,28 +96,3 @@ Onde terminamos · abre a próxima reunião
 ::: notes
 **O que o MAC-01 tem a ver com a Fase 2 esquecer?** Na seed 1 da soma, depois do 1º acerto, o agente acertou {{< fato mac01.depois_soma_s1 >}}: quando os macros encadeiam, ele repete. É uma seed só, e com o cubo fixo; se a emenda (A, B) fizer isso valer nas {{< fato mac01.n_seeds >}} seeds, é o primeiro sinal contra o esquecimento. → entrada 42.
 :::
-
-## Apêndice {.ctx fonte="slides fora dos 10 minutos, na ordem das seções: contexto, alternativas, como funciona, resultado"}
-
-::: eb
-Apêndice
-:::
-
-<div class="small muted">O vídeo inteiro da base aprendendo · as alternativas do MAC-01 · como funcionam as opções A e B do CRE-01 · a comparação das três baterias do CRE-01</div>
-
-## A base aprendendo, o vídeo inteiro {.ctx fonte="runs/2026-10-21_0842_C4_ucb-0.1_lp_P1/s1 · replay do log"}
-
-::: eb
-Apêndice · ponto de partida
-:::
-
-<div style="width:62%;margin:0 auto"><video src="../reunioes/2026-11-11/media/aprendizado_longo.mp4" controls preload="metadata"></video>
-<figcaption>{{< fato reuniao.video_seed >}}: {{< fato reuniao.video_longo_regra >}} ({{< fato reuniao.video_longo_eps >}}) e, fora da amostra, o 1º sucesso · ao lado, as taxas do bloco de 100 episódios inteiro · {{< fato reuniao.video_longo_vel >}}</figcaption></div>
-
-{{< include /mudancas/2026-11-03-mac-01/_02-alternativas.qmd >}}
-
-{{< include /mudancas/2026-10-27-cre-01/_03-como-a.qmd >}}
-
-{{< include /mudancas/2026-10-27-cre-01/_04-como-b.qmd >}}
-
-{{< include /mudancas/2026-10-27-cre-01/_06-comparacao.qmd >}}

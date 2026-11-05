@@ -1,4 +1,4 @@
-## Com a A, largar o cubo no caminho passa a contar como perda {.sol fonte="animação ilustrativa · código no apêndice · commit 85dd153"}
+## Com a A, largar o cubo no caminho passa a contar como perda {.sol fonte="animação ilustrativa · commit 85dd153"}
 
 ::: eb
 Como funciona · opção A

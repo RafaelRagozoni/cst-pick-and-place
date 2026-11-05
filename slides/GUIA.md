@@ -16,7 +16,7 @@ Entradas de infraestrutura, renomeação, quiz ou ferramenta **não** geram slid
 um slide "o que mudou / por quê / o que aprendi" — copie `tema/modelos/semana-curta.qmd` para
 `mudancas/<data>-<id>/_01-semana.qmd`, troque os «…» e crie o `fatos.json`.
 
-## Estrutura da reunião (~10 min, ordem fixa)
+## Estrutura da reunião (ordem fixa, sem apêndice)
 
 | # | Slide | Tempo | O que tem |
 |---|---|---|---|
@@ -29,7 +29,11 @@ um slide "o que mudou / por quê / o que aprendi" — copie `tema/modelos/semana
 | 8 | Comparação | ~1 min | só com 2+ abordagens; base em cinza, rótulo direto |
 | 9 | Fechamento | ~1 min | estado final, próximo passo, **"Para discutir"** neutro; vira o slide 2 da próxima |
 
-Uma reunião com várias specs repete 3–8 para cada uma; o **corte** decide o que fica nos 10 min.
+Uma reunião com várias specs repete 3–8 **inteiro** para cada uma, uma spec depois da outra.
+**Sem apêndice e sem limite de slides** (decidido em 05/11): cada mudança é contada completa, na
+ordem problema → alternativas → como funciona (logo depois das alternativas escolhidas) → previsto ×
+aconteceu → comparação. Cortar slides para caber num tempo desorganiza a história e deixa de fora o
+que é necessário. Os tempos da tabela são de referência, não um teto.
 
 ## Regras de escrita
 
@@ -45,8 +49,8 @@ Uma reunião com várias specs repete 3–8 para cada uma; o **corte** decide o 
 5. **Vídeo é exemplo, número é prova.** Ao lado do vídeo, o número agregado; na legenda, a **regra de
    escolha** do episódio (`episode_pick.py` a escreve).
 6. **Ilustração não é dado:** selo "ilustrativa" (no rodapé ou no desenho).
-7. **Vídeos da parte principal com 30–45 s.** Os longos vão para o apêndice.
-8. **Apêndice:** código, logs, alternativas em detalhe, vídeos longos.
+7. **Vídeo curto ao lado dos números (30–45 s)**; a versão longa, se ajudar, vem no slide seguinte.
+8. **Código só como diagrama**; detalhes de log e de código ficam nas notas do apresentador.
 9. **Notas do apresentador** (`::: notes`) em todo slide: 1–3 perguntas prováveis, resposta curta e
    onde está (entrada, spec, seção).
 10. **Pronto = o Rafael consegue defender cada slide.** Entregue montado, aberto no Firefox.
@@ -83,18 +87,14 @@ mudancas/<data>-<id>/
 
 1. `reunioes/<data>.qmd`: cabeçalho com `pagetitle:` (não `title:`, que cria um slide de título) e
    `fatos:` listando os `fatos.json` das mudanças e o da reunião; manchete, ponto de partida e
-   fechamento escritos ali; os slides das mudanças por include, um por um.
+   fechamento escritos ali; os slides de cada mudança por `{{< include /mudancas/<pasta>/slides.qmd >}}`,
+   inteiros e na ordem.
 2. `reunioes/<data>/midia.sh` e `fatos.py`: o vídeo de ponto de partida (`video.py learning`; escolha
    `--every` e `--stride` com `--estimate` até dar 30–45 s) e as chaves `reuniao.*`.
-3. **Proposta de corte** em `reunioes/<data>-corte.md`: `slide | tempo | entra / apêndice | motivo`,
-   parte principal ≤ 10 min 30 s; critérios: o que mais mudou o rumo, o que tem resultado, o que
-   gera pergunta. O apêndice vem depois de um slide `## Apêndice` e segue **a mesma ordem das
-   seções do deck**, misturando mudanças se preciso: contexto (vídeos longos do ponto de partida) →
-   problema → alternativas → como funciona → resultado. Nunca uma alternativa depois de um resultado.
-4. `python3 tools/slides.py build slides/reunioes/<data>.qmd`, depois `capture`.
-5. `python3 tools/slides.py send slides/reunioes/<data>.qmd [--max-video-mb N]` — zip **sem as
+3. `python3 tools/slides.py build slides/reunioes/<data>.qmd`, depois `capture`.
+4. `python3 tools/slides.py send slides/reunioes/<data>.qmd [--max-video-mb N]` — zip **sem as
    notas** em `Rafael/Meetings/<data> para enviar.zip` no vault.
-6. Depois da reunião: `python3 tools/slides.py archive slides/reunioes/<data>.qmd` — zip com as notas
+5. Depois da reunião: `python3 tools/slides.py archive slides/reunioes/<data>.qmd` — zip com as notas
    em `Rafael/Meetings/<data> apresentação.zip`.
 
 ## Ferramentas
