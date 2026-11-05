@@ -6,7 +6,7 @@
     python3 tools/slides.py send slides/reunioes/<data>.qmd [--max-video-mb N]
     python3 tools/slides.py archive slides/reunioes/<data>.qmd
 
-review renders one change's slides alone (slides/_revisao/<id>.qmd includes them) and opens them in
+review renders one change's slides alone (slides/revisao/<id>.qmd (no leading _: Quarto leaves _ folders out of the project, and their decks lose the fato extension) includes them) and opens them in
 Firefox; build renders a meeting. send zips the meeting for the advisor without the presenter notes
 (they are rehearsal) and, past --max-video-mb, without the heavy videos; archive zips it with the
 notes into the vault's Meetings folder. Both zips hold only what the deck references, not the whole
@@ -35,7 +35,7 @@ VIDEO_EXTENSIONS = ('.mp4', '.webm', '.mov')
 
 
 def review_wrapper(change_dir):
-    """The text of slides/_revisao/<id>.qmd: one change's slides and facts, alone. pagetitle, not
+    """The text of slides/revisao/<id>.qmd (no leading _: Quarto leaves _ folders out of the project, and their decks lose the fato extension): one change's slides and facts, alone. pagetitle, not
     title, so Quarto makes no title slide."""
     change_id = os.path.basename(os.path.normpath(change_dir))
     return ('---\n'
@@ -79,12 +79,14 @@ def assert_openable(path):
 # --- the deck's structure --------------------------------------------------------------------
 class SlideFinder(html.parser.HTMLParser):
     """The reveal.js hash of every slide: '#/h' for a top-level section, '#/h/v' for the sections
-    of a vertical stack. Only div and section are tracked, as Quarto always closes them."""
+    of a vertical stack; and which slides have fragments. Only div and section are tracked for
+    nesting, as Quarto always closes them."""
 
     def __init__(self):
         super().__init__()
         self.stack = []                         # 'div', 'section', 'slides' (the div.slides)
         self.hashes = []
+        self.with_fragments = set()             # indices into hashes
         self.top_index = -1
         self.nested_index = -1
 
@@ -92,9 +94,11 @@ class SlideFinder(html.parser.HTMLParser):
         return len(self.stack) - self.stack.index('slides') if 'slides' in self.stack else None
 
     def handle_starttag(self, tag, attrs):
+        classes = (dict(attrs).get('class') or '').split()
+        if 'fragment' in classes and self.hashes and self.depth_in_slides():
+            self.with_fragments.add(len(self.hashes) - 1)
         if tag not in ('div', 'section'):
             return
-        classes = (dict(attrs).get('class') or '').split()
         if tag == 'div' and 'slides' in classes and 'slides' not in self.stack:
             self.stack.append('slides')
             return
@@ -125,18 +129,37 @@ def slide_count(html_text):
     return len(slide_hashes(html_text))
 
 
+def slides_with_fragments(html_text):
+    """The hashes of the slides that have fragments (clicks)."""
+    finder = SlideFinder()
+    finder.feed(html_text)
+    return [finder.hashes[i] for i in sorted(finder.with_fragments)]
+
+
+def all_fragments_hash(slide_hash):
+    """The hash that opens a slide with every fragment shown (needs fragment-in-url)."""
+    return slide_hash + ('/99' if slide_hash.count('/') == 2 else '/0/99')
+
+
 def capture(html_path, out_dir):
-    """One 1280×720 PNG per slide (slideNN.png), from a headless Firefox with its own profile."""
+    """One 1280×720 PNG per slide (slideNN.png), from a headless Firefox with its own profile; a
+    slide with fragments also gets slideNN_cliques.png, every fragment shown."""
     assert_openable(html_path)
     assert_openable(out_dir)
     os.makedirs(CAPTURE_PROFILE, exist_ok=True)
     os.makedirs(out_dir, exist_ok=True)
     with open(html_path, encoding='utf-8') as deck:
-        hashes = slide_hashes(deck.read())
+        text = deck.read()
+    shots = []
+    with_fragments = set(slides_with_fragments(text))
+    for number, slide_hash in enumerate(slide_hashes(text), 1):
+        shots.append(('slide%02d.png' % number, slide_hash))
+        if slide_hash in with_fragments:
+            shots.append(('slide%02d_cliques.png' % number, all_fragments_hash(slide_hash)))
     uri = pathlib.Path(os.path.abspath(html_path)).as_uri()
     written = []
-    for number, slide_hash in enumerate(hashes, 1):
-        png = os.path.join(out_dir, 'slide%02d.png' % number)
+    for name, slide_hash in shots:
+        png = os.path.join(out_dir, name)
         if os.path.exists(png):
             os.remove(png)
         subprocess.run(['firefox', '--headless', '--no-remote', '--profile', CAPTURE_PROFILE,
@@ -272,7 +295,7 @@ def archive(out_dir, meeting_date, meetings_dir=VAULT_MEETINGS, files=None):
 # --- commands ---------------------------------------------------------------------------------
 def review(change_dir, open_browser=True):
     change_id = os.path.basename(os.path.normpath(change_dir))
-    wrapper = os.path.join(SLIDES, '_revisao', change_id + '.qmd')
+    wrapper = os.path.join(SLIDES, 'revisao', change_id + '.qmd')
     os.makedirs(os.path.dirname(wrapper), exist_ok=True)
     with open(wrapper, 'w', encoding='utf-8') as out:
         out.write(review_wrapper(change_dir))

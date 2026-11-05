@@ -67,6 +67,7 @@ def main():
     check('fmt_number(-0.06, 2) uses U+2212', sf.fmt_number(-0.06, 2) == '−0,06')
     check('fmt_percent_range', sf.fmt_percent_range(0.93, 0.97) == '93–97%')
     check('fmt_number_range', sf.fmt_number_range(8, 32) == '8–32')
+    check('a range with equal ends is one number', sf.fmt_percent_range(1.0, 0.9999) == '100%')
     check('fmt_number(1234567.5, 1)', sf.fmt_number(1234567.5, 1) == '1.234.567,5')
     check('negative that rounds to zero has no sign', sf.fmt_number(-0.001, 2) == '0,00')
 
@@ -124,6 +125,7 @@ def main():
         check('transports_per_100 over the all rows, last row included',
               r['transports_per_100'] == (0.0, 100.0))
         check('grasps of every row', r['grasps'] == 7)
+        check('drops by grab_open: none in the fake log', r['by_open_share'] == (0.0, 0.0))
         allrows = [l.split(' | ') for l in sf.carry_report.report([batch], 2).splitlines()
                    if l.startswith('| **all**')]
         check('same rows as carry_report prints',

@@ -3,10 +3,14 @@ project:
   output-dir: _saida
   render:
     - reunioes/*.qmd
-    - _revisao/*.qmd
+    - revisao/*.qmd
     - teste/exemplo.qmd
   resources:
     - tema/fontes/*.otf
+    # videos sit in raw <video> tags, which Quarto does not copy by itself
+    - mudancas/*/media/*.mp4
+    - reunioes/*/media/*.mp4
+    - teste/media/*.mp4
 
 lang: pt-BR
 
@@ -18,6 +22,7 @@ format:
     center: false
     transition: none
     hash: true
+    fragment-in-url: true
     slide-number: c/t
     controls: false
     menu: false

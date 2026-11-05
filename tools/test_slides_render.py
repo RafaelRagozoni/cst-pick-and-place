@@ -56,6 +56,12 @@ def main():
             ok = os.path.exists(os.path.normpath(os.path.join(os.path.dirname(html_path), src.group(1))))
         check('included slide image resolves', ok)
 
+        # a <video> in raw HTML: Quarto neither rewrites its path nor copies the file by itself;
+        # the media globs in _quarto.yml's resources do the copying
+        video_src = re.search(r'<video src="([^"]*clip\.mp4)"', html)
+        check('included raw-HTML video resolves', bool(video_src) and os.path.exists(
+            os.path.normpath(os.path.join(os.path.dirname(html_path), video_src.group(1)))))
+
         exemplo = read(os.path.join(work, 'teste', 'exemplo.qmd'))
         with open(os.path.join(work, 'teste', 'exemplo.qmd'), 'w', encoding='utf-8') as f:
             f.write(exemplo + '\n## Falta\n\n{{< fato teste.nao_existe >}}\n')

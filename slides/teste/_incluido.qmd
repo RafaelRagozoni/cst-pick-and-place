@@ -3,3 +3,5 @@
 ::: {style="width: 120px"}
 ![pixel de teste](/teste/media/pixel.png)
 :::
+
+<video src="../teste/media/clip.mp4" controls preload="metadata"></video>

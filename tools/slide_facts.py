@@ -48,7 +48,9 @@ def fmt_percent(fraction, decimals=0):
 
 
 def fmt_number_range(low, high, decimals=0):
-    return fmt_number(low, decimals) + EN_DASH + fmt_number(high, decimals)
+    """8, 32 -> '8–32'; a range whose ends format the same is one number: 1.0, 1.0 -> '1'."""
+    low_text, high_text = fmt_number(low, decimals), fmt_number(high, decimals)
+    return low_text if low_text == high_text else low_text + EN_DASH + high_text
 
 
 def fmt_percent_range(low, high, decimals=0):
@@ -126,7 +128,10 @@ def carry_ranges(batch_dir, block=500):
     """Ranges over carry_report's **all** rows (carry_report.pool_by_block: block k of every seed
     that reached it, summed), every row, the last one included, which is how code_notes entry 40
     read its "93–97%", "0–2", "1–22%" and "8–32". {'drop_share': (min, max) of dropped_away /
-    grasps as fractions (rows without grasps left out); 'transports_per_100': (min, max);
+    grasps as fractions (rows without grasps left out); 'by_open_share': (min, max) of the drops
+    whose last action was grab_open, over the rows with drops; 'open_new_share': (min, max) of the
+    grab_open picks with the cube held whose habit was new to its bin (UCB's forced draw, before
+    borrowing), over the rows with such picks; 'transports_per_100': (min, max);
     'grasps': total grasps}."""
     rows = carry_report.pool_by_block(
         [carry_report.scan(log, block) for _, log, _ in runlog.find_logs([batch_dir])])
@@ -134,7 +139,11 @@ def carry_ranges(batch_dir, block=500):
         raise ValueError('no episode in %s' % batch_dir)
     shares = [r.dropped_away / r.grasps for r in rows if r.grasps]
     transports = [100.0 * r.transports / r.episodes for r in rows]
+    by_open = [r.dropped_by_open / r.dropped_away for r in rows if r.dropped_away]
+    open_new = [r.open_new / r.held_open for r in rows if r.held_open]
     return {'drop_share': (min(shares), max(shares)) if shares else None,
+            'by_open_share': (min(by_open), max(by_open)) if by_open else None,
+            'open_new_share': (min(open_new), max(open_new)) if open_new else None,
             'transports_per_100': (min(transports), max(transports)),
             'grasps': sum(r.grasps for r in rows)}
 

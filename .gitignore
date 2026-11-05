@@ -25,7 +25,7 @@ agent/bin/
 
 # Quarto slides (APR-01): saídas e mídia geradas
 slides/_saida/
-slides/_revisao/
+slides/revisao/
 slides/_cache/
 slides/.quarto/
 slides/mudancas/*/media/

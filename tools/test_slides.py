@@ -79,6 +79,13 @@ def main():
 
     print('slide count')
     check('two top-level slides', slides.slide_count(NOTES_HTML) == 2)
+    stacked = ('<div class="slides"><section id="a"><p class="fragment">x</p></section>'
+               '<section><section id="b"></section><section id="c"><div class="alt fragment riscar">'
+               '</div></section></section></div>')
+    check('vertical stacks: #/h/v', slides.slide_hashes(stacked) == ['#/0', '#/1/0', '#/1/1'])
+    check('slides with fragments found', slides.slides_with_fragments(stacked) == ['#/0', '#/1/1'])
+    check('hash with every fragment shown', slides.all_fragments_hash('#/0') == '#/0/0/99'
+          and slides.all_fragments_hash('#/1/1') == '#/1/1/99')
 
     temporary = tempfile.mkdtemp(prefix='slides_', dir=os.path.expanduser('~'))
     try:
@@ -90,7 +97,7 @@ def main():
         write(os.path.join(out, 'mudancas', 'x', 'media', 'curta.jpg'), b'jpg', 'wb')
         write(os.path.join(out, 'tema', 'fontes', 'Inter-Regular.otf'), b'otf', 'wb')
         write(os.path.join(out, 'reunioes', 'outra.html'), '<aside class="notes">n</aside>')
-        write(os.path.join(out, '_revisao', 'x.html'), 'revisao')
+        write(os.path.join(out, 'revisao', 'x.html'), 'revisao')
 
         print('deck files')
         files = slides.deck_files(deck, out)
