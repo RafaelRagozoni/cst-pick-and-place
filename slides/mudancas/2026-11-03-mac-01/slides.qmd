@@ -1,0 +1,167 @@
+## O robô acha o caminho, mas o refaz de grau em grau a cada episódio {.prob fonte="spec MAC-01, medição de partida (03/11) · P1 da emenda, runs/2026-10-28_1803_C4_ucb-0.1_lp_P1"}
+
+::: eb
+Problema · geração de hábitos (WP3)
+:::
+
+<div class="body" style="gap:36px">
+<div class="col" style="flex:1.05">
+<div class="kv" style="flex-direction:column;align-items:flex-start;gap:2px"><div class="what">passos de 1° num reach (chegar ao cubo)</div><div class="to" style="color:var(--prob)">{{< fato mac01.reach_passos >}}</div><div class="tiny">mediana dos trechos de reach do P1 da emenda</div></div>
+<div class="kv" style="flex-direction:column;align-items:flex-start;gap:2px"><div class="what">o mesmo reach feito pelo giro líquido de cada junta, de uma vez</div><div class="to">{{< fato mac01.reach_liquido >}} ticks</div><div class="tiny">a junta que mais gira, a {{< fato mac01.vel_max >}} · estimativa da spec</div></div>
+<div class="small muted" style="margin-top:6px">O cap. 4 prevê <b>gerar hábitos</b> a partir dos que deram certo. O primeiro operador é o <b>macro</b>: os passos que cumpriram uma etapa viram um hábito só, que dá para repetir.</div>
+</div>
+<div class="col">
+<svg viewBox="0 0 520 330" style="width:100%">
+<text x="20" y="24" font-size="15" fill="#7b7f8a" font-weight="700" letter-spacing="1">ILUSTRATIVA</text>
+<circle cx="60" cy="280" r="14" fill="#6250d6"/><text x="60" y="318" font-size="16" text-anchor="middle" fill="#4d5260">pose inicial</text>
+<rect x="440" y="62" width="34" height="34" rx="5" fill="#d62a24"/><text x="457" y="122" font-size="16" text-anchor="middle" fill="#4d5260">cubo</text>
+<polyline points="74,280 74,262 92,262 92,250 104,250 104,236 98,236 98,224 120,224 120,214 134,214 134,200 128,200 128,190 156,190 156,176 170,176 170,168 164,168 164,156 198,156 198,144 214,144 214,136 236,136 236,124 252,124 252,118 246,118 246,108 282,108 282,100 304,100 304,92 330,92 330,86 356,86 356,82 382,82 382,80 410,80 410,79 436,79" fill="none" stroke="#eb6834" stroke-width="3"/>
+<path d="M74 270 Q 220 60 436 76" fill="none" stroke="#2a78d6" stroke-width="4" stroke-dasharray="9 6"/>
+<text x="200" y="250" font-size="17" fill="#eb6834" font-weight="700">hoje: um primitivo de 1° por vez</text>
+<text x="190" y="52" font-size="17" fill="#2a78d6" font-weight="700">macro: o trecho todo, de uma vez</text>
+</svg>
+<div class="tiny" style="margin-top:6px"><b>macro</b> = hábito feito de vários passos · <b>tick</b> = um passo de simulação ({{< fato mac01.tick >}}) · <b>contexto</b> = a etapa + a faixa de posição da garra (o <i>bin</i>)</div>
+</div>
+</div>
+
+::: notes
+**Por que não aprender uma política contínua de uma vez?** O cap. 4 trabalha com hábitos como listas de comandos; o macro é o primeiro operador de geração desse esquema, e dá para testar em dias. A alternativa mais forte (skill chaining) está no próximo slide. → spec MAC-01, Goal.
+:::
+
+## Duas regras de macro e três caminhos de fora {.sol fonte="spec MAC-01, Prior art / alternativas consideradas"}
+
+::: eb
+Alternativas · cada clique mostra o que ficou de fora e por quê
+:::
+
+<div class="alts">
+<div class="alt pick"><span class="badge">cópia</span>
+<svg class="ic" viewBox="0 0 200 64"><g fill="#2a78d6"><rect x="8" y="22" width="16" height="20" rx="3"/><rect x="28" y="22" width="16" height="20" rx="3"/><rect x="48" y="22" width="16" height="20" rx="3"/><rect x="68" y="22" width="16" height="20" rx="3"/><rect x="88" y="22" width="16" height="20" rx="3"/><rect x="108" y="22" width="16" height="20" rx="3"/><rect x="128" y="22" width="16" height="20" rx="3"/><rect x="148" y="22" width="16" height="20" rx="3"/><rect x="168" y="22" width="16" height="20" rx="3"/></g></svg>
+<h3>Copiar os passos</h3><div class="tech">macro de malha aberta (McGovern et al. 1997)</div>
+<div class="hw">O macro repete cada passo do trecho, na mesma ordem. É o controle.</div>
+<div class="tgt">mede o ganho de só juntar</div></div>
+<div class="alt pick"><span class="badge">soma</span>
+<svg class="ic" viewBox="0 0 200 64"><rect x="20" y="16" width="110" height="32" rx="6" fill="#2a78d6"/><text x="75" y="37" font-size="14" text-anchor="middle" fill="#fff" font-weight="700">giro líquido</text><rect x="140" y="16" width="40" height="32" rx="6" fill="#fff" stroke="#2a78d6" stroke-width="3"/><text x="160" y="37" font-size="13" text-anchor="middle" fill="#2a78d6" font-weight="700">garra</text></svg>
+<h3>Somar o giro de cada junta</h3><div class="tech">ponto a ponto síncrono (PTP industrial)</div>
+<div class="hw">Entre dois eventos da garra, um passo só, com o giro líquido de cada junta; todas terminam juntas.</div>
+<div class="tgt">a aposta: o mesmo lugar, mais rápido</div></div>
+<div class="alt fragment riscar" data-fragment-index="1">
+<svg class="ic" viewBox="0 0 200 64"><g fill="#fff" stroke="#9a9994" stroke-width="3"><circle cx="30" cy="32" r="16"/><circle cx="100" cy="32" r="16"/><circle cx="170" cy="32" r="16"/></g><g stroke="#9a9994" stroke-width="3"><line x1="150" y1="32" x2="120" y2="32"/><line x1="80" y1="32" x2="50" y2="32"/></g><text x="170" y="37" font-size="12" text-anchor="middle" fill="#4d5260" font-weight="700">goal</text></svg>
+<h3>Skill chaining</h3><div class="tech">Konidaris &amp; Barto 2009 · a mais forte</div>
+<div class="hw">Aprende skills de malha fechada, de trás para frente a partir do goal, cada uma com onde pode começar.</div>
+<div class="why"><b>Por que não agora:</b> uma política e um classificador por skill; foge do "hábito = lista de comandos". Perdemos: o macro só serve no seu contexto.</div></div>
+<div class="alt fragment riscar" data-fragment-index="2">
+<svg class="ic" viewBox="0 0 200 64"><path d="M14 50 C 60 4, 120 4, 180 40" fill="none" stroke="#9a9994" stroke-width="4"/><circle cx="180" cy="40" r="8" fill="#9a9994"/></svg>
+<h3>Movimento aprendido de uma demonstração</h3><div class="tech">DMP (Ijspeert et al. 2013)</div>
+<div class="hw">Ajusta um movimento à trajetória que deu certo e o leva a outro alvo.</div>
+<div class="why"><b>Por que não:</b> precisa da posição do cubo como parâmetro, que o hábito não tem; com o cubo fixo, não acrescenta.</div></div>
+<div class="alt fragment riscar" data-fragment-index="3">
+<svg class="ic" viewBox="0 0 200 64"><g fill="#fff" stroke="#9a9994" stroke-width="3"><rect x="10" y="10" width="50" height="18" rx="4"/><rect x="74" y="10" width="50" height="18" rx="4"/><rect x="138" y="10" width="50" height="18" rx="4"/></g><rect x="74" y="38" width="50" height="18" rx="4" fill="#9a9994"/><g stroke="#9a9994" stroke-width="2"><line x1="35" y1="28" x2="90" y2="38"/><line x1="99" y1="28" x2="99" y2="38"/><line x1="163" y1="28" x2="108" y2="38"/></g></svg>
+<h3>Achar o que se repete entre muitas soluções</h3><div class="tech">action grammars, DreamCoder</div>
+<div class="hw">Procura subsequências que aparecem em muitas trajetórias e as vira em ações novas.</div>
+<div class="why"><b>Por que não:</b> nossas sequências quase nunca se repetem iguais (a ordem das juntas varia), e a soma já junta tudo.</div></div>
+</div>
+<div class="plan fragment" data-fragment-index="4"><b>Plano:</b> cópia e soma, {{< fato mac01.n_seeds >}} seeds × {{< fato mac01.n_episodios >}} episódios, contra o agente base, com o critério fixado antes</div>
+
+::: notes
+**Por que não skill chaining, se é a mais forte?** Ela funciona saindo de outras poses, mas exige uma política aprendida por skill e um classificador de onde cada uma pode começar. É bem maior e foge do esquema de hábito do cap. 4. Ganhamos poder testar em dias; perdemos que o macro só serve no contexto onde nasceu, e o cubo fixo faz a malha aberta parecer melhor do que seria (R5). → spec MAC-01, Prior art.
+:::
+
+## Ao cumprir uma etapa, os passos que levaram até ali viram um macro {.sol fonte="ilustrativa · exemplo real: macro_reach_8 da soma, seed 1 (entrada 42) · commits 2ca7c90, 33fa330"}
+
+::: eb
+Como funciona · cópia e soma
+:::
+
+<div class="row"><h3>O trecho que cumpriu o reach (passos de 1°, com a garra abrindo e fechando no meio)</h3>
+<div style="display:flex;gap:5px;flex-wrap:wrap;margin:10px 0 6px">
+<span class="chipj">j0 −</span><span class="chipj">j1 −</span><span class="chipj">j0 −</span><span class="chipg">garra</span><span class="chipj">j2 −</span><span class="chipj">j3 +</span><span class="chipj">j2 −</span><span class="chipg">garra</span><span class="chipj">j0 −</span><span class="chipj">j2 −</span><span class="chipj">j3 +</span><span class="chipj">j1 −</span><span class="chipj">j0 +</span><span class="chipj">j2 −</span><span class="tiny" style="align-self:center">… dezenas de passos</span>
+</div></div>
+<div class="body" style="gap:20px;flex:none">
+<div class="row" style="flex:1"><h3>Cópia</h3>
+<div class="small" style="margin:8px 0">todos os passos, na mesma ordem</div>
+<div style="display:flex;gap:4px;flex-wrap:wrap"><span class="chipj">j0 −</span><span class="chipj">j1 −</span><span class="chipj">j0 −</span><span class="chipg">garra</span><span class="chipj">j2 −</span><span class="chipj">j3 +</span><span class="chipj">j2 −</span><span class="chipg">garra</span><span class="tiny" style="align-self:center">…</span></div></div>
+<div class="row after" style="flex:1"><h3>Soma</h3>
+<div class="small" style="margin:8px 0">entre dois eventos da garra, um passo só com o giro líquido</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chipj" style="background:#2a78d6;color:#fff">{{< fato mac01.exemplo_giro >}}</span><span class="chipg">garra</span><span class="tiny" style="align-self:center">…</span></div></div>
+</div>
+<div class="small muted" style="margin-top:14px">O macro só pode ser escolhido no <b>contexto</b> onde o trecho começou: é de malha aberta, e o mesmo giro saindo de outra pose leva a outro lugar. Escolhido, ele roda até o fim (a regra do TROCA).</div>
+
+::: notes
+**O que acontece se o mesmo contexto gerar outro trecho?** Se o novo for mais curto, o macro antigo é aposentado e o novo entra no lugar; senão, só conta uma repetição. → spec MAC-01, decisão D4.
+:::
+
+## A soma não passou: o reach por macro ficou mais lento, não mais rápido {.res fonte="entrada 42 · macro_report.py --window 400 499 --seeds 1 2 3 · commit 33fa330"}
+
+::: eb
+Resultado · exploratória, {{< fato mac01.n_seeds >}} seeds, fora do protocolo
+:::
+
+<div class="body" style="gap:30px">
+<div class="col" style="flex:1.25">
+<table>
+<tr><th style="width:50%">previsto (antes de rodar)</th><th>aconteceu</th><th></th></tr>
+<tr><td>soma: macro de reach antes do ep. {{< fato mac01.prev_ep >}}</td><td>eps. {{< fato mac01.reach_eps >}}</td><td class="ok">✓</td></tr>
+<tr><td>soma: depois disso, reach em {{< fato mac01.prev_ticks_soma >}} ticks</td><td>{{< fato mac01.reach_soma_seeds >}}</td><td class="no">✗</td></tr>
+<tr><td>cópia: reach em {{< fato mac01.prev_ticks_copia >}} ticks</td><td>{{< fato mac01.reach_copia_seeds >}} (a {{< fato mac01.copia_sem_reach >}} travou)</td><td class="no">✗</td></tr>
+<tr><td>a parte do tempo dentro de macros cresce</td><td>{{< fato mac01.ticks_em_macro >}} dos ticks</td><td class="ok">✓</td></tr>
+<tr><td>macros de grasp falham mais que os de reach</td><td>os de grasp cumprem {{< fato mac01.grasp_cumpre >}}</td><td class="no">✗</td></tr>
+</table>
+</div>
+<div class="col">
+<div class="kv" style="flex-direction:column;align-items:flex-start;gap:4px"><div class="what">seeds em que a soma passou</div><div class="to no">{{< fato mac01.passam >}} de {{< fato mac01.n_seeds >}}</div></div>
+<div class="legend"><b>Passa</b> se, nas {{< fato mac01.n_seeds >}} seeds, nos episódios {{< fato mac01.janela >}}: cria e usa um macro de reach; o reach é mais rápido que o da cópia e o do agente base ({{< fato mac01.reach_c4 >}} ticks); grasps ≥ {{< fato mac01.limite_grasps >}}, transportes ≥ {{< fato mac01.limite_transp >}} e colisões ≤ {{< fato mac01.limite_colisoes >}} a cada 100 episódios (o pior seed do agente base). Fixado em 03/11, antes de rodar. Com {{< fato mac01.n_episodios >}} episódios não dá para medir a M2.</div>
+</div>
+</div>
+
+::: notes
+**Se não passou, por que mostrar?** Porque errou de um jeito que ensina: as duas causas estão no log (próximos slides). E o critério foi fixado antes de rodar, então "não passa" é um resultado, não uma escolha. → entrada 42.
+:::
+
+## Numa seed, a soma fez a tarefa inteira no episódio {{< fato mac01.primeiro_soma_s1 >}} e repetiu em {{< fato mac01.depois_soma_s1_pct >}} dos seguintes {.res fonte="entrada 42 · runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum/s1 · runs/2026-10-28_1803_C4_ucb-0.1_lp_P1"}
+
+::: eb
+Resultado · o caso da seed 1 · exploratória
+:::
+
+<div class="body" style="gap:30px">
+<div class="col" style="flex:1.35"><video src="../mudancas/2026-11-03-mac-01/media/soma_s1.mp4" controls preload="metadata"></video>
+<figcaption>MAC-01 soma, seed 1, {{< fato mac01.video_ep >}}: quatro macros em cadeia (chegar, pegar, levar, soltar) · {{< fato mac01.video_regra >}} · {{< fato mac01.video_vel >}}</figcaption></div>
+<div class="col" style="gap:10px">
+<div class="kv" style="flex-direction:column;align-items:flex-start;gap:2px"><div class="what">acertos depois do 1º, soma, seed 1</div><div class="to ok">{{< fato mac01.depois_soma_s1 >}}</div></div>
+<div class="kv" style="flex-direction:column;align-items:flex-start;gap:2px"><div class="what">agente base, mesmas seeds, a mesma conta</div><div class="small">s2: {{< fato mac01.c4_depois_s2 >}} · s3: {{< fato mac01.c4_depois_s3 >}} · s1: {{< fato mac01.c4_depois_s1 >}}</div></div>
+<div class="hint">soma nas seeds {{< fato mac01.soma_sem_acerto >}}: nenhum acerto em {{< fato mac01.n_episodios >}} episódios · 1º acerto do agente base nas {{< fato mac01.c4_n_seeds >}} seeds: eps. {{< fato mac01.c4_primeiros >}} · uma seed de {{< fato mac01.n_seeds >}}, o cubo sempre no mesmo lugar: é pista, não resultado</div>
+</div>
+</div>
+
+::: notes
+**Isso não contradiz o "não passou"?** Não: o critério pede as 3 seeds, e a soma fez a tarefa em uma. O que a seed 1 mostra é que, quando os macros encadeiam, o agente repete o que achou, o oposto da Fase 2 do agente base. Mas é uma seed, e com o cubo fixo um macro de malha aberta acerta sempre (R5). → entrada 42.
+:::
+
+## Por que não passou: a garra que o macro herdou, e o crédito por execução {.ctx .proximos fonte="entrada 42 · spec MAC-01, riscos R2 e R9"}
+
+::: eb
+Próximos · as duas causas estão no log
+:::
+
+<div class="small muted" style="margin-bottom:6px">O episódio do vídeo, em ticks por etapa:</div>
+<div style="display:flex;height:38px;border-radius:8px;overflow:hidden;font-size:15px;font-weight:700;color:#fff">
+<div style="width:{{< fato mac01.ep_largura_reach >}};background:#eb6834;display:flex;align-items:center;padding-left:12px">chegar ao cubo: {{< fato mac01.ep_ticks_reach >}} ticks</div>
+<div style="width:{{< fato mac01.ep_largura_grasp >}};background:#2a78d6"></div>
+<div style="width:{{< fato mac01.ep_largura_transport >}};background:#1e7b34"></div>
+<div style="width:{{< fato mac01.ep_largura_release >}};background:#6250d6"></div>
+</div>
+<div class="tiny" style="text-align:right;margin-top:4px">pegar {{< fato mac01.ep_ticks_grasp >}} · levar {{< fato mac01.ep_ticks_transport >}} · soltar {{< fato mac01.ep_ticks_release >}} ticks</div>
+<div class="body" style="gap:24px;margin-top:10px">
+<div class="col">
+<div class="cause small"><b class="k">1</b><div><b>A garra.</b> O primeiro trecho de cada contexto vem da exploração, com a garra abrindo e fechando. A soma guardou cada troca, de {{< fato mac01.troca_garra >}} ticks: {{< fato mac01.garra_ticks >}} dos ticks nas seeds 1 e 3.</div></div>
+<div class="cause small"><b class="k">2</b><div><b>O crédito por execução.</b> O macro soma o progresso da execução inteira; o primitivo, de um passo ({{< fato mac01.credito_macro >}} contra {{< fato mac01.credito_primitivo >}}). O primeiro macro ganha sempre: na cópia s1, um que não cabe no episódio rodou {{< fato mac01.travou_eps >}} episódios seguidos.</div></div>
+</div>
+<div class="col" style="flex:.9">
+<div class="disc" style="margin-top:10px"><b>Para discutir</b><ul class="small"><li><b>A · a garra na soma:</b> tratá-la como uma junta, pelo estado líquido, cortando só onde "segurando" muda?</li><li><b>B · a escala do crédito:</b> crédito por tick, desconto pela duração (depois do WP4) ou um limite de tempo para o macro?</li></ul></div>
+</div>
+</div>
+
+::: notes
+**Qual das duas resolver primeiro?** A garra explica o reach lento nas seeds 1 e 3; o crédito explica a trava da cópia s1 e por que um macro ruim não sai. Crédito por tick é barato; o desconto pela duração (SMDP) precisa de bootstrapping, que ficou para depois do WP4 (Fila 7). → entrada 42, Decisões.
+:::

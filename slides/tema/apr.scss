@@ -130,6 +130,9 @@ $presentation-heading-margin-bottom: 0;
   .xl span { flex: 1; text-align: center; }
   .disc { background: #f2f0fb; border-left: 6px solid var(--ctx); padding: 12px 18px; border-radius: 6px; margin-top: 14px; }
   .disc ul { margin: 6px 0 0; padding-left: 24px; }
+  /* steps of a habit, as chips: a joint step and a gripper step */
+  .chipj, .chipg { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 16px; font-weight: 600; }
+  .chipj { background: #eef0f4; color: var(--ink2); } .chipg { background: #fff3ec; color: var(--prob); }
 
   
 /* fragment "riscar": visible from the start; when reveal marks it .visible it greys out, the h3 is

@@ -1,0 +1,352 @@
+{
+ "gerado_por": "python3 slides/mudancas/2026-11-03-mac-01/fatos.py",
+ "fatos": {
+  "mac01.n_seeds": {
+   "valor": 3,
+   "texto": "3",
+   "fonte": "spec MAC-01, Testing 1 (seeds 1–3)",
+   "manual": false
+  },
+  "mac01.n_episodios": {
+   "valor": 500,
+   "texto": "500",
+   "fonte": "runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum/s1/run.json, emax",
+   "manual": false
+  },
+  "mac01.janela": {
+   "valor": [
+    400,
+    499
+   ],
+   "texto": "400–499",
+   "fonte": "spec MAC-01, Testing 1",
+   "manual": false
+  },
+  "mac01.reach_soma": {
+   "valor": [
+    407.0,
+    173.0,
+    356.0
+   ],
+   "texto": "173–407",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum, coluna reach ticks",
+   "manual": false
+  },
+  "mac01.reach_soma_seeds": {
+   "valor": [
+    407.0,
+    173.0,
+    356.0
+   ],
+   "texto": "407 / 173 / 356",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum, coluna reach ticks, seeds 1 / 2 / 3",
+   "manual": false
+  },
+  "mac01.reach_copia": {
+   "valor": [
+    403.0,
+    443.0
+   ],
+   "texto": "403–443",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-copy, coluna reach ticks",
+   "manual": false
+  },
+  "mac01.reach_copia_seeds": {
+   "valor": [
+    null,
+    403.0,
+    443.0
+   ],
+   "texto": "— / 403 / 443",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-copy, coluna reach ticks, seeds 1 / 2 / 3",
+   "manual": false
+  },
+  "mac01.reach_c4": {
+   "valor": [
+    93,
+    95,
+    100.5
+   ],
+   "texto": "93–100",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-10-28_1803_C4_ucb-0.1_lp_P1, coluna reach ticks",
+   "manual": false
+  },
+  "mac01.reach_c4_seeds": {
+   "valor": [
+    93,
+    95,
+    100.5
+   ],
+   "texto": "93 / 95 / 100",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-10-28_1803_C4_ucb-0.1_lp_P1, coluna reach ticks, seeds 1 / 2 / 3",
+   "manual": false
+  },
+  "mac01.copia_sem_reach": {
+   "valor": [
+    1
+   ],
+   "texto": "s1",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-copy: seeds sem reach nos episódios 400–499",
+   "manual": false
+  },
+  "mac01.limite_grasps": {
+   "valor": 48.0,
+   "texto": "48",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-10-28_1803_C4_ucb-0.1_lp_P1: o pior dos 3 seeds (spec MAC-01, Testing 3)",
+   "manual": false
+  },
+  "mac01.limite_transp": {
+   "valor": 8.0,
+   "texto": "8",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-10-28_1803_C4_ucb-0.1_lp_P1: o pior dos 3 seeds (spec MAC-01, Testing 3)",
+   "manual": false
+  },
+  "mac01.limite_colisoes": {
+   "valor": 535.0,
+   "texto": "535",
+   "fonte": "macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-10-28_1803_C4_ucb-0.1_lp_P1: o pior dos 3 seeds (spec MAC-01, Testing 3)",
+   "manual": false
+  },
+  "mac01.passam": {
+   "valor": 0,
+   "texto": "0",
+   "fonte": "spec MAC-01, Testing 3, aplicado a macro_report.py --window 400 499 --seeds 1 2 3, runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum",
+   "manual": false
+  },
+  "mac01.primeiro_soma_s1": {
+   "valor": 172,
+   "texto": "172",
+   "fonte": "runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum/s1, 1º sucesso",
+   "manual": false
+  },
+  "mac01.depois_soma_s1": {
+   "valor": [
+    412,
+    500
+   ],
+   "texto": "412 de 500",
+   "fonte": "runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum/s1, sucessos depois do 1º (slide_facts.success_after_first)",
+   "manual": false
+  },
+  "mac01.depois_soma_s1_pct": {
+   "valor": 0.824,
+   "texto": "82%",
+   "fonte": "runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum/s1, sucessos depois do 1º",
+   "manual": false
+  },
+  "mac01.soma_sem_acerto": {
+   "valor": [
+    2,
+    3
+   ],
+   "texto": "s2 e s3",
+   "fonte": "runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum: seeds sem sucesso nenhum",
+   "manual": false
+  },
+  "mac01.c4_depois_s1": {
+   "valor": null,
+   "texto": "nenhum acerto em 2.000 episódios",
+   "fonte": "runs/2026-10-28_1803_C4_ucb-0.1_lp_P1/s1, sucessos depois do 1º",
+   "manual": false
+  },
+  "mac01.c4_depois_s2": {
+   "valor": [
+    10,
+    500
+   ],
+   "texto": "2%",
+   "fonte": "runs/2026-10-28_1803_C4_ucb-0.1_lp_P1/s2, sucessos depois do 1º",
+   "manual": false
+  },
+  "mac01.c4_depois_s3": {
+   "valor": [
+    1,
+    500
+   ],
+   "texto": "0,2%",
+   "fonte": "runs/2026-10-28_1803_C4_ucb-0.1_lp_P1/s3, sucessos depois do 1º",
+   "manual": false
+  },
+  "mac01.c4_n_seeds": {
+   "valor": 9,
+   "texto": "9",
+   "fonte": "scorecard de runs/2026-10-28_1803_C4_ucb-0.1_lp_P1: seeds",
+   "manual": false
+  },
+  "mac01.c4_primeiros": {
+   "valor": [
+    222,
+    630,
+    194,
+    229,
+    741,
+    194
+   ],
+   "texto": "194–741",
+   "fonte": "scorecard de runs/2026-10-28_1803_C4_ucb-0.1_lp_P1: 1º sucesso dos seeds que acertaram",
+   "manual": false
+  },
+  "mac01.ep_ticks_reach": {
+   "valor": 407,
+   "texto": "407",
+   "fonte": "media/soma_s1.mp4.json (midia.sh): passos entre as etapas",
+   "manual": false
+  },
+  "mac01.ep_largura_reach": {
+   "valor": null,
+   "texto": "85.9%",
+   "fonte": "largura da barra: mac01.ep_ticks_reach sobre o episódio",
+   "manual": false
+  },
+  "mac01.ep_ticks_grasp": {
+   "valor": 24,
+   "texto": "24",
+   "fonte": "media/soma_s1.mp4.json (midia.sh): passos entre as etapas",
+   "manual": false
+  },
+  "mac01.ep_largura_grasp": {
+   "valor": null,
+   "texto": "5.1%",
+   "fonte": "largura da barra: mac01.ep_ticks_grasp sobre o episódio",
+   "manual": false
+  },
+  "mac01.ep_ticks_transport": {
+   "valor": 27,
+   "texto": "27",
+   "fonte": "media/soma_s1.mp4.json (midia.sh): passos entre as etapas",
+   "manual": false
+  },
+  "mac01.ep_largura_transport": {
+   "valor": null,
+   "texto": "5.7%",
+   "fonte": "largura da barra: mac01.ep_ticks_transport sobre o episódio",
+   "manual": false
+  },
+  "mac01.ep_ticks_release": {
+   "valor": 15,
+   "texto": "15",
+   "fonte": "media/soma_s1.mp4.json (midia.sh): passos entre as etapas",
+   "manual": false
+  },
+  "mac01.ep_largura_release": {
+   "valor": null,
+   "texto": "3.2%",
+   "fonte": "largura da barra: mac01.ep_ticks_release sobre o episódio",
+   "manual": false
+  },
+  "mac01.video_ep": {
+   "valor": 172,
+   "texto": "ep. 172",
+   "fonte": "media/soma_s1.mp4.json (midia.sh)",
+   "manual": false
+  },
+  "mac01.video_regra": {
+   "valor": "o 1º sucesso deste seed",
+   "texto": "o 1º sucesso deste seed",
+   "fonte": "media/soma_s1.mp4.json (midia.sh)",
+   "manual": false
+  },
+  "mac01.video_vel": {
+   "valor": 2,
+   "texto": "2×",
+   "fonte": "media/soma_s1.mp4.json (midia.sh), stride",
+   "manual": false
+  },
+  "mac01.reach_passos": {
+   "valor": null,
+   "texto": "96",
+   "fonte": "spec MAC-01 (vault Rafael/Specs), medição de partida: reach, mediana dos trechos do P1 da emenda",
+   "manual": true
+  },
+  "mac01.reach_liquido": {
+   "valor": null,
+   "texto": "~20",
+   "fonte": "spec MAC-01 (vault Rafael/Specs), medição de partida (seed 4, ep. 242)",
+   "manual": true
+  },
+  "mac01.vel_max": {
+   "valor": null,
+   "texto": "0,4 rad/s",
+   "fonte": "spec MAC-01 (vault Rafael/Specs), As regras (soma)",
+   "manual": true
+  },
+  "mac01.tick": {
+   "valor": null,
+   "texto": "50 ms",
+   "fonte": "tools/replay.py: 1× = 20 passos/s",
+   "manual": true
+  },
+  "mac01.prev_ep": {
+   "valor": null,
+   "texto": "30",
+   "fonte": "spec MAC-01 (vault Rafael/Specs), Testing 2",
+   "manual": true
+  },
+  "mac01.prev_ticks_soma": {
+   "valor": null,
+   "texto": "~20–30",
+   "fonte": "spec MAC-01 (vault Rafael/Specs), Testing 2",
+   "manual": true
+  },
+  "mac01.prev_ticks_copia": {
+   "valor": null,
+   "texto": "~90",
+   "fonte": "spec MAC-01 (vault Rafael/Specs), Testing 2",
+   "manual": true
+  },
+  "mac01.reach_eps": {
+   "valor": null,
+   "texto": "21, 16 e 15",
+   "fonte": "code_notes entrada 42, previsões",
+   "manual": true
+  },
+  "mac01.ticks_em_macro": {
+   "valor": null,
+   "texto": "35–100%",
+   "fonte": "code_notes entrada 42, previsões",
+   "manual": true
+  },
+  "mac01.grasp_cumpre": {
+   "valor": null,
+   "texto": "84–100%",
+   "fonte": "code_notes entrada 42, previsões",
+   "manual": true
+  },
+  "mac01.garra_ticks": {
+   "valor": null,
+   "texto": "74–80%",
+   "fonte": "code_notes entrada 42, \"Em 30 segundos\"",
+   "manual": true
+  },
+  "mac01.troca_garra": {
+   "valor": null,
+   "texto": "~43",
+   "fonte": "code_notes entrada 42, \"Em 30 segundos\"",
+   "manual": true
+  },
+  "mac01.credito_macro": {
+   "valor": null,
+   "texto": "0,112",
+   "fonte": "code_notes entrada 42, \"Crédito no contexto inicial\"",
+   "manual": true
+  },
+  "mac01.credito_primitivo": {
+   "valor": null,
+   "texto": "0,003",
+   "fonte": "code_notes entrada 42, \"Crédito no contexto inicial\"",
+   "manual": true
+  },
+  "mac01.travou_eps": {
+   "valor": null,
+   "texto": "478",
+   "fonte": "code_notes entrada 42, \"Em 30 segundos\" (cópia s1)",
+   "manual": true
+  },
+  "mac01.exemplo_giro": {
+   "valor": null,
+   "texto": "j0 −25° · j1 −9° · j2 −31° · j3 +17°",
+   "fonte": "code_notes entrada 42, macro_reach_8 da soma s1",
+   "manual": true
+  }
+ }
+}
