@@ -1,0 +1,22 @@
+## «afirmação: o que mudou nesta semana, numa frase» {.ctx fonte="entrada «N» · commit «hash»"}
+
+::: eb
+Semana curta · «infraestrutura, correção, ferramenta»
+:::
+
+<div class="body">
+<div class="col" style="flex:1.1">
+
+![«o que a imagem mostra»](/mudancas/«data»-«id»/media/«imagem».jpg){fig-alt="«descrição»"}
+
+</div>
+<div class="col" style="gap:12px">
+<div class="kv" style="flex-direction:column;align-items:flex-start;gap:2px"><div class="what">o que mudou</div><div class="small">«uma frase»</div></div>
+<div class="kv" style="flex-direction:column;align-items:flex-start;gap:2px"><div class="what">por quê</div><div class="small">«uma frase, com o número por fato: {{< fato semana.numero >}}»</div></div>
+<div class="kv" style="flex-direction:column;align-items:flex-start;gap:2px"><div class="what">o que aprendi</div><div class="small">«uma frase»</div></div>
+</div>
+</div>
+
+::: notes
+**«pergunta provável»** «resposta curta» → entrada «N».
+:::
