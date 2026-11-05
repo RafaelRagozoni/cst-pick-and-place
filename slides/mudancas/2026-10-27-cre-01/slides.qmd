@@ -1,0 +1,165 @@
+## Quase toda vez que pega o cubo, o robô o larga no caminho {.prob fonte="entrada 34 (medição com carry_report) · imagens: base, seed 1, {{< fato cre01.tira_ep >}}"}
+
+::: eb
+Problema
+:::
+
+::: strip
+![[1]{.n}chega ao cubo](/mudancas/2026-10-27-cre-01/media/base_1.jpg){fig-alt="o braço chega ao cubo"}
+
+![[2]{.n}pega](/mudancas/2026-10-27-cre-01/media/base_2.jpg){fig-alt="a garra fecha no cubo"}
+
+![[3]{.n}começa a levar](/mudancas/2026-10-27-cre-01/media/base_3.jpg){fig-alt="o braço começa a levar o cubo"}
+
+![[4]{.n}abre a garra no caminho](/mudancas/2026-10-27-cre-01/media/base_4.jpg){fig-alt="o cubo caído longe do pad"}
+:::
+
+<div class="body" style="margin-top:14px;gap:20px">
+<div class="col" style="flex:.55;justify-content:center"><div class="to" style="font-size:54px;font-weight:800;color:var(--prob)">{{< fato cre01.quedas_base >}}</div><div class="small muted">das {{< fato cre01.pegas_base >}} pegas terminam assim (base, {{< fato cre01.n_seeds >}} seeds)</div></div>
+<div class="col">
+<div class="cause"><b class="k">1</b><div><b>Largar não custa nada.</b> Quando o cubo cai, a conta de progresso do agente recomeça do zero na nova etapa, e a queda não aparece como perda.</div></div>
+<div class="cause"><b class="k">2</b><div><b>A regra de escolha obriga a testar tudo.</b> Em cada situação nova, todo hábito ainda não testado ali precisa ser tentado, inclusive abrir a garra.</div></div>
+</div>
+</div>
+
+::: notes
+**Como sabe que são essas duas causas?** Contagem: {{< fato cre01.quedas_por_abrir_base >}} das quedas vêm de abrir a garra, e {{< fato cre01.sorteio_forcado >}} das aberturas com o cubo na mão foram o teste obrigatório da regra de escolha (UCB). → entrada 34.
+:::
+
+## Cinco caminhos, do mais simples ao mais elaborado {.sol fonte="spec CRE-01, seção de alternativas"}
+
+::: eb
+Alternativas · cada clique mostra o que ficou de fora e por quê
+:::
+
+<div class="alts">
+<div class="alt pick"><span class="badge">A</span>
+<svg class="ic" viewBox="0 0 200 64"><line x1="12" y1="34" x2="188" y2="34" stroke="#d6d5cf" stroke-width="5"/><circle cx="20" cy="34" r="9" fill="#2a78d6"/><circle cx="73" cy="34" r="9" fill="#2a78d6"/><circle cx="127" cy="34" r="9" fill="#fff" stroke="#b9b8b2" stroke-width="3"/><circle cx="180" cy="34" r="9" fill="#fff" stroke="#b9b8b2" stroke-width="3"/><text x="73" y="16" font-size="15" text-anchor="middle" fill="#2a78d6" font-weight="700">etapa 2</text></svg>
+<h3>Contar a etapa no progresso</h3><div class="tech">forma do DrS (ICLR 2024)</div>
+<div class="hw">O progresso passa a incluir em que etapa o robô está, não só a distância até o próximo alvo.</div>
+<div class="tgt">ataca a causa 1</div></div>
+<div class="alt pick"><span class="badge">B</span>
+<svg class="ic" viewBox="0 0 200 64"><g fill="#d8735c"><rect x="40" y="6" width="34" height="22" rx="4"/><rect x="80" y="6" width="34" height="22" rx="4"/><rect x="120" y="6" width="34" height="22" rx="4"/><rect x="40" y="34" width="34" height="22" rx="4"/><rect x="120" y="34" width="34" height="22" rx="4"/></g><rect x="80" y="34" width="34" height="22" rx="4" fill="#fff" stroke="#2a78d6" stroke-width="3" stroke-dasharray="5 3"/><text x="97" y="51" font-size="16" text-anchor="middle" fill="#2a78d6" font-weight="800">?</text></svg>
+<h3>Aprender com situações parecidas</h3><div class="tech">empréstimo entre vizinhos (shrinkage)</div>
+<div class="hw">Numa situação nova, cada hábito começa com a média do que deu nas vizinhas, em vez de ser testado à força.</div>
+<div class="tgt">ataca a causa 2</div></div>
+<div class="alt fragment riscar" data-fragment-index="1">
+<svg class="ic" viewBox="0 0 200 64"><g stroke="#9a9994" stroke-width="3" fill="#fff"><circle cx="24" cy="32" r="14"/><circle cx="76" cy="32" r="14"/><circle cx="128" cy="32" r="14"/><circle cx="178" cy="32" r="14"/></g><g stroke="#9a9994" stroke-width="3"><line x1="38" y1="32" x2="62" y2="32"/><line x1="90" y1="32" x2="114" y2="32"/><line x1="142" y1="32" x2="164" y2="32"/></g><g font-size="13" text-anchor="middle" fill="#4d5260" font-weight="700"><text x="24" y="37">v1</text><text x="76" y="37">v2</text><text x="128" y="37">v3</text><text x="178" y="37">v4</text></g></svg>
+<h3>Mapa de etapas com valor calculado</h3><div class="tech">reward machines (JAIR 2022)</div>
+<div class="hw">Descreve a tarefa como um mapa de etapas e calcula quanto vale estar em cada uma.</div>
+<div class="why"><b>Por que não:</b> nosso mapa é uma fila de 4 etapas, e o cálculo devolve os mesmos degraus da A, só que com mais código.</div></div>
+<div class="alt fragment riscar" data-fragment-index="2">
+<svg class="ic" viewBox="0 0 200 64"><g fill="#d8735c"><rect x="40" y="6" width="34" height="22" rx="4"/><rect x="120" y="6" width="34" height="22" rx="4"/><rect x="40" y="34" width="34" height="22" rx="4"/></g><rect x="80" y="34" width="34" height="22" rx="4" fill="#fff" stroke="#9a9994" stroke-width="3" stroke-dasharray="5 3"/><path d="M150 50 q18 -30 36 0" stroke="#4d5260" stroke-width="3" fill="none"/><text x="168" y="26" font-size="13" text-anchor="middle" fill="#4d5260" font-weight="700">peso?</text></svg>
+<h3>Aprender quanto confiar nas vizinhas</h3><div class="tech">bandit bayesiano hierárquico (AISTATS 2022)</div>
+<div class="hw">Como a B, mas o quanto confiar nas vizinhas é aprendido dos dados, não fixado à mão.</div>
+<div class="why"><b>Por que não agora:</b> exige trocar a regra de escolha inteira. Ficando com a B, perdemos isto: o peso de confiança é fixo.</div></div>
+<div class="alt fragment riscar" data-fragment-index="3">
+<svg class="ic" viewBox="0 0 200 64"><g fill="#fff" stroke="#9a9994" stroke-width="3"><rect x="10" y="16" width="38" height="32" rx="6"/><rect x="58" y="16" width="38" height="32" rx="6"/><rect x="106" y="16" width="38" height="32" rx="6"/><rect x="154" y="16" width="38" height="32" rx="6"/></g><g font-size="12" text-anchor="middle" fill="#4d5260" font-weight="700"><text x="29" y="37">agente</text><text x="77" y="37">agente</text><text x="125" y="37">agente</text><text x="173" y="37">agente</text></g></svg>
+<h3>Um controlador por etapa</h3><div class="tech">skill chaining · SAC-X</div>
+<div class="hw">Cada etapa vira um mini-agente com a sua própria recompensa.</div>
+<div class="why"><b>Por que não agora:</b> muda a arquitetura do agente. É assunto da geração de hábitos (WP3).</div></div>
+</div>
+<div class="plan fragment" data-fragment-index="4"><b>Plano:</b> A → medir → B → medir, sempre nas mesmas {{< fato cre01.n_seeds >}} seeds e contra a base</div>
+
+::: notes
+**Por que não o bandit hierárquico, se é o mais forte?** Ele precisa de um modelo estatístico por nível e de sortear da distribuição; a base escolhe por UCB. Ganhamos simplicidade; perdemos o peso escolhido pelos dados. → spec CRE-01, "Alternativas mais fortes e o saldo".
+:::
+
+## Com a A, largar o cubo no caminho passa a contar como perda {.sol fonte="animação ilustrativa · código no apêndice · commit 85dd153"}
+
+::: eb
+Como funciona · opção A
+:::
+
+<div class="row"><h3>Antes</h3>
+<div class="tr"><div class="line"></div>
+<div class="nd" style="left:0%"></div><div class="nl" style="left:0%">chegar ao cubo</div>
+<div class="nd" style="left:33.3%"></div><div class="nl" style="left:33.3%">pegar</div>
+<div class="nd" style="left:66.6%"></div><div class="nl" style="left:66.6%">levar ao pad</div>
+<div class="nd" style="left:100%"></div><div class="nl" style="left:100%">soltar no pad</div>
+<div class="cb"></div></div>
+<div class="readout"><span class="ev">larga o cubo →</span><span class="cr">a conta recomeça na etapa nova: <span class="big">0</span> · nada a aprender</span></div></div>
+<div class="row after"><h3>Depois</h3>
+<div class="tr"><div class="line"></div>
+<div class="nd" style="left:0%"></div><div class="nl" style="left:0%">chegar ao cubo</div>
+<div class="nd" style="left:33.3%"></div><div class="nl" style="left:33.3%">pegar</div>
+<div class="nd" style="left:66.6%"></div><div class="nl" style="left:66.6%">levar ao pad</div>
+<div class="nd" style="left:100%"></div><div class="nl" style="left:100%">soltar no pad</div>
+<div class="cb"></div></div>
+<div class="readout"><span class="ev">larga o cubo →</span><span class="cr">perde uma etapa inteira: <span class="big no">−1 etapa</span> · aprende a não largar</span></div></div>
+<div class="small muted">O agente aprende pela <b>variação do progresso</b> (o impulso de tarefa, "Task"). Antes, a conta só via a distância até o alvo da etapa atual.</div>
+
+::: notes
+**Isso não ensina o robô a nunca soltar?** Pela tabela da spec, soltar no caminho custa {{< fato cre01.custo_soltar_caminho >}}, soltar perto do pad custa {{< fato cre01.custo_soltar_pad >}}, e o sucesso paga {{< fato cre01.paga_sucesso >}} quando o cubo assenta. Se abrir a garra *sobre* o pad também cai na linha do custo, é uma pergunta aberta (ver o slide "Previsto × aconteceu"). → spec CRE-01, Parte 1.
+:::
+
+## Com a B, numa situação nova o robô parte do que aprendeu nas vizinhas {.sol fonte="animação ilustrativa, não dados · commits eca83f5 e 0ef7b70 · entrada 37"}
+
+::: eb
+Como funciona · opção B
+:::
+
+<div class="small muted" style="margin:-8px 0 14px">Cada quadrado é uma <b>situação</b>: braço e cubo numa faixa de posições (o agente chama de <i>bin</i>). A cor mostra quanto abrir a garra deu errado ali.</div>
+<div class="body" style="gap:28px">
+<div class="gwrap before"><h3>Antes</h3>
+<div class="g"><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#c95a45"></div><div style="background:#e08b74"></div><div style="background:#d8735c"></div><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#e08b74"></div><div class="q">?</div><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#e08b74"></div><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#e08b74"></div><div style="background:#d8735c"></div><div style="background:#c95a45"></div><div style="background:#d8735c"></div></div>
+<div class="say">situação nova: abrir a garra ainda não foi testado ali → <b>teste obrigatório</b> → o cubo cai</div></div>
+<div class="gwrap after"><h3>Depois</h3>
+<div class="g"><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#c95a45"></div><div style="background:#e08b74"></div><div style="background:#d8735c"></div><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#e08b74"></div><div class="q">?</div><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#e08b74"></div><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#e08b74"></div><div style="background:#d8735c"></div><div style="background:#c95a45"></div><div style="background:#d8735c"></div></div>
+<div class="say">situação nova: parte da <b>média das vizinhas</b> → abrir a garra já parece ruim → mantém o cubo</div></div>
+</div>
+<div class="small muted" style="margin-top:12px"><b>Emenda (28/10):</b> só empresta quando o cubo está na mão. Sem isso, a média contaminava as situações sem cubo.</div>
+
+::: notes
+**Quanto peso as vizinhas têm?** Valem como n₀ = {{< fato cre01.n0 >}} testes imaginários (contextPriorWeight); depois de alguns testes reais, a situação passa a valer pelo que viu. → spec CRE-01, parte 2.
+:::
+
+## Menos quedas não virou sucesso: agora o robô leva o cubo até o pad e não solta {.res fonte="entrada 40 · bench.py compare b590ea9 × 2ac8e29 · carry_report"}
+
+::: eb
+Resultado · previsto antes de rodar × aconteceu
+:::
+
+<div class="body" style="gap:30px">
+<div class="col" style="flex:1.1">
+<table>
+<tr><th style="width:52%">previsto</th><th>aconteceu</th><th></th></tr>
+<tr><td>quedas longe do pad: {{< fato cre01.prev_quedas >}}</td><td>{{< fato cre01.quedas_cre >}}</td><td class="ok">✓</td></tr>
+<tr><td>chegadas ao pad por 100 ep.: {{< fato cre01.prev_transp >}}</td><td>{{< fato cre01.transp_cre >}}</td><td class="ok">✓</td></tr>
+<tr><td>M2: {{< fato cre01.prev_m2 >}}</td><td>{{< fato cre01.m2_cre >}}</td><td class="no">✗</td></tr>
+</table>
+<div class="legend"><b>M2</b> = taxa de sucesso nos <b>últimos {{< fato cre01.janela_m2 >}} episódios da Fase 2</b> (a Fase 2 são os {{< fato cre01.fase2 >}} episódios depois do 1º acerto), média dos {{< fato cre01.n_seeds >}} seeds; seed sem 1º acerto conta 0. Mede se o agente <i>repete</i> o que achou. <b>p = {{< fato cre01.p_m2 >}}</b>: com {{< fato cre01.n_seeds >}} seeds, a diferença pode ser acaso.</div>
+</div>
+<div class="col"><video src="../mudancas/2026-10-27-cre-01/media/cre01_s1.mp4" controls preload="metadata"></video>
+<figcaption>CRE-01, seed 1, {{< fato cre01.video_ep >}}: chega ao pad no passo {{< fato cre01.video_passo_pad >}} e segura o cubo até o fim · {{< fato cre01.video_regra >}} · {{< fato cre01.video_vel >}}</figcaption></div>
+</div>
+
+::: notes
+**Por que ele não solta?** Ainda não sei. Os seeds 1 e 5 levam o cubo {{< fato cre01.carregam_s1_s5 >}} vezes a cada 100 episódios e nunca soltam no pad. Hipótese a conferir: a spec dá {{< fato cre01.custo_soltar_pad >}} para soltar perto do pad; se isso vale também para abrir a garra sobre o pad, o agente pode estar aprendendo a não soltar nem lá. → entrada 40; spec CRE-01, Parte 1.
+:::
+
+## A emenda devolveu o 1º acerto, mas o sucesso depois dele caiu {.res fonte="bench/ledger.csv · b590ea9, 8253182, 2ac8e29"}
+
+::: eb
+Resultado · mesmas {{< fato cre01.n_seeds >}} seeds, mesmo protocolo
+:::
+
+<div class="body">
+<div class="chart"><div class="t">seeds que acertaram ao menos uma vez (de {{< fato cre01.n_seeds >}})</div>
+<div class="bars">
+<div class="bar"><div class="val">{{< fato cre01.primeiro_base >}}</div><div class="fill" style="height:{{< fato cre01.altura_primeiro_base >}};background:#9a9994"></div></div>
+<div class="bar"><div class="val">{{< fato cre01.primeiro_sem_emenda >}}</div><div class="fill" style="height:{{< fato cre01.altura_primeiro_sem_emenda >}};background:#eb6834"></div></div>
+<div class="bar"><div class="val">{{< fato cre01.primeiro_cre >}}</div><div class="fill" style="height:{{< fato cre01.altura_primeiro_cre >}};background:#2a78d6"></div></div></div>
+<div class="xl"><span>base</span><span>CRE-01</span><span>CRE-01 + emenda</span></div></div>
+<div class="chart"><div class="t">taxa de sucesso no fim da Fase 2 (M2)</div>
+<div class="bars">
+<div class="bar"><div class="val">{{< fato cre01.m2_base >}}</div><div class="fill" style="height:{{< fato cre01.altura_m2_base >}};background:#9a9994"></div></div>
+<div class="bar"><div class="val">{{< fato cre01.m2_sem_emenda >}}</div><div class="fill" style="height:{{< fato cre01.altura_m2_sem_emenda >}};background:#eb6834"></div></div>
+<div class="bar"><div class="val">{{< fato cre01.m2_cre >}}</div><div class="fill" style="height:{{< fato cre01.altura_m2_cre >}};background:#2a78d6"></div></div></div>
+<div class="xl"><span>base</span><span>CRE-01</span><span>CRE-01 + emenda</span></div></div>
+</div>
+<div class="hint" style="margin-top:8px">emenda = só emprestar das vizinhas com o cubo na mão (slide "Como funciona · opção B")</div>
+
+::: notes
+**Por que a M2 cai com a emenda?** Quatro seeds começam a Fase 2 com {{< fato cre01.fase2_comeca >}} e caem a 0 em 100 episódios: o agente esquece. Ainda sem explicação. → entrada 40.
+:::
