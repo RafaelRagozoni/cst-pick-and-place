@@ -103,7 +103,7 @@ def main():
 
         print('carry_ranges')
         batch = os.path.join(tmp, 'batch')
-        # seed 1: block 1 = 1 grasp/1 drop, 1 transport; block 2 = 2 grasps/0 drops.. (see below)
+
         def seed(n, blocks):
             eps, ep = [], 0
             for dropped, reached in blocks:
@@ -113,16 +113,22 @@ def main():
             write_log(os.path.join(batch, 's%d' % n, 'log.jsonl.gz'), eps)
         T = ['reach', 'grasp', 'transport']
         R = ['reach']
-        # seed 1: block A: 2 grasps both dropped (100%), 1 transport of 2 (50/100);
-        #         block B: 2 grasps, 1 dropped... (a grasp ending the episode counts no drop)
+        # blocks of 2 episodes, seeds summed per block like carry_report's **all** rows: block A
+        # 3 grasps, 3 dropped, 1 transport in 4 episodes; block B 3 grasps, 1 dropped, none; the
+        # last row, only in seed 1, 1 grasp dropped and 1 transport in 1 episode. Per seed, drops
+        # would reach 0% and transports 50 in block A, so a per-seed reading fails these checks.
         seed(1, [([True, True], [T, R]), ([True, False], [R, R]), ([True], [T])])
-        # seed 2: block A: 1 grasp dropped (100%), 0 transports; block B: 2 grasps kept (0%)
-        seed(2, [([True, False], [R, R]), (['keep', 'keep'], [R, R]), ([True], [T])])
+        seed(2, [([True, False], [R, R]), (['keep', 'keep'], [R, R])])
         r = sf.carry_ranges(batch, block=2)
-        check('drop_share range', r['drop_share'] == (0.0, 1.0))
-        check('transports_per_100 range', r['transports_per_100'] == (0.0, 50.0))
-        check('grasps counts complete blocks only', r['grasps'] == 6)
-        check('incomplete block ignored', r['transports_per_100'][1] == 50.0)
+        check('drop_share over the all rows', r['drop_share'] == (1 / 3, 1.0))
+        check('transports_per_100 over the all rows, last row included',
+              r['transports_per_100'] == (0.0, 100.0))
+        check('grasps of every row', r['grasps'] == 7)
+        allrows = [l.split(' | ') for l in sf.carry_report.report([batch], 2).splitlines()
+                   if l.startswith('| **all**')]
+        check('same rows as carry_report prints',
+              [int(l[2]) for l in allrows] == [3, 3, 1]
+              and [float(l[-1].rstrip(' |')) for l in allrows] == [25.0, 0.0, 100.0])
 
         print('success_after_first')
         log = os.path.join(tmp, 'late', 'log.jsonl.gz')

@@ -123,22 +123,20 @@ def phase2_successes(card):
 
 
 def carry_ranges(batch_dir, block=500):
-    """Over the complete blocks of every seed's log (an incomplete last block is ignored):
-    {'drop_share': (min, max) of dropped_away / grasps as fractions, blocks without grasps left
-    out; 'transports_per_100': (min, max); 'grasps': total grasps in those blocks}."""
-    shares, transports, grasps = [], [], 0
-    for _, log, _ in runlog.find_logs([batch_dir]):
-        for b in carry_report.scan(log, block):
-            if b.episodes < block:
-                continue
-            grasps += b.grasps
-            if b.grasps:
-                shares.append(b.dropped_away / b.grasps)
-            transports.append(100.0 * b.transports / b.episodes)
-    if not transports:
-        raise ValueError('no complete block of %d episodes in %s' % (block, batch_dir))
+    """Ranges over carry_report's **all** rows (carry_report.pool_by_block: block k of every seed
+    that reached it, summed), every row, the last one included, which is how code_notes entry 40
+    read its "93–97%", "0–2", "1–22%" and "8–32". {'drop_share': (min, max) of dropped_away /
+    grasps as fractions (rows without grasps left out); 'transports_per_100': (min, max);
+    'grasps': total grasps}."""
+    rows = carry_report.pool_by_block(
+        [carry_report.scan(log, block) for _, log, _ in runlog.find_logs([batch_dir])])
+    if not rows:
+        raise ValueError('no episode in %s' % batch_dir)
+    shares = [r.dropped_away / r.grasps for r in rows if r.grasps]
+    transports = [100.0 * r.transports / r.episodes for r in rows]
     return {'drop_share': (min(shares), max(shares)) if shares else None,
-            'transports_per_100': (min(transports), max(transports)), 'grasps': grasps}
+            'transports_per_100': (min(transports), max(transports)),
+            'grasps': sum(r.grasps for r in rows)}
 
 
 def success_after_first(log):
