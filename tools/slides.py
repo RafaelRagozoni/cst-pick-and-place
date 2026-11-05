@@ -34,6 +34,16 @@ CAPTURE_PROFILE = os.path.expanduser('~/snap/firefox/common/slides-capture')
 VIDEO_EXTENSIONS = ('.mp4', '.webm', '.mov')
 
 
+def print_lint(qmd_path):
+    """slide_lint's warnings about typed numbers, for qmd_path and what it includes."""
+    import slide_lint
+    warnings = slide_lint.lint(qmd_path, root=SLIDES)
+    for line in slide_lint.format_warnings(warnings, root=SLIDES):
+        print(line)
+    print('%d número(s) digitado(s)' % len(warnings))
+    return warnings
+
+
 def review_wrapper(change_dir):
     """The text of slides/revisao/<id>.qmd (no leading _: Quarto leaves _ folders out of the project, and their decks lose the fato extension): one change's slides and facts, alone. pagetitle, not
     title, so Quarto makes no title slide."""
@@ -299,6 +309,7 @@ def review(change_dir, open_browser=True):
     os.makedirs(os.path.dirname(wrapper), exist_ok=True)
     with open(wrapper, 'w', encoding='utf-8') as out:
         out.write(review_wrapper(change_dir))
+    print_lint(os.path.join(change_dir, 'slides.qmd'))
     html_path = render(wrapper)
     assert_openable(html_path)
     with open(html_path, encoding='utf-8') as deck:
@@ -335,6 +346,7 @@ def main():
         for png in capture(args.html, args.out_dir):
             print(png)
     else:
+        print_lint(args.meeting)
         html_path = render(args.meeting)
         files = deck_files(html_path)
         with open(html_path, encoding='utf-8') as deck:

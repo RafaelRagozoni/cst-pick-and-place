@@ -1,0 +1,19 @@
+## Numa seed, a soma fez a tarefa inteira no episódio {{< fato mac01.primeiro_soma_s1 >}} e repetiu em {{< fato mac01.depois_soma_s1_pct >}} dos seguintes {.res fonte="entrada 42 · runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum/s1 · runs/2026-10-28_1803_C4_ucb-0.1_lp_P1"}
+
+::: eb
+Resultado · o caso da seed 1 · exploratória
+:::
+
+<div class="body" style="gap:30px">
+<div class="col" style="flex:1.35"><video src="../mudancas/2026-11-03-mac-01/media/soma_s1.mp4" controls preload="metadata"></video>
+<figcaption>MAC-01 soma, seed 1, {{< fato mac01.video_ep >}}: quatro macros em cadeia (chegar, pegar, levar, soltar) · {{< fato mac01.video_regra >}} · {{< fato mac01.video_vel >}}</figcaption></div>
+<div class="col" style="gap:10px">
+<div class="kv" style="flex-direction:column;align-items:flex-start;gap:2px"><div class="what">acertos depois do 1º, soma, seed 1</div><div class="to ok">{{< fato mac01.depois_soma_s1 >}}</div></div>
+<div class="kv" style="flex-direction:column;align-items:flex-start;gap:2px"><div class="what">agente base, mesmas seeds, a mesma conta</div><div class="small">s2: {{< fato mac01.c4_depois_s2 >}} · s3: {{< fato mac01.c4_depois_s3 >}} · s1: {{< fato mac01.c4_depois_s1 >}}</div></div>
+<div class="hint">soma nas seeds {{< fato mac01.soma_sem_acerto >}}: nenhum acerto em {{< fato mac01.n_episodios >}} episódios · 1º acerto do agente base nas {{< fato mac01.c4_n_seeds >}} seeds: eps. {{< fato mac01.c4_primeiros >}} · uma seed de {{< fato mac01.n_seeds >}}, o cubo sempre no mesmo lugar: é pista, não resultado</div>
+</div>
+</div>
+
+::: notes
+**Isso não contradiz o "não passou"?** Não: o critério pede as {{< fato mac01.n_seeds >}} seeds, e a soma fez a tarefa em uma. O que a seed 1 mostra é que, quando os macros encadeiam, o agente repete o que achou, o oposto da Fase 2 do agente base. Mas é uma seed, e com o cubo fixo um macro de malha aberta acerta sempre (R5). → entrada 42.
+:::

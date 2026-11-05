@@ -1,0 +1,25 @@
+## A emenda devolveu o 1º acerto, mas o sucesso depois dele caiu {.res fonte="bench/ledger.csv · b590ea9, 8253182, 2ac8e29"}
+
+::: eb
+Resultado · mesmas {{< fato cre01.n_seeds >}} seeds, mesmo protocolo
+:::
+
+<div class="body">
+<div class="chart"><div class="t">seeds que acertaram ao menos uma vez (de {{< fato cre01.n_seeds >}})</div>
+<div class="bars">
+<div class="bar"><div class="val">{{< fato cre01.primeiro_base >}}</div><div class="fill" style="height:{{< fato cre01.altura_primeiro_base >}};background:#9a9994"></div></div>
+<div class="bar"><div class="val">{{< fato cre01.primeiro_sem_emenda >}}</div><div class="fill" style="height:{{< fato cre01.altura_primeiro_sem_emenda >}};background:#eb6834"></div></div>
+<div class="bar"><div class="val">{{< fato cre01.primeiro_cre >}}</div><div class="fill" style="height:{{< fato cre01.altura_primeiro_cre >}};background:#2a78d6"></div></div></div>
+<div class="xl"><span>base</span><span>CRE-01</span><span>CRE-01 + emenda</span></div></div>
+<div class="chart"><div class="t">taxa de sucesso no fim da Fase 2 (M2)</div>
+<div class="bars">
+<div class="bar"><div class="val">{{< fato cre01.m2_base >}}</div><div class="fill" style="height:{{< fato cre01.altura_m2_base >}};background:#9a9994"></div></div>
+<div class="bar"><div class="val">{{< fato cre01.m2_sem_emenda >}}</div><div class="fill" style="height:{{< fato cre01.altura_m2_sem_emenda >}};background:#eb6834"></div></div>
+<div class="bar"><div class="val">{{< fato cre01.m2_cre >}}</div><div class="fill" style="height:{{< fato cre01.altura_m2_cre >}};background:#2a78d6"></div></div></div>
+<div class="xl"><span>base</span><span>CRE-01</span><span>CRE-01 + emenda</span></div></div>
+</div>
+<div class="hint" style="margin-top:8px">emenda = só emprestar das vizinhas com o cubo na mão (slide "Como funciona · opção B")</div>
+
+::: notes
+**Por que a M2 cai com a emenda?** Quatro seeds começam a Fase 2 com {{< fato cre01.fase2_comeca >}} e caem a {{< fato cre01.fase2_queda >}}: o agente esquece. Ainda sem explicação. → entrada 40.
+:::

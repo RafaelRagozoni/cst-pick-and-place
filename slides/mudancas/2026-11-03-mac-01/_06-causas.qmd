@@ -1,0 +1,27 @@
+## Por que não passou: a garra que o macro herdou, e o crédito por execução {.ctx .proximos fonte="entrada 42 · spec MAC-01, riscos R2 e R9"}
+
+::: eb
+Próximos · as duas causas estão no log
+:::
+
+<div class="small muted" style="margin-bottom:6px">O episódio do vídeo, em ticks por etapa:</div>
+<div style="display:flex;height:38px;border-radius:8px;overflow:hidden;font-size:15px;font-weight:700;color:#fff">
+<div style="width:{{< fato mac01.ep_largura_reach >}};background:#eb6834;display:flex;align-items:center;padding-left:12px">chegar ao cubo: {{< fato mac01.ep_ticks_reach >}} ticks</div>
+<div style="width:{{< fato mac01.ep_largura_grasp >}};background:#2a78d6"></div>
+<div style="width:{{< fato mac01.ep_largura_transport >}};background:#1e7b34"></div>
+<div style="width:{{< fato mac01.ep_largura_release >}};background:#6250d6"></div>
+</div>
+<div class="tiny" style="text-align:right;margin-top:4px">pegar {{< fato mac01.ep_ticks_grasp >}} · levar {{< fato mac01.ep_ticks_transport >}} · soltar {{< fato mac01.ep_ticks_release >}} ticks</div>
+<div class="body" style="gap:24px;margin-top:10px">
+<div class="col">
+<div class="cause small"><b class="k">1</b><div><b>A garra.</b> O primeiro trecho de cada contexto vem da exploração, com a garra abrindo e fechando. A soma guardou cada troca, de {{< fato mac01.troca_garra >}} ticks: {{< fato mac01.garra_ticks >}} dos ticks nas seeds 1 e 3.</div></div>
+<div class="cause small"><b class="k">2</b><div><b>O crédito por execução.</b> O macro soma o progresso da execução inteira; o primitivo, de um passo ({{< fato mac01.credito_macro >}} contra {{< fato mac01.credito_primitivo >}}). O primeiro macro ganha sempre: na cópia s1, um que não cabe no episódio rodou {{< fato mac01.travou_eps >}} episódios seguidos.</div></div>
+</div>
+<div class="col" style="flex:.9">
+<div class="disc" style="margin-top:10px"><b>Para discutir</b><ul class="small"><li><b>A · a garra na soma:</b> tratá-la como uma junta, pelo estado líquido, cortando só onde "segurando" muda?</li><li><b>B · a escala do crédito:</b> crédito por tick, desconto pela duração (depois do WP4) ou um limite de tempo para o macro?</li></ul></div>
+</div>
+</div>
+
+::: notes
+**Qual das duas resolver primeiro?** A garra explica o reach lento nas seeds 1 e 3; o crédito explica a trava da cópia s1 e por que um macro ruim não sai. Crédito por tick é barato; o desconto pela duração (SMDP) precisa de bootstrapping, que ficou para depois do WP4 (Fila 7). → entrada 42, Decisões.
+:::

@@ -118,6 +118,7 @@ def main():
     facts.add_manual('cre01.paga_sucesso', '+0,20', spec + ', Parte 1, tabela')
     facts.add_manual('cre01.carregam_s1_s5', '30–50', 'code_notes entrada 40, "Carregar não basta"')
     facts.add_manual('cre01.fase2_comeca', '6–14%', 'code_notes entrada 40, "A Fase 2 esquece"')
+    facts.add_manual('cre01.fase2_queda', '0 em 100 episódios', 'code_notes entrada 40, "Em 30 segundos"')
     facts.write(os.path.join(HERE, 'fatos.json'), 'python3 slides/mudancas/2026-10-27-cre-01/fatos.py')
     for key, fact in facts.facts.items():
         print('%-30s %s' % (key, fact['texto']))

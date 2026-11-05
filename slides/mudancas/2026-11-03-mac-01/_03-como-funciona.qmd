@@ -1,0 +1,23 @@
+## Ao cumprir uma etapa, os passos que levaram até ali viram um macro {.sol fonte="ilustrativa · exemplo real: macro_reach_8 da soma, seed 1 (entrada 42) · commits 2ca7c90, 33fa330"}
+
+::: eb
+Como funciona · cópia e soma
+:::
+
+<div class="row"><h3>O trecho que cumpriu o reach (passos de 1°, com a garra abrindo e fechando no meio)</h3>
+<div style="display:flex;gap:5px;flex-wrap:wrap;margin:10px 0 6px">
+<span class="chipj">j0 −</span><span class="chipj">j1 −</span><span class="chipj">j0 −</span><span class="chipg">garra</span><span class="chipj">j2 −</span><span class="chipj">j3 +</span><span class="chipj">j2 −</span><span class="chipg">garra</span><span class="chipj">j0 −</span><span class="chipj">j2 −</span><span class="chipj">j3 +</span><span class="chipj">j1 −</span><span class="chipj">j0 +</span><span class="chipj">j2 −</span><span class="tiny" style="align-self:center">… dezenas de passos</span>
+</div></div>
+<div class="body" style="gap:20px;flex:none">
+<div class="row" style="flex:1"><h3>Cópia</h3>
+<div class="small" style="margin:8px 0">todos os passos, na mesma ordem</div>
+<div style="display:flex;gap:4px;flex-wrap:wrap"><span class="chipj">j0 −</span><span class="chipj">j1 −</span><span class="chipj">j0 −</span><span class="chipg">garra</span><span class="chipj">j2 −</span><span class="chipj">j3 +</span><span class="chipj">j2 −</span><span class="chipg">garra</span><span class="tiny" style="align-self:center">…</span></div></div>
+<div class="row after" style="flex:1"><h3>Soma</h3>
+<div class="small" style="margin:8px 0">entre dois eventos da garra, um passo só com o giro líquido</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chipj" style="background:#2a78d6;color:#fff">{{< fato mac01.exemplo_giro >}}</span><span class="chipg">garra</span><span class="tiny" style="align-self:center">…</span></div></div>
+</div>
+<div class="small muted" style="margin-top:14px">O macro só pode ser escolhido no <b>contexto</b> onde o trecho começou: é de malha aberta, e o mesmo giro saindo de outra pose leva a outro lugar. Escolhido, ele roda até o fim (a regra do TROCA).</div>
+
+::: notes
+**O que acontece se o mesmo contexto gerar outro trecho?** Se o novo for mais curto, o macro antigo é aposentado e o novo entra no lugar; senão, só conta uma repetição. → spec MAC-01, decisão D4.
+:::

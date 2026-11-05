@@ -1,0 +1,26 @@
+## A soma não passou: o reach por macro ficou mais lento, não mais rápido {.res fonte="entrada 42 · macro_report.py --window 400 499 --seeds 1 2 3 · commit 33fa330"}
+
+::: eb
+Resultado · exploratória, {{< fato mac01.n_seeds >}} seeds, fora do protocolo
+:::
+
+<div class="body" style="gap:30px">
+<div class="col" style="flex:1.25">
+<table>
+<tr><th style="width:50%">previsto (antes de rodar)</th><th>aconteceu</th><th></th></tr>
+<tr><td>soma: macro de reach antes do ep. {{< fato mac01.prev_ep >}}</td><td>eps. {{< fato mac01.reach_eps >}}</td><td class="ok">✓</td></tr>
+<tr><td>soma: depois disso, reach em {{< fato mac01.prev_ticks_soma >}} ticks</td><td>{{< fato mac01.reach_soma_seeds >}}</td><td class="no">✗</td></tr>
+<tr><td>cópia: reach em {{< fato mac01.prev_ticks_copia >}} ticks</td><td>{{< fato mac01.reach_copia_seeds >}} (a {{< fato mac01.copia_sem_reach >}} travou)</td><td class="no">✗</td></tr>
+<tr><td>a parte do tempo dentro de macros cresce</td><td>{{< fato mac01.ticks_em_macro >}} dos ticks</td><td class="ok">✓</td></tr>
+<tr><td>macros de grasp falham mais que os de reach</td><td>os de grasp cumprem {{< fato mac01.grasp_cumpre >}}</td><td class="no">✗</td></tr>
+</table>
+</div>
+<div class="col">
+<div class="kv" style="flex-direction:column;align-items:flex-start;gap:4px"><div class="what">seeds em que a soma passou</div><div class="to no">{{< fato mac01.passam >}} de {{< fato mac01.n_seeds >}}</div></div>
+<div class="legend"><b>Passa</b> se, nas {{< fato mac01.n_seeds >}} seeds, nos episódios {{< fato mac01.janela >}}: cria e usa um macro de reach; o reach é mais rápido que o da cópia e o do agente base ({{< fato mac01.reach_c4 >}} ticks); grasps ≥ {{< fato mac01.limite_grasps >}}, transportes ≥ {{< fato mac01.limite_transp >}} e colisões ≤ {{< fato mac01.limite_colisoes >}} a cada 100 episódios (o pior seed do agente base). Fixado em 03/11, antes de rodar. Com {{< fato mac01.n_episodios >}} episódios não dá para medir a M2.</div>
+</div>
+</div>
+
+::: notes
+**Se não passou, por que mostrar?** Porque errou de um jeito que ensina: as duas causas estão no log (próximos slides). E o critério foi fixado antes de rodar, então "não passa" é um resultado, não uma escolha. → entrada 42.
+:::

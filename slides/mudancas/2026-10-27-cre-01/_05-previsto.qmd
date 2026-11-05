@@ -1,0 +1,23 @@
+## Menos quedas não virou sucesso: agora o robô leva o cubo até o pad e não solta {.res fonte="entrada 40 · bench.py compare b590ea9 × 2ac8e29 · carry_report"}
+
+::: eb
+Resultado · previsto antes de rodar × aconteceu
+:::
+
+<div class="body" style="gap:30px">
+<div class="col" style="flex:1.1">
+<table>
+<tr><th style="width:52%">previsto</th><th>aconteceu</th><th></th></tr>
+<tr><td>quedas longe do pad: {{< fato cre01.prev_quedas >}}</td><td>{{< fato cre01.quedas_cre >}}</td><td class="ok">✓</td></tr>
+<tr><td>chegadas ao pad por 100 ep.: {{< fato cre01.prev_transp >}}</td><td>{{< fato cre01.transp_cre >}}</td><td class="ok">✓</td></tr>
+<tr><td>M2: {{< fato cre01.prev_m2 >}}</td><td>{{< fato cre01.m2_cre >}}</td><td class="no">✗</td></tr>
+</table>
+<div class="legend"><b>M2</b> = taxa de sucesso nos <b>últimos {{< fato cre01.janela_m2 >}} episódios da Fase 2</b> (a Fase 2 são os {{< fato cre01.fase2 >}} episódios depois do 1º acerto), média dos {{< fato cre01.n_seeds >}} seeds; seed sem 1º acerto conta 0 <!-- número digitado: a definição da M2 (tools/bench.py) -->. Mede se o agente <i>repete</i> o que achou. <b>p = {{< fato cre01.p_m2 >}}</b>: com {{< fato cre01.n_seeds >}} seeds, a diferença pode ser acaso.</div>
+</div>
+<div class="col"><video src="../mudancas/2026-10-27-cre-01/media/cre01_s1.mp4" controls preload="metadata"></video>
+<figcaption>CRE-01, seed 1, {{< fato cre01.video_ep >}}: chega ao pad no passo {{< fato cre01.video_passo_pad >}} e segura o cubo até o fim · {{< fato cre01.video_regra >}} · {{< fato cre01.video_vel >}}</figcaption></div>
+</div>
+
+::: notes
+**Por que ele não solta?** Ainda não sei. Os seeds 1 e 5 levam o cubo {{< fato cre01.carregam_s1_s5 >}} vezes a cada 100 episódios e nunca soltam no pad. Hipótese a conferir: a spec dá {{< fato cre01.custo_soltar_pad >}} para soltar perto do pad; se isso vale também para abrir a garra sobre o pad, o agente pode estar aprendendo a não soltar nem lá. → entrada 40; spec CRE-01, Parte 1.
+:::
