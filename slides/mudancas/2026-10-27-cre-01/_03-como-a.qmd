@@ -11,6 +11,7 @@ Como funciona · opção A
 <div class="nd" style="left:66.6%"></div><div class="nl" style="left:66.6%">levar ao pad</div>
 <div class="nd" style="left:100%"></div><div class="nl" style="left:100%">soltar no pad</div>
 <div class="cb"></div></div>
+<span class="fragment marca passo-leva" data-fragment-index="1"></span><span class="fragment marca passo-larga" data-fragment-index="2"></span>
 <div class="readout fragment" data-fragment-index="2"><span class="ev">larga o cubo →</span><span class="cr">a conta recomeça na etapa nova: <span class="big">0</span> · nada a aprender</span></div></div> <!-- número digitado: valor da animação ilustrativa -->
 <div class="row after"><h3>Depois</h3>
 <div class="tr"><div class="line"></div>
@@ -19,8 +20,8 @@ Como funciona · opção A
 <div class="nd" style="left:66.6%"></div><div class="nl" style="left:66.6%">levar ao pad</div>
 <div class="nd" style="left:100%"></div><div class="nl" style="left:100%">soltar no pad</div>
 <div class="cb"></div></div>
-<div class="readout fragment" data-fragment-index="2"><span class="ev">larga o cubo →</span><span class="cr">perde uma etapa inteira: <span class="big no">−1 etapa</span> · aprende a não largar</span></div></div> <!-- número digitado: valor da animação ilustrativa -->
-<span class="fragment marca passo-leva" data-fragment-index="1"></span><span class="fragment marca passo-larga" data-fragment-index="2"></span>
+<span class="fragment marca passo-leva" data-fragment-index="3"></span><span class="fragment marca passo-larga" data-fragment-index="4"></span>
+<div class="readout fragment" data-fragment-index="4"><span class="ev">larga o cubo →</span><span class="cr">perde uma etapa inteira: <span class="big no">−1 etapa</span> · aprende a não largar</span></div></div> <!-- número digitado: valor da animação ilustrativa -->
 <div class="small muted">O agente aprende pela <b>variação do progresso</b> (o impulso de tarefa, "Task"). Antes, a conta só via a distância até o alvo da etapa atual.</div>
 
 ::: notes

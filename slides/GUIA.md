@@ -49,7 +49,8 @@ que é necessário. Os tempos da tabela são de referência, não um teto.
 5. **Vídeo é exemplo, número é prova.** Ao lado do vídeo, o número agregado; na legenda, a **regra de
    escolha** do episódio (`episode_pick.py` a escreve).
 6. **Ilustração não é dado:** selo "ilustrativa" (no rodapé ou no desenho). **Animação anda por
-   clique** (fragmentos), nunca em laço: quem apresenta para em cada estado para mostrar a diferença.
+   clique** (fragmentos), nunca em laço, e **o antes inteiro vem antes do depois**: quem apresenta
+   mostra como era, para, e então mostra como fica.
    **Resultado se entende sozinho:** cada série nomeada no próprio slide (ex.: "macro-cópia: repete
    cada passo"), o critério de "passou" escrito antes do placar, o previsto desenhado junto do
    observado, e o positivo ao lado do negativo.
@@ -120,8 +121,8 @@ mudancas/<data>-<id>/
 | tira de quadros (`.strip`, legenda `[1]{.n}texto`) | `mudancas/2026-10-27-cre-01/_01-problema.qmd` |
 | causas (`.cause` com `<b class="k">1</b>`) | o mesmo |
 | cartões de alternativa (`.alts`, `.alt.pick`, `.alt.fragment.riscar` com `.why`, `.plan.fragment`) | `mudancas/2026-10-27-cre-01/_02-alternativas.qmd` |
-| trilho de etapas, **por clique** (`.row`, `.tr`; fragmentos vazios `.marca .passo-leva` / `.passo-larga` movem o cubo, o `.readout` aparece no 2º clique e fica parado) | `mudancas/2026-10-27-cre-01/_03-como-a.qmd` |
-| grade de situações, **por clique** (`.gwrap`, `.g`, `.q`; `.marca .passo-q` pinta o "?", `.say` é fragmento) | `mudancas/2026-10-27-cre-01/_04-como-b.qmd` |
+| trilho de etapas, **por clique, uma linha de cada vez** (`.row`, `.tr`; dentro de cada linha, fragmentos vazios `.marca .passo-leva` / `.passo-larga` movem o cubo dela, e o `.readout` aparece com o largar: antes nos cliques 1–2, depois nos 3–4) | `mudancas/2026-10-27-cre-01/_03-como-a.qmd` |
+| grade de situações, **por clique, um lado de cada vez** (`.gwrap`, `.g`, `.q`; um `.marca .passo-q` dentro de cada lado pinta o "?" dele, junto do `.say`: antes no clique 1, depois no 2) | `mudancas/2026-10-27-cre-01/_04-como-b.qmd` |
 | tabela previsto × aconteceu + legenda da métrica (`table`, `.legend`) | `mudancas/2026-10-27-cre-01/_05-previsto.qmd` |
 | barras de comparação (`.chart`, `.bars`, alturas por fato) | `mudancas/2026-10-27-cre-01/_06-comparacao.qmd` |
 | passos como chips (`.chipj`, `.chipg`) | `mudancas/2026-11-03-mac-01/_03-como-funciona.qmd` |

@@ -96,11 +96,12 @@ $presentation-heading-margin-bottom: 0;
   .tr .nl { position: absolute; top: 56px; transform: translateX(-50%); font-size: 17px; color: var(--ink2); white-space: nowrap; }
   .tr .cb { position: absolute; top: 15px; width: 36px; height: 36px; background: var(--cube); border-radius: 6px; transform: translateX(-50%);
             left: 0%; transition: left 1.4s ease-in-out; box-shadow: 0 2px 4px rgba(0,0,0,.25); }
-  /* the trail moves by clicks, so the presenter can stop on each state: empty fragments mark the
-     steps (.passo-leva: carry to the pad; .passo-larga: let go), and the cube follows them */
+  /* the trail moves by clicks, row by row (before, then after), so the presenter can stop on each
+     state: empty fragments inside a row mark its steps (.passo-leva: carry to the pad; .passo-larga:
+     let go), and that row's cube follows them */
   .marca { display: none; }
-  section:has(.passo-leva.visible) .tr .cb { left: 66.6%; }
-  section:has(.passo-larga.visible) .tr .cb { left: 33.3%; }
+  .row:has(.passo-leva.visible) .tr .cb { left: 66.6%; }
+  .row:has(.passo-larga.visible) .tr .cb { left: 33.3%; }
   .readout { display: flex; align-items: center; gap: 16px; font-size: 21px; min-height: 40px; }
   .readout .ev { color: var(--cube); font-weight: 700; }
   .readout .big { font-size: 30px; font-weight: 800; }
@@ -112,10 +113,10 @@ $presentation-heading-margin-bottom: 0;
   .g { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
   .g div { aspect-ratio: 1.6; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 22px; color: #fff; }
   .g .q { background: #fff; border: 3px dashed #9a9994; color: var(--ink2); }
-  /* the grid also moves by a click (.passo-q): the new situation "?" gets its colour */
+  /* the grid also moves by clicks, one per side (.passo-q inside each): the "?" gets its colour */
   .g .q { transition: background .6s, border-color .6s; }
-  section:has(.passo-q.visible) .before .g .q { background: #f5c242; border-color: #f5c242; }
-  section:has(.passo-q.visible) .after .g .q { background: #d8735c; border-color: #d8735c; }
+  .gwrap.before:has(.passo-q.visible) .g .q { background: #f5c242; border-color: #f5c242; }
+  .gwrap.after:has(.passo-q.visible) .g .q { background: #d8735c; border-color: #d8735c; }
   .say { margin-top: 12px; font-size: 20px; }
   /* table + charts */
   table { border-collapse: collapse; width: 100%; }

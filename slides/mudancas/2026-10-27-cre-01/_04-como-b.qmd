@@ -8,12 +8,13 @@ Como funciona · opção B
 <div class="body" style="gap:28px">
 <div class="gwrap before"><h3>Antes</h3>
 <div class="g"><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#c95a45"></div><div style="background:#e08b74"></div><div style="background:#d8735c"></div><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#e08b74"></div><div class="q">?</div><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#e08b74"></div><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#e08b74"></div><div style="background:#d8735c"></div><div style="background:#c95a45"></div><div style="background:#d8735c"></div></div>
+<span class="fragment marca passo-q" data-fragment-index="1"></span>
 <div class="say fragment" data-fragment-index="1">situação nova: abrir a garra ainda não foi testado ali → <b>teste obrigatório</b> → o cubo cai</div></div>
 <div class="gwrap after"><h3>Depois</h3>
 <div class="g"><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#c95a45"></div><div style="background:#e08b74"></div><div style="background:#d8735c"></div><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#e08b74"></div><div class="q">?</div><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#e08b74"></div><div style="background:#c95a45"></div><div style="background:#d8735c"></div><div style="background:#e08b74"></div><div style="background:#d8735c"></div><div style="background:#c95a45"></div><div style="background:#d8735c"></div></div>
-<div class="say fragment" data-fragment-index="1">situação nova: parte da <b>média das vizinhas</b> → abrir a garra já parece ruim → mantém o cubo</div></div>
+<span class="fragment marca passo-q" data-fragment-index="2"></span>
+<div class="say fragment" data-fragment-index="2">situação nova: parte da <b>média das vizinhas</b> → abrir a garra já parece ruim → mantém o cubo</div></div>
 </div>
-<span class="fragment marca passo-q" data-fragment-index="1"></span>
 <div class="small muted" style="margin-top:12px"><b>Emenda (28/10):</b> só empresta quando o cubo está na mão. Sem isso, a média contaminava as situações sem cubo.</div>
 
 ::: notes
