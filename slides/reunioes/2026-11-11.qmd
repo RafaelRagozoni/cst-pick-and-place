@@ -96,21 +96,13 @@ Onde terminamos · abre a próxima reunião
 **O que o MAC-01 tem a ver com a Fase 2 esquecer?** Na seed 1 da soma, depois do 1º acerto, o agente acertou {{< fato mac01.depois_soma_s1 >}}: quando os macros encadeiam, ele repete. É uma seed só, e com o cubo fixo; se a emenda (A, B) fizer isso valer nas {{< fato mac01.n_seeds >}} seeds, é o primeiro sinal contra o esquecimento. → entrada 42.
 :::
 
-## Apêndice {.ctx fonte="slides fora dos 10 minutos: mecanismos, a comparação completa e o vídeo longo"}
+## Apêndice {.ctx fonte="slides fora dos 10 minutos, na ordem das seções: contexto, alternativas, como funciona, resultado"}
 
 ::: eb
 Apêndice
 :::
 
-<div class="small muted">Como funcionam as opções A e B do CRE-01 · a comparação das três baterias · as alternativas do MAC-01 · o vídeo inteiro da base aprendendo</div>
-
-{{< include /mudancas/2026-10-27-cre-01/_03-como-a.qmd >}}
-
-{{< include /mudancas/2026-10-27-cre-01/_04-como-b.qmd >}}
-
-{{< include /mudancas/2026-10-27-cre-01/_06-comparacao.qmd >}}
-
-{{< include /mudancas/2026-11-03-mac-01/_02-alternativas.qmd >}}
+<div class="small muted">O vídeo inteiro da base aprendendo · as alternativas do MAC-01 · como funcionam as opções A e B do CRE-01 · a comparação das três baterias do CRE-01</div>
 
 ## A base aprendendo, o vídeo inteiro {.ctx fonte="runs/2026-10-21_0842_C4_ucb-0.1_lp_P1/s1 · replay do log"}
 
@@ -120,3 +112,11 @@ Apêndice · ponto de partida
 
 <div style="width:62%;margin:0 auto"><video src="../reunioes/2026-11-11/media/aprendizado_longo.mp4" controls preload="metadata"></video>
 <figcaption>{{< fato reuniao.video_seed >}}: {{< fato reuniao.video_longo_regra >}} ({{< fato reuniao.video_longo_eps >}}) e, fora da amostra, o 1º sucesso · ao lado, as taxas do bloco de 100 episódios inteiro · {{< fato reuniao.video_longo_vel >}}</figcaption></div>
+
+{{< include /mudancas/2026-11-03-mac-01/_02-alternativas.qmd >}}
+
+{{< include /mudancas/2026-10-27-cre-01/_03-como-a.qmd >}}
+
+{{< include /mudancas/2026-10-27-cre-01/_04-como-b.qmd >}}
+
+{{< include /mudancas/2026-10-27-cre-01/_06-comparacao.qmd >}}

@@ -88,7 +88,9 @@ mudancas/<data>-<id>/
    `--every` e `--stride` com `--estimate` até dar 30–45 s) e as chaves `reuniao.*`.
 3. **Proposta de corte** em `reunioes/<data>-corte.md`: `slide | tempo | entra / apêndice | motivo`,
    parte principal ≤ 10 min 30 s; critérios: o que mais mudou o rumo, o que tem resultado, o que
-   gera pergunta. O apêndice vem depois de um slide `## Apêndice`.
+   gera pergunta. O apêndice vem depois de um slide `## Apêndice` e segue **a mesma ordem das
+   seções do deck**, misturando mudanças se preciso: contexto (vídeos longos do ponto de partida) →
+   problema → alternativas → como funciona → resultado. Nunca uma alternativa depois de um resultado.
 4. `python3 tools/slides.py build slides/reunioes/<data>.qmd`, depois `capture`.
 5. `python3 tools/slides.py send slides/reunioes/<data>.qmd [--max-video-mb N]` — zip **sem as
    notas** em `Rafael/Meetings/<data> para enviar.zip` no vault.
