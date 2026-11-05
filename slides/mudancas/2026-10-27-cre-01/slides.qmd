@@ -1,0 +1,11 @@
+{{< include /mudancas/2026-10-27-cre-01/_01-problema.qmd >}}
+
+{{< include /mudancas/2026-10-27-cre-01/_02-alternativas.qmd >}}
+
+{{< include /mudancas/2026-10-27-cre-01/_03-como-a.qmd >}}
+
+{{< include /mudancas/2026-10-27-cre-01/_04-como-b.qmd >}}
+
+{{< include /mudancas/2026-10-27-cre-01/_05-previsto.qmd >}}
+
+{{< include /mudancas/2026-10-27-cre-01/_06-comparacao.qmd >}}

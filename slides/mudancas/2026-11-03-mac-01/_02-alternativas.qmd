@@ -1,0 +1,38 @@
+## Duas regras de macro e três caminhos de fora {.sol fonte="spec MAC-01, Prior art / alternativas consideradas"}
+
+::: eb
+Alternativas · cada clique mostra o que ficou de fora e por quê
+:::
+
+<div class="alts">
+<div class="alt pick"><span class="badge">cópia</span>
+<svg class="ic" viewBox="0 0 200 64"><g fill="#2a78d6"><rect x="8" y="22" width="16" height="20" rx="3"/><rect x="28" y="22" width="16" height="20" rx="3"/><rect x="48" y="22" width="16" height="20" rx="3"/><rect x="68" y="22" width="16" height="20" rx="3"/><rect x="88" y="22" width="16" height="20" rx="3"/><rect x="108" y="22" width="16" height="20" rx="3"/><rect x="128" y="22" width="16" height="20" rx="3"/><rect x="148" y="22" width="16" height="20" rx="3"/><rect x="168" y="22" width="16" height="20" rx="3"/></g></svg>
+<h3>Copiar os passos</h3><div class="tech">macro de malha aberta (McGovern et al. 1997)</div>
+<div class="hw">O macro repete cada passo do trecho, na mesma ordem. É o controle.</div>
+<div class="tgt">mede o ganho de só juntar</div></div>
+<div class="alt pick"><span class="badge">soma</span>
+<svg class="ic" viewBox="0 0 200 64"><rect x="20" y="16" width="110" height="32" rx="6" fill="#2a78d6"/><text x="75" y="37" font-size="14" text-anchor="middle" fill="#fff" font-weight="700">giro líquido</text><rect x="140" y="16" width="40" height="32" rx="6" fill="#fff" stroke="#2a78d6" stroke-width="3"/><text x="160" y="37" font-size="13" text-anchor="middle" fill="#2a78d6" font-weight="700">garra</text></svg>
+<h3>Somar o giro de cada junta</h3><div class="tech">ponto a ponto síncrono (PTP industrial)</div>
+<div class="hw">Entre dois eventos da garra, um passo só, com o giro líquido de cada junta; todas terminam juntas.</div>
+<div class="tgt">a aposta: o mesmo lugar, mais rápido</div></div>
+<div class="alt fragment riscar" data-fragment-index="1">
+<svg class="ic" viewBox="0 0 200 64"><g fill="#fff" stroke="#9a9994" stroke-width="3"><circle cx="30" cy="32" r="16"/><circle cx="100" cy="32" r="16"/><circle cx="170" cy="32" r="16"/></g><g stroke="#9a9994" stroke-width="3"><line x1="150" y1="32" x2="120" y2="32"/><line x1="80" y1="32" x2="50" y2="32"/></g><text x="170" y="37" font-size="12" text-anchor="middle" fill="#4d5260" font-weight="700">goal</text></svg>
+<h3>Skill chaining</h3><div class="tech">Konidaris &amp; Barto 2009 · a mais forte</div>
+<div class="hw">Aprende skills de malha fechada, de trás para frente a partir do goal, cada uma com onde pode começar.</div>
+<div class="why"><b>Por que não agora:</b> uma política e um classificador por skill; foge do "hábito = lista de comandos". Perdemos: o macro só serve no seu contexto.</div></div>
+<div class="alt fragment riscar" data-fragment-index="2">
+<svg class="ic" viewBox="0 0 200 64"><path d="M14 50 C 60 4, 120 4, 180 40" fill="none" stroke="#9a9994" stroke-width="4"/><circle cx="180" cy="40" r="8" fill="#9a9994"/></svg>
+<h3>Movimento aprendido de uma demonstração</h3><div class="tech">DMP (Ijspeert et al. 2013)</div>
+<div class="hw">Ajusta um movimento à trajetória que deu certo e o leva a outro alvo.</div>
+<div class="why"><b>Por que não:</b> precisa da posição do cubo como parâmetro, que o hábito não tem; com o cubo fixo, não acrescenta.</div></div>
+<div class="alt fragment riscar" data-fragment-index="3">
+<svg class="ic" viewBox="0 0 200 64"><g fill="#fff" stroke="#9a9994" stroke-width="3"><rect x="10" y="10" width="50" height="18" rx="4"/><rect x="74" y="10" width="50" height="18" rx="4"/><rect x="138" y="10" width="50" height="18" rx="4"/></g><rect x="74" y="38" width="50" height="18" rx="4" fill="#9a9994"/><g stroke="#9a9994" stroke-width="2"><line x1="35" y1="28" x2="90" y2="38"/><line x1="99" y1="28" x2="99" y2="38"/><line x1="163" y1="28" x2="108" y2="38"/></g></svg>
+<h3>Achar o que se repete entre muitas soluções</h3><div class="tech">action grammars, DreamCoder</div>
+<div class="hw">Procura subsequências que aparecem em muitas trajetórias e as vira em ações novas.</div>
+<div class="why"><b>Por que não:</b> nossas sequências quase nunca se repetem iguais (a ordem das juntas varia), e a soma já junta tudo.</div></div>
+</div>
+<div class="plan fragment" data-fragment-index="4"><b>Plano:</b> cópia e soma, {{< fato mac01.n_seeds >}} seeds × {{< fato mac01.n_episodios >}} episódios, contra o agente base, com o critério fixado antes</div>
+
+::: notes
+**Por que não skill chaining, se é a mais forte?** Ela funciona saindo de outras poses, mas exige uma política aprendida por skill e um classificador de onde cada uma pode começar. É bem maior e foge do esquema de hábito do cap. 4. Ganhamos poder testar em dias; perdemos que o macro só serve no contexto onde nasceu, e o cubo fixo faz a malha aberta parecer melhor do que seria (R5). → spec MAC-01, Prior art.
+:::

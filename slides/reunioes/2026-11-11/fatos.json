@@ -1,0 +1,142 @@
+{
+ "gerado_por": "python3 slides/reunioes/2026-11-11/fatos.py",
+ "fatos": {
+  "reuniao.n_seeds": {
+   "valor": 9,
+   "texto": "9",
+   "fonte": "bench/ledger.csv, 2026-10-21_0842_C4_ucb-0.1_lp_P1 (commit b590ea9), coluna n",
+   "manual": false
+  },
+  "reuniao.m1_mediana": {
+   "valor": 727.0,
+   "texto": "727",
+   "fonte": "bench/ledger.csv, 2026-10-21_0842_C4_ucb-0.1_lp_P1 (commit b590ea9), coluna m1_median",
+   "manual": false
+  },
+  "reuniao.m1_faixa": {
+   "valor": [
+    550.0,
+    968.0
+   ],
+   "texto": "550 e 968",
+   "fonte": "bench/ledger.csv, 2026-10-21_0842_C4_ucb-0.1_lp_P1 (commit b590ea9), colunas m1_low e m1_high",
+   "manual": false
+  },
+  "reuniao.fase2_acertos": {
+   "valor": [
+    44,
+    4500
+   ],
+   "texto": "44 em 4.500",
+   "fonte": "scorecard de runs/2026-10-21_0842_C4_ucb-0.1_lp_P1: sucessos e episódios da Fase 2, somados nos seeds",
+   "manual": false
+  },
+  "reuniao.fase2_pct": {
+   "valor": 0.009777777777777778,
+   "texto": "1%",
+   "fonte": "scorecard de runs/2026-10-21_0842_C4_ucb-0.1_lp_P1: sucessos da Fase 2 / episódios da Fase 2",
+   "manual": false
+  },
+  "reuniao.video_seed": {
+   "valor": "s1",
+   "texto": "seed 1",
+   "fonte": "runs/2026-10-21_0842_C4_ucb-0.1_lp_P1: o seed com mais acertos depois do 1º",
+   "manual": false
+  },
+  "reuniao.video_seed_acertos": {
+   "valor": [
+    12,
+    500
+   ],
+   "texto": "12 de 500",
+   "fonte": "runs/2026-10-21_0842_C4_ucb-0.1_lp_P1/s1, sucessos depois do 1º (slide_facts.success_after_first)",
+   "manual": false
+  },
+  "reuniao.pega_inicio": {
+   "valor": 17.0,
+   "texto": "17%",
+   "fonte": "runs/2026-10-21_0842_C4_ucb-0.1_lp_P1/s1: blocos completos de 100 episódios (video.learning_blocks), as taxas do vídeo longo, o 1º bloco",
+   "manual": false
+  },
+  "reuniao.pega_max": {
+   "valor": 48.0,
+   "texto": "48%",
+   "fonte": "runs/2026-10-21_0842_C4_ucb-0.1_lp_P1/s1: blocos completos de 100 episódios (video.learning_blocks), as taxas do vídeo longo, o maior",
+   "manual": false
+  },
+  "reuniao.sucesso_max": {
+   "valor": 5.0,
+   "texto": "5%",
+   "fonte": "runs/2026-10-21_0842_C4_ucb-0.1_lp_P1/s1: blocos completos de 100 episódios (video.learning_blocks), as taxas do vídeo longo, o maior",
+   "manual": false
+  },
+  "reuniao.video_curto_regra": {
+   "valor": "um episódio a cada 300",
+   "texto": "um episódio a cada 300",
+   "fonte": "media/aprendizado_curto.mp4.json (midia.sh)",
+   "manual": false
+  },
+  "reuniao.video_curto_eps": {
+   "valor": [
+    0,
+    300,
+    600,
+    900,
+    1200
+   ],
+   "texto": "0, 300, …, 1200",
+   "fonte": "media/aprendizado_curto.mp4.json (midia.sh)",
+   "manual": false
+  },
+  "reuniao.video_curto_vel": {
+   "valor": 8,
+   "texto": "8×",
+   "fonte": "media/aprendizado_curto.mp4.json (midia.sh), stride",
+   "manual": false
+  },
+  "reuniao.video_curto_seg": {
+   "valor": 39.0,
+   "texto": "39 s",
+   "fonte": "media/aprendizado_curto.mp4.json (midia.sh)",
+   "manual": false
+  },
+  "reuniao.video_longo_regra": {
+   "valor": "um episódio a cada 100",
+   "texto": "um episódio a cada 100",
+   "fonte": "media/aprendizado_longo.mp4.json (midia.sh)",
+   "manual": false
+  },
+  "reuniao.video_longo_eps": {
+   "valor": [
+    0,
+    100,
+    200,
+    300,
+    400,
+    500,
+    600,
+    700,
+    800,
+    900,
+    1000,
+    1100,
+    1200
+   ],
+   "texto": "0, 100, …, 1200",
+   "fonte": "media/aprendizado_longo.mp4.json (midia.sh)",
+   "manual": false
+  },
+  "reuniao.video_longo_vel": {
+   "valor": 4,
+   "texto": "4×",
+   "fonte": "media/aprendizado_longo.mp4.json (midia.sh), stride",
+   "manual": false
+  },
+  "reuniao.video_longo_seg": {
+   "valor": 122.65,
+   "texto": "123 s",
+   "fonte": "media/aprendizado_longo.mp4.json (midia.sh)",
+   "manual": false
+  }
+ }
+}

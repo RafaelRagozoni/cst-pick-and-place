@@ -1,0 +1,38 @@
+## Cinco caminhos, do mais simples ao mais elaborado {.sol fonte="spec CRE-01, seção de alternativas"}
+
+::: eb
+Alternativas · cada clique mostra o que ficou de fora e por quê
+:::
+
+<div class="alts">
+<div class="alt pick"><span class="badge">A</span>
+<svg class="ic" viewBox="0 0 200 64"><line x1="12" y1="34" x2="188" y2="34" stroke="#d6d5cf" stroke-width="5"/><circle cx="20" cy="34" r="9" fill="#2a78d6"/><circle cx="73" cy="34" r="9" fill="#2a78d6"/><circle cx="127" cy="34" r="9" fill="#fff" stroke="#b9b8b2" stroke-width="3"/><circle cx="180" cy="34" r="9" fill="#fff" stroke="#b9b8b2" stroke-width="3"/><text x="73" y="16" font-size="15" text-anchor="middle" fill="#2a78d6" font-weight="700">etapa 2</text></svg>
+<h3>Contar a etapa no progresso</h3><div class="tech">forma do DrS (ICLR 2024)</div>
+<div class="hw">O progresso passa a incluir em que etapa o robô está, não só a distância até o próximo alvo.</div>
+<div class="tgt">ataca a causa 1</div></div>
+<div class="alt pick"><span class="badge">B</span>
+<svg class="ic" viewBox="0 0 200 64"><g fill="#d8735c"><rect x="40" y="6" width="34" height="22" rx="4"/><rect x="80" y="6" width="34" height="22" rx="4"/><rect x="120" y="6" width="34" height="22" rx="4"/><rect x="40" y="34" width="34" height="22" rx="4"/><rect x="120" y="34" width="34" height="22" rx="4"/></g><rect x="80" y="34" width="34" height="22" rx="4" fill="#fff" stroke="#2a78d6" stroke-width="3" stroke-dasharray="5 3"/><text x="97" y="51" font-size="16" text-anchor="middle" fill="#2a78d6" font-weight="800">?</text></svg>
+<h3>Aprender com situações parecidas</h3><div class="tech">empréstimo entre vizinhos (shrinkage)</div>
+<div class="hw">Numa situação nova, cada hábito começa com a média do que deu nas vizinhas, em vez de ser testado à força.</div>
+<div class="tgt">ataca a causa 2</div></div>
+<div class="alt fragment riscar" data-fragment-index="1">
+<svg class="ic" viewBox="0 0 200 64"><g stroke="#9a9994" stroke-width="3" fill="#fff"><circle cx="24" cy="32" r="14"/><circle cx="76" cy="32" r="14"/><circle cx="128" cy="32" r="14"/><circle cx="178" cy="32" r="14"/></g><g stroke="#9a9994" stroke-width="3"><line x1="38" y1="32" x2="62" y2="32"/><line x1="90" y1="32" x2="114" y2="32"/><line x1="142" y1="32" x2="164" y2="32"/></g><g font-size="13" text-anchor="middle" fill="#4d5260" font-weight="700"><text x="24" y="37">v1</text><text x="76" y="37">v2</text><text x="128" y="37">v3</text><text x="178" y="37">v4</text></g></svg>
+<h3>Mapa de etapas com valor calculado</h3><div class="tech">reward machines (JAIR 2022)</div>
+<div class="hw">Descreve a tarefa como um mapa de etapas e calcula quanto vale estar em cada uma.</div>
+<div class="why"><b>Por que não:</b> nosso mapa é uma fila de 4 etapas, e o cálculo devolve os mesmos degraus da A, só que com mais código.</div></div> <!-- número digitado: a tarefa tem 4 etapas por definição (goals.py) -->
+<div class="alt fragment riscar" data-fragment-index="2">
+<svg class="ic" viewBox="0 0 200 64"><g fill="#d8735c"><rect x="40" y="6" width="34" height="22" rx="4"/><rect x="120" y="6" width="34" height="22" rx="4"/><rect x="40" y="34" width="34" height="22" rx="4"/></g><rect x="80" y="34" width="34" height="22" rx="4" fill="#fff" stroke="#9a9994" stroke-width="3" stroke-dasharray="5 3"/><path d="M150 50 q18 -30 36 0" stroke="#4d5260" stroke-width="3" fill="none"/><text x="168" y="26" font-size="13" text-anchor="middle" fill="#4d5260" font-weight="700">peso?</text></svg>
+<h3>Aprender quanto confiar nas vizinhas</h3><div class="tech">bandit bayesiano hierárquico (AISTATS 2022)</div>
+<div class="hw">Como a B, mas o quanto confiar nas vizinhas é aprendido dos dados, não fixado à mão.</div>
+<div class="why"><b>Por que não agora:</b> exige trocar a regra de escolha inteira. Ficando com a B, perdemos isto: o peso de confiança é fixo.</div></div>
+<div class="alt fragment riscar" data-fragment-index="3">
+<svg class="ic" viewBox="0 0 200 64"><g fill="#fff" stroke="#9a9994" stroke-width="3"><rect x="10" y="16" width="38" height="32" rx="6"/><rect x="58" y="16" width="38" height="32" rx="6"/><rect x="106" y="16" width="38" height="32" rx="6"/><rect x="154" y="16" width="38" height="32" rx="6"/></g><g font-size="12" text-anchor="middle" fill="#4d5260" font-weight="700"><text x="29" y="37">agente</text><text x="77" y="37">agente</text><text x="125" y="37">agente</text><text x="173" y="37">agente</text></g></svg>
+<h3>Um controlador por etapa</h3><div class="tech">skill chaining · SAC-X</div>
+<div class="hw">Cada etapa vira um mini-agente com a sua própria recompensa.</div>
+<div class="why"><b>Por que não agora:</b> muda a arquitetura do agente. É assunto da geração de hábitos (WP3).</div></div>
+</div>
+<div class="plan fragment" data-fragment-index="4"><b>Plano:</b> A → medir → B → medir, sempre nas mesmas {{< fato cre01.n_seeds >}} seeds e contra a base</div>
+
+::: notes
+**Por que não o bandit hierárquico, se é o mais forte?** Ele precisa de um modelo estatístico por nível e de sortear da distribuição; a base escolhe por UCB. Ganhamos simplicidade; perdemos o peso escolhido pelos dados. → spec CRE-01, "Alternativas mais fortes e o saldo".
+:::

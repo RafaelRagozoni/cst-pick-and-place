@@ -1,0 +1,27 @@
+## Quase toda vez que pega o cubo, o robô o larga no caminho {.prob fonte="entrada 34 (medição com carry_report) · imagens: base, seed 1, {{< fato cre01.tira_ep >}}"}
+
+::: eb
+Problema
+:::
+
+::: strip
+![[1]{.n}chega ao cubo](/mudancas/2026-10-27-cre-01/media/base_1.jpg){fig-alt="o braço chega ao cubo"}
+
+![[2]{.n}pega](/mudancas/2026-10-27-cre-01/media/base_2.jpg){fig-alt="a garra fecha no cubo"}
+
+![[3]{.n}começa a levar](/mudancas/2026-10-27-cre-01/media/base_3.jpg){fig-alt="o braço começa a levar o cubo"}
+
+![[4]{.n}abre a garra no caminho](/mudancas/2026-10-27-cre-01/media/base_4.jpg){fig-alt="o cubo caído longe do pad"}
+:::
+
+<div class="body" style="margin-top:14px;gap:20px">
+<div class="col" style="flex:.55;justify-content:center"><div class="to" style="font-size:54px;font-weight:800;color:var(--prob)">{{< fato cre01.quedas_base >}}</div><div class="small muted">das {{< fato cre01.pegas_base >}} pegas terminam assim (base, {{< fato cre01.n_seeds >}} seeds)</div></div>
+<div class="col">
+<div class="cause"><b class="k">1</b><div><b>Largar não custa nada.</b> Quando o cubo cai, a conta de progresso do agente recomeça do zero na nova etapa, e a queda não aparece como perda.</div></div>
+<div class="cause"><b class="k">2</b><div><b>A regra de escolha obriga a testar tudo.</b> Em cada situação nova, todo hábito ainda não testado ali precisa ser tentado, inclusive abrir a garra.</div></div>
+</div>
+</div>
+
+::: notes
+**Como sabe que são essas duas causas?** Contagem: {{< fato cre01.quedas_por_abrir_base >}} das quedas vêm de abrir a garra, e {{< fato cre01.sorteio_forcado >}} das aberturas com o cubo na mão foram o teste obrigatório da regra de escolha (UCB). → entrada 34.
+:::

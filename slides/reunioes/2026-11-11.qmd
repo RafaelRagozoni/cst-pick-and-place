@@ -1,0 +1,98 @@
+---
+pagetitle: "Reunião de 11/11 · CRE-01 e MAC-01"
+fatos:
+  - ../mudancas/2026-10-27-cre-01/fatos.json
+  - ../mudancas/2026-11-03-mac-01/fatos.json
+  - 2026-11-11/fatos.json
+---
+
+## As quedas do cubo acabaram e os macros encadearam numa seed, mas a taxa de sucesso não subiu {.ctx fonte="entradas 40 e 42 · ledger 0071a5f · macro_report, episódios 400–499"}
+
+::: eb
+Reunião de 11/11 · semanas de 21/10 a 03/11
+:::
+
+<div class="body">
+<div class="col" style="flex:1.2">
+<div class="kv"><div class="what">CRE-01 · pegas que terminam com o cubo largado longe do pad</div><div class="from">{{< fato cre01.quedas_base >}} →</div><div class="to ok">{{< fato cre01.quedas_cre >}}</div><div class="mark ok">✓</div></div>
+<div class="kv"><div class="what">CRE-01 · taxa de sucesso no fim da Fase 2 <span class="tiny">(M2, a métrica principal: últimos {{< fato cre01.janela_m2 >}} episódios da Fase 2, média dos {{< fato cre01.n_seeds >}} seeds)</span></div><div class="from">{{< fato cre01.m2_base >}} →</div><div class="to no">{{< fato cre01.m2_cre >}}</div><div class="mark no">✗</div></div>
+<div class="kv"><div class="what">MAC-01 · ticks até o cubo, agente base → macro-soma <span class="tiny">(exploratória, {{< fato mac01.n_seeds >}} seeds)</span></div><div class="from">{{< fato mac01.reach_c4 >}} →</div><div class="to no">{{< fato mac01.reach_soma >}}</div><div class="mark no">✗</div></div>
+<div class="hint">✓ ✗ = previsto antes de rodar · M2: p = {{< fato cre01.p_m2 >}}, pode ser acaso</div>
+</div>
+<div class="col manchete-fotos" style="gap:8px">
+
+![CRE-01: leva o cubo até o pad… e não solta (seed 1, {{< fato cre01.video_ep >}})](/mudancas/2026-10-27-cre-01/media/cre_1.jpg){fig-alt="a garra segura o cubo acima do pad"}
+
+![MAC-01 soma: quatro macros em cadeia e o cubo no pad (seed 1, {{< fato mac01.video_ep >}})](/mudancas/2026-11-03-mac-01/media/soma_4.jpg){fig-alt="o cubo solto sobre o pad"}
+
+</div>
+</div>
+<div class="roads"><span class="done">WP1 · simulador ✓</span><span class="done">WP2 · agente base ✓</span><span class="now">WP3 · geração de hábitos ← aqui</span><span>WP4</span><span>escrita</span></div>
+
+::: notes
+**Por que fechar o CRE-01 se a métrica principal não subiu?** O alvo dele eram as quedas, e elas sumiram. A taxa de sucesso depende de soltar no pad e de manter o que deu certo, e o CRE-01 não mexe nisso. → entrada 40.
+
+**{{< fato cre01.m2_cre >}} contra {{< fato cre01.m2_base >}} não é pior?** Com {{< fato cre01.n_seeds >}} seeds, p = {{< fato cre01.p_m2 >}}: não dá para afirmar nem que piorou nem que melhorou.
+
+**O MAC-01 não passou, por que está na manchete?** Porque numa seed os macros encadearam e o agente repetiu a tarefa ({{< fato mac01.depois_soma_s1 >}} depois do 1º acerto), o oposto da Fase 2 do agente base. É uma pista, não um resultado. → entrada 42.
+:::
+
+## Partimos de uma base que acha a tarefa, mas não aprende a repeti-la {.ctx fonte="entrada 29 · bench/ledger.csv (b590ea9) · runs/2026-10-21_0842_C4_ucb-0.1_lp_P1"}
+
+::: eb
+Ponto de partida
+:::
+
+<div class="body">
+<div class="col" style="flex:1.5"><video src="../reunioes/2026-11-11/media/aprendizado_curto.mp4" controls preload="metadata"></video>
+<figcaption>a base aprendendo, {{< fato reuniao.video_seed >}}: {{< fato reuniao.video_curto_regra >}} ({{< fato reuniao.video_curto_eps >}}) e, fora da amostra, o 1º sucesso · replay do log · {{< fato reuniao.video_curto_vel >}} · a versão inteira, de {{< fato reuniao.video_longo_seg >}}, vem no próximo slide</figcaption></div>
+<div class="col" style="gap:14px">
+<div class="kv" style="flex-direction:column;align-items:flex-start;gap:2px"><div class="what">episódios até o 1º acerto</div><div class="to">{{< fato reuniao.m1_mediana >}}</div><div class="tiny">mediana dos {{< fato reuniao.n_seeds >}} seeds · entre {{< fato reuniao.m1_faixa >}}</div></div>
+<div class="kv" style="flex-direction:column;align-items:flex-start;gap:2px"><div class="what">acertos depois do 1º</div><div class="to">{{< fato reuniao.fase2_pct >}}</div><div class="tiny">{{< fato reuniao.fase2_acertos >}} episódios da Fase 2 · não sobe com o tempo</div></div>
+</div>
+</div>
+
+::: notes
+**Esse vídeo é o melhor seed?** É o seed com mais acertos depois do 1º ({{< fato reuniao.video_seed_acertos >}}), escolhido por isso; os episódios do vídeo seguem a regra fixa ({{< fato reuniao.video_curto_regra >}}), não são os melhores. Os números à direita são dos {{< fato reuniao.n_seeds >}} seeds.
+:::
+
+## Bloco a bloco, a base passa de {{< fato reuniao.pega_inicio >}} a {{< fato reuniao.pega_max >}} de pegas, mas o sucesso não passa de {{< fato reuniao.sucesso_max >}} {.ctx fonte="runs/2026-10-21_0842_C4_ucb-0.1_lp_P1/s1 · replay do log"}
+
+::: eb
+Ponto de partida · o vídeo inteiro
+:::
+
+<div style="width:62%;margin:0 auto"><video src="../reunioes/2026-11-11/media/aprendizado_longo.mp4" controls preload="metadata"></video>
+<figcaption>{{< fato reuniao.video_seed >}}: {{< fato reuniao.video_longo_regra >}} ({{< fato reuniao.video_longo_eps >}}) e, fora da amostra, o 1º sucesso · ao lado, as taxas do bloco de 100 episódios inteiro · {{< fato reuniao.video_longo_vel >}}</figcaption></div>
+
+::: notes
+**Por que mostrar o vídeo inteiro?** O curto mostra que a base acha a tarefa; este mostra o que muda ao longo do tempo: ela pega o cubo cada vez mais, mas não completa a tarefa. É o problema que o CRE-01 e o MAC-01 atacam. → entrada 29.
+:::
+
+{{< include /mudancas/2026-10-27-cre-01/slides.qmd >}}
+
+{{< include /mudancas/2026-11-03-mac-01/slides.qmd >}}
+
+## Terminamos com o cubo chegando ao pad e macros que encadeiam numa seed; falta o sucesso subir em todas {.ctx .proximos fonte="entradas 40 a 42 · PR #2"}
+
+::: eb
+Onde terminamos · abre a próxima reunião
+:::
+
+<div class="body">
+<div class="col" style="flex:1.1">
+
+![fim do {{< fato cre01.video_ep >}} do CRE-01: o cubo ainda na garra, no alto, sobre o pad](/mudancas/2026-10-27-cre-01/media/cre_2.jpg){fig-alt="o cubo na garra, acima do pad"}
+
+</div>
+<div class="col">
+<b>Próximo passo</b>
+<div class="small" style="margin-top:4px">MAC-01 emendado: decidir A (a garra na soma) e B (a escala do crédito), repetir as exploratórias e, se a soma passar, rodar o P1.</div>
+<div class="disc"><b>Para discutir</b><ul class="small"><li>A e B do MAC-01 (slide anterior).</li><li>Por que o sucesso cai a zero depois do 1º acerto no CRE-01 emendado? Investigar isso agora ou depois do WP4?</li></ul></div>
+<div class="hint" style="margin-top:12px"><b>Também nestas semanas</b> (entradas 31, 35, 38 e 39): golden master antes do CRE-01 · um CoppeliaSim por vez na partida · quiz do código e cards dos conceitos · e estas ferramentas de slides (APR-01)</div>
+</div>
+</div>
+
+::: notes
+**O que o MAC-01 tem a ver com a Fase 2 esquecer?** Na seed 1 da soma, depois do 1º acerto, o agente acertou {{< fato mac01.depois_soma_s1 >}}: quando os macros encadeiam, ele repete. É uma seed só, e com o cubo fixo; se a emenda (A, B) fizer isso valer nas {{< fato mac01.n_seeds >}} seeds, é o primeiro sinal contra o esquecimento. → entrada 42.
+:::

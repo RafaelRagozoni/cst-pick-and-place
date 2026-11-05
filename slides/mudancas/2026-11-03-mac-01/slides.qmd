@@ -1,0 +1,11 @@
+{{< include /mudancas/2026-11-03-mac-01/_01-problema.qmd >}}
+
+{{< include /mudancas/2026-11-03-mac-01/_02-alternativas.qmd >}}
+
+{{< include /mudancas/2026-11-03-mac-01/_03-como-funciona.qmd >}}
+
+{{< include /mudancas/2026-11-03-mac-01/_04-previsto.qmd >}}
+
+{{< include /mudancas/2026-11-03-mac-01/_05-seed1.qmd >}}
+
+{{< include /mudancas/2026-11-03-mac-01/_06-causas.qmd >}}

@@ -142,20 +142,29 @@ def row(label, b):
         100.0 * b.transports / b.episodes)
 
 
+def pool_by_block(blocks_per_seed):
+    """The **all** rows: block k of every seed that reached it, summed. Nothing is dropped, so the
+    last row may cover fewer seeds, or fewer episodes, than the others."""
+    together = []
+    for blocks in blocks_per_seed:
+        for i, b in enumerate(blocks):
+            if i == len(together):
+                together.append(Block())
+            together[i].add(b)
+    return together
+
+
 def report(paths, block):
     logs = runlog.find_logs(paths)
     lines = ['# Carry report', '', 'Vault spec CRE-01; columns in tools/carry_report.py. Blocks of '
              '%d episodes.' % block, '', HEADER]
-    together = []
+    blocks_per_seed = []
     for label, log, _ in logs:
-        for i, b in enumerate(scan(log, block)):
-            lines.append(row(label, b))
-            if i == len(together):
-                together.append(Block())
-            together[i].add(b)
+        blocks = scan(log, block)
+        blocks_per_seed.append(blocks)
+        lines.extend(row(label, b) for b in blocks)
     if len(logs) > 1:
-        for i, b in enumerate(together):
-            lines.append(row('**all**', b))
+        lines.extend(row('**all**', b) for b in pool_by_block(blocks_per_seed))
     return '\n'.join(lines) + '\n'
 
 

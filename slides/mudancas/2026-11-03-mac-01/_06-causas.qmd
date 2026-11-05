@@ -1,0 +1,29 @@
+## O macro já faz o agente repetir o sucesso; falta corrigir a garra e o crédito {.ctx .proximos fonte="entrada 42 · spec MAC-01, riscos R2 e R9 · runs/2026-11-03_1242_C0_ucb-0.1_lp_macro-sum/s1"}
+
+::: eb
+Próximos · o que funcionou e as duas causas no log
+:::
+
+<div class="body" style="gap:24px">
+<div class="col" style="flex:1.45;gap:0">
+<div class="cause good small" style="margin-top:0"><b class="k">✓</b><div><b>Já funciona:</b> com os quatro macros em cadeia, o agente repete o que achou: na seed 1, {{< fato mac01.depois_soma_s1 >}} depois do 1º acerto; o agente base, nas mesmas seeds, não passa de {{< fato mac01.taxa_depois_c4_s2 >}}.</div></div>
+<div class="cause small"><b class="k">1</b><div><b>A garra.</b> O primeiro trecho de cada contexto vem da exploração, com a garra abrindo e fechando, e a soma guardou cada troca. No episódio do vídeo, chegar ao cubo leva {{< fato mac01.ep_ticks_reach >}} ticks, e a garra se mexe em {{< fato mac01.ep_garra_ticks >}} deles ({{< fato mac01.ep_garra_trocas >}} trocas):
+<div class="tl">
+<div class="seg" style="width:{{< fato mac01.ep_largura_reach >}};background:#eb6834;justify-content:flex-end;padding-right:10px">chegar ao cubo: {{< fato mac01.ep_ticks_reach >}} ticks</div>
+<div class="seg" style="width:{{< fato mac01.ep_largura_grasp >}};background:#2a78d6"></div>
+<div class="seg" style="width:{{< fato mac01.ep_largura_transport >}};background:#1e7b34"></div>
+<div class="seg" style="width:{{< fato mac01.ep_largura_release >}};background:#6250d6"></div>
+<div class="mk" style="left:{{< fato mac01.ep_marca_base >}}"><span>o agente base já chegou aqui (tick {{< fato mac01.reach_c4_s1 >}})</span></div>
+</div>
+<div class="tl-pe"><span>início do episódio</span><span>depois: <b style="color:#2a78d6">pegar {{< fato mac01.ep_ticks_grasp >}}</b> · <b style="color:#1e7b34">levar {{< fato mac01.ep_ticks_transport >}}</b> · <b style="color:#6250d6">soltar {{< fato mac01.ep_ticks_release >}}</b> · fim no tick {{< fato mac01.ep_total >}}</span></div>
+</div></div>
+<div class="cause small"><b class="k">2</b><div><b>O crédito por execução.</b> O macro soma o progresso da execução inteira; o primitivo, de um passo ({{< fato mac01.credito_macro >}} contra {{< fato mac01.credito_primitivo >}}). O primeiro macro ganha sempre: na macro-cópia, seed 1, um que não cabe no episódio rodou {{< fato mac01.travou_eps >}} episódios seguidos.</div></div>
+</div>
+<div class="col">
+<div class="disc" style="margin-top:0"><b>Para discutir</b><ul class="small"><li><b>A · a garra na soma:</b> tratá-la como uma junta, pelo estado líquido, cortando só onde "segurando" muda?</li><li><b>B · a escala do crédito:</b> crédito por tick, desconto pela duração (depois do WP4) ou um limite de tempo para o macro?</li></ul></div>
+</div>
+</div>
+
+::: notes
+**Qual das duas resolver primeiro?** A garra explica a chegada lenta nas seeds 1 e 3; o crédito explica a trava da cópia s1 e por que um macro ruim não sai. Crédito por tick é barato; o desconto pela duração (SMDP) precisa de bootstrapping, que ficou para depois do WP4 (Fila 7). → entrada 42, Decisões.
+:::
