@@ -3,6 +3,7 @@ package agent;
 import agent.codelets.BehaviorGeneratorCodelet;
 import agent.codelets.CreditAssignmentCodelet;
 import agent.codelets.GoalGeneratorCodelet;
+import agent.codelets.HabitLearnerCodelet;
 import agent.codelets.PlanTrackerCodelet;
 import agent.codelets.SensoryCodelet;
 import agent.credit.CreditSnapshot;
@@ -798,5 +799,281 @@ class CodeletsTest {
         assertFalse(Goal.of(goalMO).met(o, Drives.of(driveMO), cfg.curiosityGoalMet, cfg.safetyGoalMet));
         curiosity(4, 0.2, 1.0, 0.6);                     // novelty found
         assertTrue(Goal.of(goalMO).met(o, Drives.of(driveMO), cfg.curiosityGoalMet, cfg.safetyGoalMet));
+    }
+
+    // --- HabitLearner: macros (vault spec MAC-01) ---------------------------------------------
+    private static final double DEGREE = Math.toRadians(1.0);
+
+    private static Command turn(int joint, double degrees) {
+        return new Command(Command.MOVE, joint, degrees * DEGREE, 0.4, 20.0, 0);
+    }
+
+    /** A learner with three one-degree primitives, building macros by {@code rule}. */
+    private HabitLearnerCodelet learner(String rule, MemoryContainer pool) {
+        Config config = new Config().withMacroRule(rule);
+        HabitLearnerCodelet learner = new HabitLearnerCodelet(config, mind);
+        learner.addInput(creditMO);
+        learner.addInput(executionMO);
+        learner.addOutput(pool);
+        learner.seed(List.of(
+                HabitIdeas.create("move_j0_pos", HabitIdeas.PRIMITIVE, List.of(), List.of(turn(0, 1))),
+                HabitIdeas.create("move_j1_pos", HabitIdeas.PRIMITIVE, List.of(), List.of(turn(1, 1))),
+                HabitIdeas.create("move_j0_neg", HabitIdeas.PRIMITIVE, List.of(), List.of(turn(0, -1)))));
+        return learner;
+    }
+
+    private long cycle;
+
+    /** One executed primitive step, under the goal and state bin given, in {@code episode}. */
+    private void ran(String habit, Command command, String context, int episode) {
+        buffer().addStep(habit, cycle, 0, 1, List.of(command), cycle, cycle + 1, "done",
+                context.substring(0, context.indexOf('|')), 1, context, episode);
+        cycle++;
+    }
+
+    private static List<HabitLearnerCodelet.MacroEvent> after(HabitLearnerCodelet learner) {
+        learner.notifyCodelet();
+        return learner.macroEvents();
+    }
+
+    @Test
+    void aTaskGoalMetBuildsAMacroForTheContextItsStretchStartedIn() {
+        MemoryContainer pool = mind.createMemoryContainer("HabitPoolMC");
+        HabitLearnerCodelet learner = learner("sum", pool);
+        ran("move_j0_pos", turn(0, 1), "explore|binA", 0);          // Curiosity's detour stays in
+        buffer().addGoalMark(Goal.EXPLORE, 1, Goal.CURIOSITY, cycle, 0);
+        ran("move_j1_pos", turn(1, 1), "reach|binB", 0);
+        ran("move_j0_pos", turn(0, 1), "reach|binC", 0);
+        buffer().addGoalMark("reach", 2, Goal.TASK, cycle, 0);
+        List<HabitLearnerCodelet.MacroEvent> events = after(learner);
+
+        assertEquals(1, events.size(), events.toString());
+        HabitLearnerCodelet.MacroEvent created = events.get(0);
+        assertEquals(HabitLearnerCodelet.CREATED, created.kind());
+        assertEquals("reach|binA", created.initiation(), "the goal met, the first step's bin");
+        assertEquals(3, created.stretchSteps());
+        Idea macro = learner.habits().get(created.macro());
+        assertEquals("macro_reach_1", HabitIdeas.id(macro));
+        assertEquals(HabitIdeas.MACRO, HabitIdeas.origin(macro));
+        assertEquals(List.of("move_j0_pos", "move_j1_pos"), HabitIdeas.parents(macro));
+        assertEquals(List.of(turn(0, 2), turn(1, 1).withSpeed(0.2)), HabitIdeas.commands(macro),
+                "one parallel step, joint 1 at half speed to end with joint 0");
+        assertEquals(CreditSnapshot.EMPTY, HabitIdeas.credit(macro), "empty credit (D5)");
+        assertEquals(4, pool.getAllMemories().size());
+        assertTrue(after(learner).isEmpty(), "each entry is read once");
+    }
+
+    @Test
+    void curiositysAndSafetysGoalsBuildNothingAndAStretchEndsWithItsEpisode() {
+        MemoryContainer pool = mind.createMemoryContainer("HabitPoolMC");
+        HabitLearnerCodelet learner = learner("copy", pool);
+        ran("move_j0_pos", turn(0, 1), "explore|binA", 0);
+        ran("move_j1_pos", turn(1, 1), "explore|binA", 0);
+        buffer().addGoalMark(Goal.EXPLORE, 1, Goal.CURIOSITY, cycle, 0);
+        buffer().addGoalMark(Goal.RECOVER, 2, Goal.SAFETY, cycle, 0);
+        assertTrue(after(learner).isEmpty());
+        ran("move_j1_pos", turn(1, 1), "reach|binZ", 1);           // a new episode starts over
+        buffer().addGoalMark("reach", 3, Goal.TASK, cycle, 1);
+        List<HabitLearnerCodelet.MacroEvent> events = after(learner);
+        assertEquals(HabitLearnerCodelet.EXISTS, events.get(0).kind(),
+                "one step, the primitive itself: nothing new");
+        assertEquals("move_j1_pos", events.get(0).macro());
+        assertEquals("reach|binZ", events.get(0).initiation());
+    }
+
+    @Test
+    void aShorterStretchFromTheSameContextRetiresTheMacroAndALongerOneIsARepetition() {
+        MemoryContainer pool = mind.createMemoryContainer("HabitPoolMC");
+        HabitLearnerCodelet learner = learner("copy", pool);
+        for (int i = 0; i < 3; i++) {
+            ran("move_j0_pos", turn(0, 1), "reach|home", 0);
+        }
+        buffer().addGoalMark("reach", 1, Goal.TASK, cycle, 0);
+        assertEquals(HabitLearnerCodelet.CREATED, after(learner).get(0).kind());
+
+        for (int i = 0; i < 3; i++) {                               // as long: a repetition
+            ran("move_j1_pos", turn(1, 1), "reach|home", 1);
+        }
+        buffer().addGoalMark("reach", 2, Goal.TASK, cycle, 1);
+        HabitLearnerCodelet.MacroEvent repeated = after(learner).get(0);
+        assertEquals(HabitLearnerCodelet.REPEATED, repeated.kind());
+        assertEquals("macro_reach_1", repeated.macro());
+
+        ran("move_j1_pos", turn(1, 1), "reach|home", 2);           // shorter: replaces it
+        ran("move_j1_pos", turn(1, 1), "reach|home", 2);
+        buffer().addGoalMark("reach", 3, Goal.TASK, cycle, 2);
+        HabitLearnerCodelet.MacroEvent replaced = after(learner).get(0);
+        assertEquals(HabitLearnerCodelet.REPLACED, replaced.kind());
+        assertEquals("macro_reach_2", replaced.macro());
+        assertEquals("macro_reach_1", replaced.retired());
+        assertTrue(HabitIdeas.isRetired(learner.habits().get("macro_reach_1")));
+        assertFalse(HabitIdeas.isRetired(learner.habits().get("macro_reach_2")));
+        assertEquals(2, HabitIdeas.stretchSteps(learner.habits().get("macro_reach_2")));
+        assertEquals(5, pool.getAllMemories().size(), "the retired one stays in the pool");
+    }
+
+    @Test
+    void aMacroThatRanAloneAndMetItsGoalDoesNotRetireItself() {
+        MemoryContainer pool = mind.createMemoryContainer("HabitPoolMC");
+        HabitLearnerCodelet learner = learner("sum", pool);
+        ran("move_j0_pos", turn(0, 1), "reach|home", 0);
+        ran("move_j1_pos", turn(1, 1), "reach|home", 0);
+        buffer().addGoalMark("reach", 1, Goal.TASK, cycle, 0);
+        Idea macro = learner.habits().get(after(learner).get(0).macro());
+
+        buffer().addStep(HabitIdeas.id(macro), cycle, 0, 1, HabitIdeas.commands(macro), cycle,
+                cycle + 20, "done", "reach", 2, "reach|home", 1);
+        cycle += 20;
+        buffer().addGoalMark("reach", 2, Goal.TASK, cycle, 1);
+        HabitLearnerCodelet.MacroEvent event = after(learner).get(0);
+        assertEquals(HabitLearnerCodelet.EXISTS, event.kind(), "one step is shorter, but the same");
+        assertFalse(HabitIdeas.isRetired(macro));
+    }
+
+    @Test
+    void aStepCutShortEntersAsFarAsItRan() {
+        MemoryContainer pool = mind.createMemoryContainer("HabitPoolMC");
+        HabitLearnerCodelet learner = learner("sum", pool);
+        buffer().addStep("some_macro", cycle, 0, 1, List.of(turn(2, 30)), List.of(turn(2, 12)),
+                cycle, cycle + 10, PlanTrackerCodelet.PREEMPTED, "reach", 1, "reach|home", 0);
+        cycle += 10;
+        ran("move_j1_pos", turn(1, 1), "reach|x", 0);
+        buffer().addGoalMark("reach", 1, Goal.TASK, cycle, 0);
+        Idea macro = learner.habits().get(after(learner).get(0).macro());
+        assertEquals(12 * DEGREE, HabitIdeas.commands(macro).get(1).angle(), 1e-12,
+                "joint 2: the 12 degrees it turned, not the 30 commanded");
+    }
+
+    @Test
+    void aFullPoolRefusesANewContextButStillReplaces() {
+        MemoryContainer pool = mind.createMemoryContainer("HabitPoolMC");
+        Config config = new Config().withMacroRule("copy");
+        config.maxActiveMacros = 1;
+        HabitLearnerCodelet learner = new HabitLearnerCodelet(config, mind);
+        learner.addInput(creditMO);
+        learner.addInput(executionMO);
+        learner.addOutput(pool);
+        learner.seed(List.of(HabitIdeas.create("move_j0_pos", HabitIdeas.PRIMITIVE, List.of(),
+                List.of(turn(0, 1)))));
+        ran("move_j0_pos", turn(0, 1), "reach|a", 0);
+        ran("move_j0_pos", turn(0, 1), "reach|a", 0);
+        ran("move_j0_pos", turn(0, 1), "reach|a", 0);
+        buffer().addGoalMark("reach", 1, Goal.TASK, cycle, 0);
+        assertEquals(HabitLearnerCodelet.CREATED, after(learner).get(0).kind());
+        ran("move_j0_pos", turn(0, 1), "grasp|b", 0);
+        ran("move_j0_pos", turn(0, 1), "grasp|b", 0);
+        buffer().addGoalMark("grasp", 2, Goal.TASK, cycle, 0);
+        assertEquals(HabitLearnerCodelet.REFUSED, after(learner).get(0).kind());
+        ran("move_j0_pos", turn(0, 1), "reach|a", 1);
+        ran("move_j0_pos", turn(0, 1), "reach|a", 1);
+        buffer().addGoalMark("reach", 3, Goal.TASK, cycle, 1);
+        assertEquals(HabitLearnerCodelet.REPLACED, after(learner).get(0).kind());
+    }
+
+    @Test
+    void withoutAMacroRuleTheLearnerBuildsNothing() {
+        MemoryContainer pool = mind.createMemoryContainer("HabitPoolMC");
+        HabitLearnerCodelet learner = learner("none", pool);
+        ran("move_j0_pos", turn(0, 1), "reach|a", 0);
+        ran("move_j1_pos", turn(1, 1), "reach|a", 0);
+        buffer().addGoalMark("reach", 1, Goal.TASK, cycle, 0);
+        assertTrue(after(learner).isEmpty());
+        assertEquals(3, pool.getAllMemories().size());
+    }
+
+    @Test
+    void aLearnerRestoredFromItsStateHasItsMacrosAndGoesOnNumbering() {
+        MemoryContainer pool = mind.createMemoryContainer("HabitPoolMC");
+        HabitLearnerCodelet learner = learner("copy", pool);
+        for (int episode = 0; episode < 2; episode++) {
+            for (int i = 0; i < 3 - episode; i++) {
+                ran("move_j0_pos", turn(0, 1), "reach|home", episode);
+            }
+            buffer().addGoalMark("reach", episode + 1, Goal.TASK, cycle, episode);
+            learner.notifyCodelet();
+        }
+        com.google.gson.JsonObject state = learner.state();
+
+        MemoryContainer otherPool = mind.createMemoryContainer("HabitPoolMC");
+        HabitLearnerCodelet restored = learner("copy", otherPool);
+        restored.restore(state);
+        assertEquals(new ArrayList<>(learner.habits().keySet()), new ArrayList<>(restored.habits().keySet()));
+        assertTrue(HabitIdeas.isRetired(restored.habits().get("macro_reach_1")));
+        assertEquals(state, restored.state());
+        ran("move_j0_pos", turn(0, 1), "reach|elsewhere", 2);
+        ran("move_j1_pos", turn(1, 1), "reach|elsewhere", 2);
+        buffer().addGoalMark("reach", 3, Goal.TASK, cycle, 2);
+        HabitLearnerCodelet.MacroEvent event = after(restored).get(0);
+        assertEquals(HabitLearnerCodelet.CREATED, event.kind());
+        assertEquals("macro_reach_3", event.macro(), "the numbering goes on");
+    }
+
+    // --- Behavior Generator and macros (MAC-01 D1, D4, D14) ---------------------------------------
+    private Idea macroIn(MemoryContainer pool, String id, String initiation) {
+        Idea macro = HabitIdeas.createMacro(id, List.of(), List.of(turn(0, 5)), initiation, 10);
+        pool.add(mind.createMemoryObject(id, macro));
+        return macro;
+    }
+
+    @Test
+    void aMacroIsChosenOnlyInItsContextAndNeverOnceRetired() {
+        MemoryContainer pool = pool("p");
+        goal(1, Goal.TASK, "reach", 0);
+        drives(0, 0.5, 0.5, 0, 0, 0, false);
+        sensoryMO.setI(at(0, Traj.obs(0).q(), false));
+        trackerMO.setI(TrackerState.idle(0));
+        String here = CreditTable.context("reach", Characterization.key(Observation.of(sensoryMO)));
+        Idea macroHere = macroIn(pool, "m_here", here);
+        Idea macroElsewhere = macroIn(pool, "m_elsewhere", "reach|far");
+        CreditTable t = new CreditTable();
+        t.add("m_here", here, new double[]{0, 1.0, 0, 0}, 1.0, true);
+        t.add("m_elsewhere", here, new double[]{0, 5.0, 0, 0}, 1.0, true);   // would win here
+        t.closeExecutions();
+        HabitIdeas.setCredit(macroHere, t.snapshot("m_here"));
+        HabitIdeas.setCredit(macroElsewhere, t.snapshot("m_elsewhere"));
+
+        behavior(new Config(), pool, 1).notifyCodelet();
+        assertEquals("m_here", HabitIdeas.id(((Plan) planMO.getI()).habit()));
+        HabitIdeas.retire(macroHere);
+        behavior(new Config(), pool, 1).notifyCodelet();
+        assertEquals("p", HabitIdeas.id(((Plan) planMO.getI()).habit()), "retired: never again");
+    }
+
+    @Test
+    void aMacroInExecutionRunsOnUntilTheGoalChanges() {
+        MemoryContainer pool = pool("p");
+        goal(1, Goal.TASK, "reach", 0);
+        drives(0, 0.5, 0.5, 0, 0, 0, false);
+        sensoryMO.setI(at(0, Traj.obs(0).q(), false));
+        trackerMO.setI(TrackerState.idle(0));
+        String here = CreditTable.context("reach", Characterization.key(Observation.of(sensoryMO)));
+        Idea macro = macroIn(pool, "m", here);
+        BehaviorGeneratorCodelet b = behavior(new Config().withSelection("ucb"), pool, 1);
+        CreditTable t = new CreditTable();
+        t.add("p", here, new double[]{0, 0.1, 0, 0}, 1.0, true);
+        t.closeExecutions();
+        HabitIdeas.setCredit(habit(pool, "p"), t.snapshot("p"));
+        b.notifyCodelet();
+        Plan chosen = (Plan) planMO.getI();
+        assertEquals("m", HabitIdeas.id(chosen.habit()), "never run here: UCB tries it");
+
+        int later = 1;                                              // the expert arm, in another bin
+        while (Characterization.key(Traj.obs(later)).equals(Characterization.key(Traj.obs(0)))) {
+            later++;
+        }
+        sensoryMO.setI(Traj.obs(later).idea());
+        trackerMO.setI(new TrackerState(true, "m", chosen.serial(), 0, 1, List.of(), 1));
+        String there = CreditTable.context("reach", Characterization.key(Observation.of(sensoryMO)));
+        assertNotEquals(here, there, "the arm moved to another bin");
+        b.notifyCodelet();
+        assertEquals(chosen.serial(), ((Plan) planMO.getI()).serial(),
+                "outside its context, beside an untried habit, the macro runs on");
+
+        goal(2, Goal.CURIOSITY, Goal.EXPLORE, 0);                 // another drive takes the goal
+        b.notifyCodelet();
+        Plan next = (Plan) planMO.getI();
+        assertNotEquals(chosen.serial(), next.serial());
+        assertEquals("p", HabitIdeas.id(next.habit()));
+        assertFalse(HabitIdeas.isRetired(macro));
     }
 }

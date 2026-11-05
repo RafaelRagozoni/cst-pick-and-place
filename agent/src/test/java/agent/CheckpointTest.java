@@ -91,6 +91,57 @@ class CheckpointTest {
         assertEquals(Checkpoint.of(straight, end), Checkpoint.of(after, end), "same state at the end");
     }
 
+    /**
+     * The same with macros (vault spec MAC-01): the pause falls after the HabitLearner has built
+     * some, retired ones included, and the resumed run chooses and runs them. Over the cube, seed 7
+     * meets its first Task goal in episode 7 (MacroIntegrationTest).
+     */
+    @ParameterizedTest
+    @CsvSource({"sum", "copy"})
+    void aResumedRunWithMacrosIsTheRunThatNeverStopped(String rule, @TempDir Path dir) {
+        int seed = 7;
+        int pause = 20;
+        int episodes = 30;
+        java.util.function.Supplier<Config> config = () -> Config.forCondition("C0")
+                .withSelection("ucb:0.1").withCuriosity("lp").withMacroRule(rule);
+        FakeEnvironment straightEnv = FakeEnvironment.startingOverTheCube(300);
+        AgentMind straight = new AgentMind(config.get(), straightEnv, seed);
+        for (int e = 0; e < episodes; e++) {
+            straight.runEpisode(seed, e);
+        }
+        FakeEnvironment beforeEnv = FakeEnvironment.startingOverTheCube(300);
+        AgentMind before = new AgentMind(config.get(), beforeEnv, seed);
+        for (int e = 0; e < pause; e++) {
+            before.runEpisode(seed, e);
+        }
+        assertTrue(before.learner.habits().size() > 14, "macros were built before the pause");
+        Path file = dir.resolve("checkpoint.json.gz");
+        Checkpoint.write(Checkpoint.of(before, new Checkpoint.Progress(seed, pause, null)), file);
+
+        FakeEnvironment afterEnv = FakeEnvironment.startingOverTheCube(300);
+        AgentMind after = new AgentMind(config.get(), afterEnv, seed);
+        Checkpoint.Progress p = Checkpoint.restore(after, Checkpoint.read(file));
+        assertEquals(new java.util.ArrayList<>(before.learner.habits().keySet()),
+                new java.util.ArrayList<>(after.learner.habits().keySet()));
+        for (int e = p.nextEpisode(); e < episodes; e++) {
+            after.runEpisode(seed, e);
+        }
+        int cut = beforeEnv.records.size();
+        boolean aMacroRanAfterThePause = false;
+        for (int i = 0; i < afterEnv.records.size(); i++) {
+            assertEquals(straightEnv.annotations.get(cut + i), afterEnv.annotations.get(i),
+                    "decision " + i + " after the pause");
+            assertEquals(straightEnv.records.get(cut + i), afterEnv.records.get(i),
+                    "command " + i + " after the pause");
+            aMacroRanAfterThePause |= afterEnv.annotations.get(i).get("habit_id").getAsString()
+                    .startsWith("macro_");
+        }
+        assertTrue(aMacroRanAfterThePause, "the resumed run chose a macro");
+        assertEquals(straightEnv.records.size(), cut + afterEnv.records.size());
+        Checkpoint.Progress end = new Checkpoint.Progress(seed, episodes, null);
+        assertEquals(Checkpoint.of(straight, end), Checkpoint.of(after, end), "same state at the end");
+    }
+
     /** --describe: every Config field, the defaults too, and the bridge's handshake as it came. */
     @Test
     void describeHasEveryConfigFieldAndTheHandshake() {

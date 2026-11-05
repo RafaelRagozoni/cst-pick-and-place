@@ -1,6 +1,7 @@
 package agent.memory;
 
 import agent.habit.Command;
+import agent.sim.StepCompletion;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -9,7 +10,7 @@ import java.util.List;
 /**
  * The content of ExecutionBuffer (cap4 4.3.3): every executed habit step, and a mark at every goal
  * completion. Written only by the PlanTracker; Credit Assignment reads the steps, the HabitLearner
- * reads the stretch between goal marks to build macros (WP3).
+ * reads the stretch between Task goal marks to build macros (vault spec MAC-01).
  *
  * <p>Entries carry a sequence number so a reader can take what is new since it last looked. The
  * buffer is bounded; a reader that falls further behind than {@code capacity} entries loses the
@@ -26,10 +27,21 @@ public final class ExecutionBuffer {
      * whose observation ended it ({@code endCycle}). {@code outcome} is StepCompletion's (done,
      * stalled, timeout) or why it was cut short: preempted (another habit took over), closed (the
      * goal was met mid-step), interrupted (the episode ended).
+     *
+     * <p>{@code commands} are the step's records as commanded; {@code executedCommands} the same
+     * records with each MOVE's angle replaced by the angle its joint actually turned, which is what a
+     * step cut short did (vault spec MAC-01: a macro built from it repeats that, not the whole
+     * command). For a step that ended done they agree within StepCompletion.ANGLE_TOL.
      */
     public record Step(long seq, String habit, long instance, int stepIndex, int nSteps,
-                       List<Command> commands, long startCycle, long endCycle, String outcome,
-                       String goal, long goalId, String context, int episode) implements Entry {
+                       List<Command> commands, List<Command> executedCommands, long startCycle,
+                       long endCycle, String outcome, String goal, long goalId, String context,
+                       int episode) implements Entry {
+
+        /** Whether the step ran until StepCompletion ended it, rather than being cut short. */
+        public boolean ranToItsEnd() {
+            return StepCompletion.DONE.equals(outcome) || StepCompletion.STALLED.equals(outcome);
+        }
     }
 
     /** The goal {@code goal} (id {@code goalId}) was achieved on {@code cycle}. */
@@ -46,12 +58,21 @@ public final class ExecutionBuffer {
     }
 
     public Step addStep(String habit, long instance, int stepIndex, int nSteps, List<Command> commands,
-                        long startCycle, long endCycle, String outcome, String goal, long goalId,
-                        String context, int episode) {
+                        List<Command> executedCommands, long startCycle, long endCycle,
+                        String outcome, String goal, long goalId, String context, int episode) {
         Step s = new Step(nextSeq++, habit, instance, stepIndex, nSteps, List.copyOf(commands),
-                startCycle, endCycle, outcome, goal, goalId, context, episode);
+                List.copyOf(executedCommands), startCycle, endCycle, outcome, goal, goalId, context,
+                episode);
         push(s);
         return s;
+    }
+
+    /** A step that turned exactly what it commanded: what tests that build a buffer by hand need. */
+    public Step addStep(String habit, long instance, int stepIndex, int nSteps, List<Command> commands,
+                        long startCycle, long endCycle, String outcome, String goal, long goalId,
+                        String context, int episode) {
+        return addStep(habit, instance, stepIndex, nSteps, commands, commands, startCycle, endCycle,
+                outcome, goal, goalId, context, episode);
     }
 
     public GoalMark addGoalMark(String goal, long goalId, String source, long cycle, int episode) {

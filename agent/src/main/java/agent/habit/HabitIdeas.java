@@ -20,6 +20,13 @@ import java.util.TreeMap;
  *     parents   space-separated parent ids ("" for a primitive)
  *     commands  r000, r001, ...   one Command Idea each (see Command.toIdea)
  *     credit    value = CreditSnapshot, copied in by the HabitLearner (cap4 4.3.4)
+ *
+ *   and a macro (vault spec MAC-01) also has
+ *     initiation    the context (goal|state bin) its stretch started in: the only one it is
+ *                   chosen in
+ *     stretchSteps  how many executed steps the stretch it was built from had
+ *     retired       true once a shorter stretch from the same context replaced it: it stays in the
+ *                   pool with its credit, but is never chosen again
  * </pre>
  *
  * Command children are zero-padded because Idea.add keeps its children sorted by name: "r10" would
@@ -60,6 +67,45 @@ public final class HabitIdeas {
             out.add(create(p.get("id").getAsString(), PRIMITIVE, List.of(), recs));
         }
         return out;
+    }
+
+    /** A macro (vault spec MAC-01): built from {@code stretchSteps} steps that started in {@code initiation}. */
+    public static Idea createMacro(String id, List<String> parents, List<Command> commands,
+                                   String initiation, int stretchSteps) {
+        Idea macro = create(id, MACRO, parents, commands);
+        macro.add(new Idea("initiation", initiation, 1));
+        macro.add(new Idea("stretchSteps", stretchSteps, 1));
+        macro.add(new Idea("retired", false, 1));
+        return macro;
+    }
+
+    public static boolean isMacro(Idea habit) {
+        return MACRO.equals(origin(habit));
+    }
+
+    /** The context a macro may be chosen in; null for any other habit, which may be chosen anywhere. */
+    public static String initiation(Idea habit) {
+        Idea initiation = habit.get("initiation");
+        return initiation == null ? null : (String) initiation.getValue();
+    }
+
+    public static int stretchSteps(Idea habit) {
+        return ((Number) habit.get("stretchSteps").getValue()).intValue();
+    }
+
+    public static boolean isRetired(Idea habit) {
+        Idea retired = habit.get("retired");
+        return retired != null && (Boolean) retired.getValue();
+    }
+
+    /** Only the HabitLearner calls this: it is the single writer of the HabitPool. */
+    public static void retire(Idea macro) {
+        macro.get("retired").setValue(true);
+    }
+
+    public static List<String> parents(Idea habit) {
+        String parents = (String) habit.get("parents").getValue();
+        return parents.isEmpty() ? List.of() : List.of(parents.split(" "));
     }
 
     public static String id(Idea habit) {

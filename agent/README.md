@@ -7,7 +7,7 @@ moved here (`agent.sim`, `agent.bench`). CST comes from the `../cst` submodule, 
 ## Run
 
 ```
-./gradlew test                       # 67 tests, offline; ParityTest runs python3
+./gradlew test                       # 108 tests, offline; ParityTest runs python3
 # live: CoppeliaSim open (or headless: `sleep infinity | ./coppeliaSim.sh -h`), then
 mkdir -p runs && python3 ../coppelia_environment/bridge.py --log runs/C0_ucb_s1.jsonl.gz --condition C0
 ./gradlew liveRun -PagentArgs="--condition C0 --seed 1 --emax 50 --eref 20 --selection ucb"
@@ -25,7 +25,11 @@ that runs out"); every logged step records `curiosity` and the `yield`. `--task-
 test one change without the other. Every step of a plan logs its `choice`: the chosen habit's
 executions in its context, the `priorCount` its score borrowed (n0 with the cube in the hand, else
 0), and how many habits were `untried` there (no execution, nothing borrowed; UCB starts one of
-those at random while there are any), out of the `candidates`. A misspelt flag is refused, not ignored.
+those at random while there are any), out of the `candidates`. `--macro` (none, copy, sum; default
+none; vault spec MAC-01) is how a Task goal's steps become a macro ("Macros", below); C2, C4 and C6
+refuse any but none. A step on which the HabitLearner did something about a macro logs it as
+`macro` (created, replaced, repeated, exists, empty, refused), and `repertoire` counts retired
+macros apart. `../tools/macro_report.py` reads both. A misspelt flag is refused, not ignored.
 
 Long runs go through `../tools/run_live.py`, which also checkpoints and resumes them (below).
 
@@ -120,6 +124,23 @@ exactly.
 
 ## Choices the text leaves open, as implemented
 
+- **Macros** (since 2026-11-03, vault spec MAC-01, decisions D1–D14 there; `--macro`, default none).
+  At each Task goal mark the HabitLearner takes the steps since the previous Task mark of the
+  episode, Curiosity's and Safety's detours included (D2, D3), and a `MacroRule` turns them into
+  commands: `copy` keeps every step (the control), `sum` adds up each joint's turn between gripper
+  events into one parallel step whose joints end together, none slower than 0.02 rad/s (D7–D9). A
+  step that ran to its end enters as commanded (D8); one cut short as far as it ran
+  (`Step.executedCommands`). The macro may be chosen only in its initiation, the goal met plus the
+  state bin its stretch started in (D1); it starts with empty credit (D5), so UCB tries it the next
+  time that context comes. A shorter stretch from the same initiation retires it (it stays in the
+  pool with its credit, never chosen again) and builds another (D4); nothing is built from a result
+  equal to a habit already in the pool, or a macro that ran alone and met its goal would retire
+  itself for its own copy. At most `maxActiveMacros` = 100 active (D10). **A macro in execution
+  follows TROCA's rule** (D14, Gudwin et al. 2020): nothing else is chosen while it runs under the
+  goal it was chosen for, not even a habit never tried in the bin the arm reached; when the goal
+  changes the choice is made again. The reference spread is computed over the candidates of the
+  context, so a macro elsewhere does not rescale the bonuses here. With `none` the agent is the one
+  before, to the bit (`GoldenTrajectoryTest`).
 - **Credit is read per execution** (`Config.creditRead = MEAN`). cap4 says credit "accumulates";
   read as a sum, a habit's score grows with how often it ran, and a context's sum and the total it
   falls back to are on different scales. Both sums and counts are stored; `SUM` is one setting away.
@@ -344,7 +365,7 @@ diffing the logs, and held since by every older test passing unchanged. **Not ru
 
 ## Testing
 
-`./gradlew test`: 67 tests, ~1 s, no simulator.
+`./gradlew test`: 108 tests, ~10 s, no simulator.
 
 - `ParityTest` — the Java ports agree with the Python they port, on the recorded expert trajectory:
   task predicates (goals.py), characterization bins (metrics.characterise), step completion
@@ -390,14 +411,29 @@ diffing the logs, and held since by every older test passing unchanged. **Not ru
   last plan and goal numbers were left out because doing so failed nothing: they only compare
   against numberings that continue.
 
+- Macros (vault spec MAC-01): `MacroRulesTest` (copy flattens and keeps order; sum cancels, cuts
+  at a gripper change and drops a repeated one, makes joints end together, floors a tiny turn's
+  speed, builds nothing from a stretch that cancels out; C2, C4 and C6 refuse a rule).
+  `CodeletsTest`: the stretch and its initiation, detours in, Curiosity's and Safety's marks
+  building nothing, a new episode starting over, repetition, retirement, a macro that ran alone not
+  retiring itself, a step cut short entering as far as it ran, the cap, `none`, and the learner's
+  state round trip; the Behavior Generator choosing a macro only in its context and never once
+  retired, and keeping one in execution beside an untried habit until the goal changes.
+  `MacroIntegrationTest`: copy and sum closed-loop over the cube, macros built, chosen and run, the
+  retired ones outside the repertoire's size. `CheckpointTest` adds a resume with macros (format 3).
+  `../tools/test_macro_report.py` holds the report's counts.
+
 Nothing checks the agent *learns the task*: that is WP3's gate, judged on live runs.
 
 ## Deferred
 
-- **HabitLearner generation (WP3)**: mutation, parallel fusion, macros at goal completion, culling,
-  pool cap. `Config.generation`/`fusion` are wired to conditions but unread. Culling needs a
-  member-removal operation in CST's `MemoryContainer` (cap4 §4.4.3), which the fork does not have.
-- The macro selection rule (open in cap4 §4.4.2).
+- **HabitLearner generation (WP3)**: mutation, parallel fusion, culling. Macros exist (MAC-01);
+  `Config.generation`/`fusion` gate them. Culling needs a member-removal operation in CST's
+  `MemoryContainer` (cap4 §4.4.3), which the fork does not have; until then retired macros stay in
+  the pool and `maxActiveMacros` caps the active ones.
+- The other macro rules of the WP3 table (tolerance, loops, credit, remove-and-test) and the
+  variants MAC-01 defers (initiation by pose, accidental stage completions, contact cuts, final
+  pose, interrupting a macro by value: INT-01).
 - Which selector: UCB and Thompson ran live once each (above), both with the bin-count bug; rerun
   them before choosing. On the fake environment (C0, 3 seeds, 6 × 300 steps) the two most-chosen
   habits take 57–76 % of choices under GREEDY and 20–24 % under either — plumbing evidence, not
@@ -406,9 +442,8 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
   episodes; a longer run would tell.
 - A discounted or sliding-window UCB if non-stationarity (below) shows up. (Per-habit variance:
   done, with a prior.)
-- Checkpoints of generated habits (WP3): the pool is checked, not saved, so a resume refuses a pool
-  that is not the primary repertoire. ExecutionBuffer entries are not saved either (only their
-  numbering); if WP3's macros read across an episode end, they must be.
+- ExecutionBuffer entries are not saved (only their numbering): macros read a stretch within one
+  episode, so nothing needs them across a checkpoint. Built habits are saved (format 3).
 - **Curiosity yields not built** (CUR-01): RND / ICM (counts are exact over the bins, and no ML
   library here); learning progress as competence on Curiosity's own goals (SAGG-RIAC; those goals
   are probably almost never met — boredom < 0.3 needs novelty ~35× its 90th percentile — not
@@ -507,6 +542,7 @@ Nothing checks the agent *learns the task*: that is WP3's gate, judged on live r
 | **Curiosity that runs out** (2026-10-17, vault spec CUR-01): count-based bonuses (MBIE-EB, Strehl and Littman 2008; pseudo-counts, Bellemare et al. 2016; #Exploration, Tang et al. 2017); learning progress (IAC, Oudeyer, Kaplan and Hafner 2007; R-IAC, Baranes and Oudeyer 2009); RND (Burda et al. 2018), ICM (Pathak et al. 2017); an annealed intrinsic weight, or Agent57's bandit over it (Badia et al. 2020); RLeXplore (rllte, 2024), a library of eight intrinsic rewards | Ways for exploration to stop paying once the world is known | Count and learning progress built, as `count` and `lp` yields. RND/ICM exist for spaces that cannot be counted, and these bins can; ICM also chases noise, and Bullet's contacts are noise. Annealing hands over by the clock, not by exploration; Agent57 needs task return to tune it, and there are no successes. RLeXplore is Python/PyTorch, per-step rewards for an RL learner, no learning progress. What ours loses against the strongest (a count bonus added to the reward, as published): the evidence is for that form; a running mean used as a drive's urgency is our adaptation, untested, with one more parameter (W) |
 | **The Task counts its stage** (2026-10-27, vault spec CRE-01): potential-based shaping (Ng, Harada and Russell 1999) and its dynamic form (Devlin and Kudenko 2012); a staged dense reward, stage plus bounded distance (DrS, Mu et al. 2024; robosuite's PickPlace, staged 0.1/0.35/0.5/0.7 with a max); reward machines with Φ(u) = −v*(u) (Toro Icarte et al. 2022); protecting the stage instead (STRIPS goal protection, BDI maintenance goals, action masking) | The standard ways to make progress through stages pay and undoing it cost | Adopted as the stage-plus-distance form, in the Task drive: the Task already is a potential, credit being its drop. Reward machines would compute the stage values by value iteration over an automaton that `TaskStages` already is with four stages in a line, so the answer is one weight, w. Protecting the stage forbids `grab_open` while carrying, which the agent must learn, and release needs it. What this loses against reward machines: w is chosen by hand (Okudo and Yamada 2021 warn it is hard to choose), not derived |
 | **A habit new to a context borrows** (2026-10-27, vault spec CRE-01): partial pooling / shrinkage of a context's mean toward its parent's (empirical Bayes); hierarchical Bayesian bandits (HierTS, Hong, Kveton et al. 2022); cold-start priors for new arms (a dynamic prior in Thompson sampling); a coarser or tiled state (tile coding / CMAC, Sutton 1996; Soar-RL summing the preferences of every matching rule); Thompson with a prior | Standard ways for an arm with no data in one context to start from what is known in related ones | Adopted as one fixed level of pooling, (sum + n0 · parent mean) / (n + n0), with the parent goal + hand: the same pseudo-count form the spread already uses (`spreadPriorWeight`). HierTS learns how far contexts differ from their parent instead of fixing n0, and samples; it is Thompson-only and needs a model of the between-context variance this table does not keep. A coarser key would change Curiosity's novelty and metric 5, which share `Characterization.key`. What this loses against HierTS: n0 is chosen by hand, and the same for every context. Amended 2026-10-28: only contexts holding the cube borrow. UCB in a new bin, with every habit at the same pseudo-count, is greedy whatever its c; without the cube that ended the random draw that explored. Thompson would keep sampling around the borrowed value, but it is not C4's selector |
+| **Macros at goal completion** (2026-11-03, vault spec MAC-01): macro-operators (STRIPS MACROPS, Fikes, Hart and Nilsson 1972; Korf 1985); options (Sutton, Precup and Singh 1999) and open-loop macro-actions (McGovern, Sutton and Fagg 1997); skill chaining (Konidaris and Barto 2009); DMPs (Ijspeert et al. 2013); action grammars and DreamCoder; Ramer–Douglas–Peucker; contact-phase segmentation (Kroemer et al. 2015); synchronous PTP of industrial controllers; TROCA's multi-step plans (Gudwin et al. 2020); habitual action sequences (Dezfouli and Balleine 2012) | Ways to turn a successful trajectory into a reusable action, and to run it | A macro is an open-loop option whose initiation set is one context (goal + bin), run to the end under its goal as TROCA runs a plan. The rule that picks the steps is pluggable; sum and copy first, the rest of the WP3 table later. Skill chaining is the strongest alternative: closed-loop options that work from other poses, at the cost of a learned policy and initiation classifier per skill, outside "a habit is a list of commands". What this loses: a macro only helps from its own context, and inside a 5 cm bin the start pose varies ~10–15° (R7 in the spec); the fixed cube flatters open loop |
 | Bandit libraries: MABWiser (Python), Vowpal Wabbit's contextual-bandit exploration (C++, JNI binding) | Tested rules: UCB1, Thompson, softmax, ε-greedy, LinUCB (MABWiser); ε-greedy, softmax, bagging, cover (VW) | Each learns its own reward estimate; here the estimate is the credit table (per-drive late fusion, eligibility traces), and only the ~20-line ranking rule would be reused. Python or native code inside a CST codelet for that is the worse trade |
 
 What building our own gains: the habit is a CST Idea end to end, every cap4 component is a codelet

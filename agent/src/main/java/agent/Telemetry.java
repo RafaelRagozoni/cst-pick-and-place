@@ -1,6 +1,7 @@
 package agent;
 
 import agent.codelets.BehaviorGeneratorCodelet;
+import agent.codelets.HabitLearnerCodelet;
 import agent.habit.HabitIdeas;
 import agent.memory.Goal;
 import agent.memory.TrackerState;
@@ -8,8 +9,10 @@ import agent.motivation.Drives;
 import br.unicamp.cst.core.entities.Memory;
 import br.unicamp.cst.core.entities.MemoryContainer;
 import br.unicamp.cst.representation.idea.Idea;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.DoubleSupplier;
@@ -34,6 +37,7 @@ public final class Telemetry {
     private final String curiosity;
     private final DoubleSupplier spread;
     private final Supplier<BehaviorGeneratorCodelet.Choice> lastChoice;
+    private final Supplier<List<HabitLearnerCodelet.MacroEvent>> macroEvents;
     private String phase = "bootstrap";
 
     /**
@@ -42,10 +46,13 @@ public final class Telemetry {
      * @param spread    the spread the Behavior Generator's last selection used, read from it rather
      *                  than recomputed, so the log shows what the selector saw
      * @param lastChoice the Behavior Generator's last choice, logged with every step of its plan
+     * @param macroEvents the HabitLearner's macro events of this cycle (vault spec MAC-01), logged
+     *                    as "macro" on the step they happened in
      */
     public Telemetry(Memory trackerMO, Memory goalMO, Memory driveMO, MemoryContainer pool,
                      String selection, String curiosity, DoubleSupplier spread,
-                     Supplier<BehaviorGeneratorCodelet.Choice> lastChoice) {
+                     Supplier<BehaviorGeneratorCodelet.Choice> lastChoice,
+                     Supplier<List<HabitLearnerCodelet.MacroEvent>> macroEvents) {
         this.trackerMO = trackerMO;
         this.goalMO = goalMO;
         this.driveMO = driveMO;
@@ -54,6 +61,7 @@ public final class Telemetry {
         this.curiosity = curiosity;
         this.spread = spread;
         this.lastChoice = lastChoice;
+        this.macroEvents = macroEvents;
     }
 
     public void setPhase(String phase) {
@@ -101,16 +109,31 @@ public final class Telemetry {
             c.addProperty("candidates", choice.candidates());
             a.add("choice", c);
         }
+        List<HabitLearnerCodelet.MacroEvent> events = macroEvents.get();
+        if (!events.isEmpty()) {
+            JsonArray eventsJson = new JsonArray();
+            events.forEach(event -> eventsJson.add(event.toJson()));
+            a.add("macro", eventsJson);
+        }
         a.add("repertoire", repertoire());
         return a;
     }
 
-    /** Pool size and how many habits each operator produced: metric 4's raw material. */
+    /**
+     * Pool size and how many habits each operator produced: metric 4's raw material. Retired macros
+     * (MAC-01 D4) stay in the pool but are counted apart, as "retired", and not in "size": a
+     * repertoire that grew only by replacing would otherwise look like one that grew.
+     */
     public JsonObject repertoire() {
         Map<String, Integer> byOrigin = new TreeMap<>();
         int n = 0;
         for (Memory m : pool.getAllMemories()) {
-            byOrigin.merge(HabitIdeas.origin((Idea) m.getI()), 1, Integer::sum);
+            Idea habit = (Idea) m.getI();
+            if (HabitIdeas.isRetired(habit)) {
+                byOrigin.merge("retired", 1, Integer::sum);
+                continue;
+            }
+            byOrigin.merge(HabitIdeas.origin(habit), 1, Integer::sum);
             n++;
         }
         JsonObject r = new JsonObject();

@@ -30,6 +30,10 @@ public record Command(String action, int joint, double angle, double speed, doub
         return new Command(action, joint, a, speed, force, step);
     }
 
+    public Command withSpeed(double v) {
+        return new Command(action, joint, angle, v, force, step);
+    }
+
     public Command withStep(int s) {
         return new Command(action, joint, angle, speed, force, s);
     }

@@ -40,6 +40,15 @@ import java.util.Random;
  * its score rests on here and the spread of one of its executions' score, which those two need: the
  * repertoire's reference spread, shrunk toward the habit's own as its executions accumulate.
  *
+ * <p>Macros (vault spec MAC-01). A macro is a candidate only in the context its stretch started in,
+ * and never once retired (D1, D4); the reference spread is computed over the candidates, so a macro
+ * elsewhere does not rescale the bonuses here. A macro in execution follows TROCA's rule (D14,
+ * Gudwin et al. 2020): plans compete whole, and inside the winner nothing is re-evaluated. While it
+ * runs under the goal it was chosen for, no other plan is chosen, not even a habit never tried here;
+ * once the goal changes, another drive having become more pressing, the choice is made again, and
+ * the macro, outside its context, is not among the candidates. A primitive in execution is kept
+ * only unless beaten, as before.
+ *
  * <p>Inputs: HabitPoolMC, GoalMO, SensoryMO, DriveMO, PlanTrackerMO. Output: PlanMO.
  */
 public final class BehaviorGeneratorCodelet extends AgentCodelet {
@@ -95,12 +104,18 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
         TrackerState trackerState = (TrackerState) trackerMO.getI();
         boolean planRunning = trackerState != null && trackerState.running();
         Goal goal = Goal.of(goalMO);
+        if (planRunning && aMacroRunsForThisGoal(trackerState, goal)) {
+            return;
+        }
         String creditContext = CreditTable.context(goal.name(), Characterization.key(observation));
         double[] driveLevels = Drives.of(driveMO).levels();
         List<Idea> habits = new ArrayList<>();
         List<CreditSnapshot> habitCredits = new ArrayList<>();
         for (Memory poolMember : habitPool.getAllMemories()) {
             Idea habit = (Idea) poolMember.getI();
+            if (!mayBeChosenIn(habit, creditContext)) {
+                continue;
+            }
             habits.add(habit);
             habitCredits.add(HabitIdeas.credit(habit));
         }
@@ -132,6 +147,22 @@ public final class BehaviorGeneratorCodelet extends AgentCodelet {
             lastChoice = new Choice(planSerial, chosen.count(), chosen.priorCount(), untried,
                     candidates.size());
         }
+    }
+
+    /** D1 and D4 of MAC-01: a macro only where its stretch started, and not once retired. */
+    static boolean mayBeChosenIn(Idea habit, String creditContext) {
+        if (HabitIdeas.isRetired(habit)) {
+            return false;
+        }
+        String initiation = HabitIdeas.initiation(habit);
+        return initiation == null || initiation.equals(creditContext);
+    }
+
+    /** D14 of MAC-01: the plan in execution is a macro this codelet chose under the current goal. */
+    private boolean aMacroRunsForThisGoal(TrackerState trackerState, Goal goal) {
+        Plan runningPlan = (Plan) planMO.getI();
+        return runningPlan != null && runningPlan.serial() == trackerState.planSerial()
+                && HabitIdeas.isMacro(runningPlan.habit()) && runningPlan.goalId() == goal.id();
     }
 
     /** The last plan chosen and what was known then, or null before the first. */
