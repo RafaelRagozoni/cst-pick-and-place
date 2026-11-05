@@ -506,7 +506,8 @@ def learning_video(run_dir, picks, stride, out_path, epilogue=None, epilogue_str
                    title='Como o agente aprende', cache_dir=episode_pick.DEFAULT_CACHE_DIR):
     """One episode per pick, each beside the rates of the whole block it belongs to, then an
     optional epilogue (e.g. the first success), marked as outside the sample, and a closing card
-    with what came after it. Every number is computed from the log and run.json."""
+    with what came after it. Every number is computed from the log and run.json. Writes out_path
+    and out_path + '.json' (seed, rule, episodes, stride, epilogue, seconds)."""
     (label, log, run_meta), = runlog.find_logs([run_dir])
     summaries = episode_pick.episode_summaries(log, cache_dir)
     blocks = learning_blocks(summaries)
@@ -576,8 +577,14 @@ def learning_video(run_dir, picks, stride, out_path, epilogue=None, epilogue_str
         count = encode_mp4(frames(), out_path, hold_last_s=0)
     finally:
         shutil.rmtree(work)
+    info = {'seed': label, 'rule': picks[0].rule, 'episodes': [p.episode for p in picks],
+            'stride': stride, 'n_episodes': len(summaries), 'seconds': count / FPS,
+            'epilogue': None if epilogue is None else {
+                'episode': epilogue.episode, 'rule': epilogue.rule, 'stride': epilogue_stride}}
+    with open(out_path + '.json', 'w') as info_file:
+        json.dump(info, info_file, ensure_ascii=False, indent=1)
     print('wrote %s: %d frames, %.1f s' % (out_path, count, count / FPS))
-    return count / FPS
+    return info
 
 
 # --- the episode video -----------------------------------------------------------------------
