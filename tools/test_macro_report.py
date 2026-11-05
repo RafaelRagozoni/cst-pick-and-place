@@ -39,6 +39,11 @@ def write(path, episodes):
                                 'habit_id': None, 'episode_summary': {}}) + '\n')
 
 
+def text_columns(text):
+    header, separator = text.splitlines()[:2]
+    return header.count('|') == separator.count('|')
+
+
 def main():
     created_reach = [{'kind': 'created', 'macro': 'macro_reach_1', 'retired': None}]
     created_grasp = [{'kind': 'created', 'macro': 'macro_grasp_1', 'retired': None},
@@ -64,6 +69,8 @@ def main():
         check('three macro runs, one per plan', s.runs == 3)
         check('goal met during or right after the run: two of three', s.runs_met == 2)
         check('ticks per run', sorted(s.run_ticks) == [1, 2, 2])
+        check('goal met by stage: reach one of two, grasp one of one',
+              {g: tuple(v) for g, v in s.runs_by_goal.items()} == {'reach': (2, 1), 'grasp': (1, 1)})
         check('never ran: the active macro never chosen',
               s.built - s.retired - s.chosen == {'macro_reach_2'})
         check('macro goal from the id', macro_report.macro_goal('macro_transport_12') == 'transport')
@@ -73,11 +80,16 @@ def main():
               (rows[0]['onsets'], rows[0]['onsets_in_macro']) == (1, 1))
         line = macro_report.row('b', s, 100)
         cells = [c.strip() for c in line.strip('|').split('|')]
-        check('row: runs, goal met, ticks, reach, grasps, collisions, in macro',
-              cells[6:] == ['3', '67', '2', '3', '50.0', '0.0', '50.0', '100'])
-        check('row: last episodes only', macro_report.row('b', s, 1).split('|')[10].strip() == '-')
+        check('row: runs, goal met, by stage, ticks, reach, grasps, collisions, in macro',
+              cells[6:] == ['3', '67', 'grasp 100 · reach 50', '2', '3', '50.0', '0.0', '50.0', '100'])
+        check('row: last episodes only', macro_report.row('b', s, 1).split('|')[11].strip() == '-')
+        check('header and separator have the same columns',
+              text_columns(macro_report.report([tmp], 100)))
         check('a window picks episodes by index',
               [r['reach'] for r in macro_report.last_rows(s, 100, (0, 0))] == [3])
+        s.events = dict.fromkeys(macro_report.KINDS, 0)          # a batch without macros (the C4)
+        check('no macros: the in-macro share is empty, not 0',
+              macro_report.row('b', s, 100).strip().strip('|').split('|')[-1].strip() == '-')
         text = macro_report.report([tmp], 100)
         check('report has a header and the seed row', text.count('| s1 |') == 1)
     print('\nmacro report: %s' % ('PASS' if not FAILS else 'FAIL: %s' % FAILS))

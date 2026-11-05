@@ -15,6 +15,8 @@ row, its macro columns empty. Over the whole run:
   goal met        % of those runs during which, or right after which, the Task stage the macro was
                   built for was completed (macro_<goal>_<n>): the record after a run's last one is
                   the observation that ended it
+  by stage        the same, per stage the macros were built for (R7: macros leaving from a pose
+                  that varies inside the bin should fail more)
   ticks/run       median steps a macro run lasted
 
 Over the last --last episodes (default 100) of each seed, or the episodes --window FIRST LAST of
@@ -29,6 +31,7 @@ what MAC-01's pass test compares:
                   hits something); the onset is seen in the record after the action that caused it
 """
 import argparse
+import collections
 import os
 import statistics
 import sys
@@ -63,11 +66,18 @@ class Seed:
         self.chosen = set()
         self.runs = 0
         self.runs_met = 0
+        self.runs_by_goal = collections.defaultdict(lambda: [0, 0])     # goal -> [runs, met]
         self.run_ticks = []
         self.repertoire = None
         self.episodes = []
         # per episode: reach step, grasps, transports, collision onsets, onsets after a macro step
         self.by_episode = {}
+
+
+def close(s, run):
+    """Counts a finished macro run as met or not, in total and by stage."""
+    s.runs_met += run[3]
+    s.runs_by_goal[macro_goal(run[0])][1] += run[3]
 
 
 def scan(label, path):
@@ -77,7 +87,7 @@ def scan(label, path):
     for r in runlog.records(path):
         if r.get('done') and 'episode_summary' in r:
             if run is not None:
-                s.runs_met += run[3]
+                close(s, run)
                 run = None
             previous = None
             continue
@@ -109,11 +119,12 @@ def scan(label, path):
         if run is not None and fired == macro_goal(run[0]):
             run[3] = 1                          # met during the run, or seen right after it
         if run is not None and (habit != run[0] or r.get('plan') != run[1]):
-            s.runs_met += run[3]
+            close(s, run)
             run = None
         if is_macro(habit) and run is None:
             run = [habit, r.get('plan'), 0, 0]
             s.runs += 1
+            s.runs_by_goal[macro_goal(habit)][0] += 1
             s.chosen.add(habit)
         if run is not None:
             run[2] += 1
@@ -122,7 +133,7 @@ def scan(label, path):
             s.run_ticks[-1] += 1
         previous = r
     if run is not None:
-        s.runs_met += run[3]
+        close(s, run)
     return s
 
 
@@ -142,6 +153,14 @@ def fmt(v, digits=0):
     return ('%%.%df' % digits) % v
 
 
+def by_stage(s):
+    """'grasp 100 · reach 50': % of the runs that met their goal, per stage."""
+    if not s.runs:
+        return '-'
+    return ' · '.join('%s %s' % (goal, fmt(100.0 * met / runs))
+                      for goal, (runs, met) in sorted(s.runs_by_goal.items()))
+
+
 def row(batch, s, last, window=None):
     rows = last_rows(s, last, window)
     n = len(rows)
@@ -158,20 +177,21 @@ def row(batch, s, last, window=None):
              str(never) if has_macros else '-',
              str(s.runs) if has_macros else '-',
              fmt(100.0 * s.runs_met / s.runs) if s.runs else '-',
+             by_stage(s),
              fmt(statistics.median(s.run_ticks)) if s.run_ticks else '-',
              fmt(statistics.median(reach)) if reach else '-',
              fmt(100.0 * sum(r['grasp'] for r in rows) / n, 1) if n else '-',
              fmt(100.0 * sum(r['transport'] for r in rows) / n, 1) if n else '-',
              fmt(100.0 * onsets / n, 1) if n else '-',
-             fmt(100.0 * in_macro / onsets) if onsets else '-']
+             fmt(100.0 * in_macro / onsets) if onsets and has_macros else '-']
     return '| ' + ' | '.join(cells) + ' |'
 
 
 def report(paths, last, window=None, seeds=None):
     lines = ['| batch | seed | episodes | events c / rp / rep / ex / em / ref | active / retired '
-             '| never ran | runs | goal met % | ticks/run | reach ticks | grasps/100 '
+             '| never ran | runs | goal met % | by stage % | ticks/run | reach ticks | grasps/100 '
              '| transports/100 | collisions/100 | in macro % |',
-             '|' + '---|' * 14]
+             '|' + '---|' * 15]
     for path in paths:
         batch = os.path.basename(os.path.normpath(path))
         for label, log, _ in runlog.find_logs([path]):
