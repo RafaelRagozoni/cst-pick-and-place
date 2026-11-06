@@ -52,10 +52,11 @@ def main():
     episodes = [
         [('move_j0_pos', 1, None, False, created_reach),
          ('macro_reach_1', 2, None, False, None),
-         ('macro_reach_1', 2, None, False, None),
-         ('move_j1_pos', 3, 'reach', False, created_grasp),   # the reach seen right after the run
+         ('macro_reach_1', 2, 'reach', False, None),          # the macro's own last step completes it
+         ('move_j1_pos', 3, None, False, created_grasp),
          ('macro_grasp_1', 4, None, False, None),
-         ('grab_close', 5, 'grasp', True, None)],              # a collision after the macro's step
+         ('grab_close', 5, 'grasp', True, None)],              # grasp completed by the next habit's
+                                                               # action; collision after the macro's step
         [('macro_reach_1', 6, None, False, replaced),
          ('macro_reach_1', 6, None, False, None)],              # the episode ends, reach not met
     ]
@@ -67,26 +68,28 @@ def main():
         check('events by kind', (s.events['created'], s.events['replaced'], s.events['repeated'])
               == (2, 1, 1))
         check('three macro runs, one per plan', s.runs == 3)
-        check('goal met during or right after the run: two of three', s.runs_met == 2)
+        check('goal met by the run\'s own actions: one of three', s.runs_met == 1)
         check('ticks per run', sorted(s.run_ticks) == [1, 2, 2])
-        check('goal met by stage: reach one of two, grasp one of one',
-              {g: tuple(v) for g, v in s.runs_by_goal.items()} == {'reach': (2, 1), 'grasp': (1, 1)})
+        check('goal met by stage: reach one of two, grasp none of one',
+              {g: tuple(v) for g, v in s.runs_by_goal.items()} == {'reach': (2, 1), 'grasp': (1, 0)})
+        check('a goal the habit after the run completes is not the macro\'s',
+              s.runs_by_goal['grasp'][1] == 0)
         check('never ran: the active macro never chosen',
               s.built - s.retired - s.chosen == {'macro_reach_2'})
         check('macro goal from the id', macro_report.macro_goal('macro_transport_12') == 'transport')
         rows = macro_report.last_rows(s, 100)
-        check('reach step of the episode that had one', [r['reach'] for r in rows] == [3, None])
+        check('reach step of the episode that had one', [r['reach'] for r in rows] == [2, None])
         check('one collision onset, after a macro step',
               (rows[0]['onsets'], rows[0]['onsets_in_macro']) == (1, 1))
         line = macro_report.row('b', s, 100)
         cells = [c.strip() for c in line.strip('|').split('|')]
         check('row: runs, goal met, by stage, ticks, reach, grasps, collisions, in macro',
-              cells[6:] == ['3', '67', 'grasp 100 · reach 50', '2', '3', '50.0', '0.0', '50.0', '100'])
+              cells[6:] == ['3', '33', 'grasp 0 · reach 50', '2', '2', '50.0', '0.0', '50.0', '100'])
         check('row: last episodes only', macro_report.row('b', s, 1).split('|')[11].strip() == '-')
         check('header and separator have the same columns',
               text_columns(macro_report.report([tmp], 100)))
         check('a window picks episodes by index',
-              [r['reach'] for r in macro_report.last_rows(s, 100, (0, 0))] == [3])
+              [r['reach'] for r in macro_report.last_rows(s, 100, (0, 0))] == [2])
         s.events = dict.fromkeys(macro_report.KINDS, 0)          # a batch without macros (the C4)
         check('no macros: the in-macro share is empty, not 0',
               macro_report.row('b', s, 100).strip().strip('|').split('|')[-1].strip() == '-')

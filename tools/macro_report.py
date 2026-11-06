@@ -12,9 +12,10 @@ row, its macro columns empty. Over the whole run:
   active, retired at the end (the last logged repertoire)
   never ran       active macros at the end that were never chosen
   runs            plans whose habit was a macro
-  goal met        % of those runs during which, or right after which, the Task stage the macro was
-                  built for was completed (macro_<goal>_<n>): the record after a run's last one is
-                  the observation that ended it
+  goal met        % of those runs in which one of the run's own actions completed the Task stage the
+                  macro was built for (macro_<goal>_<n>). A record's goal_fired is the outcome of
+                  that record's action (translog.py), so a goal fired in the record after the run
+                  belongs to the next habit, not to the macro
   by stage        the same, per stage the macros were built for (R7: macros leaving from a pose
                   that varies inside the bin should fail more)
   ticks/run       median steps a macro run lasted
@@ -116,8 +117,6 @@ def scan(label, path):
             s.repertoire = r['repertoire']
 
         habit = r.get('habit_id')
-        if run is not None and fired == macro_goal(run[0]):
-            run[3] = 1                          # met during the run, or seen right after it
         if run is not None and (habit != run[0] or r.get('plan') != run[1]):
             close(s, run)
             run = None
@@ -131,6 +130,8 @@ def scan(label, path):
             if run[2] == 1:
                 s.run_ticks.append(0)
             s.run_ticks[-1] += 1
+            if fired == macro_goal(run[0]):
+                run[3] = 1                      # this record's own action completed the stage
         previous = r
     if run is not None:
         close(s, run)
