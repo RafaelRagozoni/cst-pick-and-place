@@ -31,8 +31,9 @@ class MacroIntegrationTest {
                 .withMacroRule(rule);
         FakeEnvironment environment = FakeEnvironment.startingOverTheCube(300);
         AgentMind mind = new AgentMind(config, environment, 7);
+        AgentMind.EpisodeResult lastEpisode = null;
         for (int episode = 0; episode < 30; episode++) {
-            mind.runEpisode(7, episode);
+            lastEpisode = mind.runEpisode(7, episode);
         }
         Map<String, Integer> eventsByKind = new TreeMap<>();
         int stepsInMacros = 0;
@@ -66,6 +67,9 @@ class MacroIntegrationTest {
         JsonObject repertoire = mind.telemetry.repertoire();
         assertEquals(14 + activeMacros, repertoire.get("size").getAsInt(), "the retired ones apart");
         assertTrue(activeMacros > 0, "the repertoire grew");
+        assertTrue(retiredMacros > 0, "a macro was retired, so the pool size below is put to the test");
+        assertEquals(14 + activeMacros, lastEpisode.poolSize(),
+                "the episode's pool size (the agent's stdout) counts like the log: retired apart");
     }
 
     /**

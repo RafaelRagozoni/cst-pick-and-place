@@ -168,6 +168,10 @@ public final class AgentMind {
         telemetry.setPhase("refinement");
     }
 
+    /**
+     * @param poolSize the repertoire's size as the log counts it (Telemetry.repertoire): retired
+     *                 macros (MAC-01 D4) stay in the pool but not in the size
+     */
     public record EpisodeResult(int episode, int steps, boolean success, List<String> goalsMet,
                                 int poolSize) {
     }
@@ -191,6 +195,6 @@ public final class AgentMind {
             }
         }
         return new EpisodeResult(episode, link.latest().get("step").getAsInt(), link.success(), met,
-                pool.getAllMemories().size());
+                telemetry.repertoire().get("size").getAsInt());
     }
 }
