@@ -29,7 +29,8 @@ what MAC-01's pass test compares:
   transports/100  transport completions per 100 episodes
   collisions/100  collision onsets (envCollision or selfCollision turning on) per 100 episodes
   in macro        % of all collision onsets that followed a step of a macro (R3: the straight line
-                  hits something); the onset is seen in the record after the action that caused it
+                  hits something); the onset is seen in the record after the action that caused it,
+                  the episode's terminal record included (its obs is the last action's outcome)
 """
 import argparse
 import collections
@@ -81,12 +82,23 @@ def close(s, run):
     s.runs_by_goal[macro_goal(run[0])][1] += run[3]
 
 
+def count_collision_onset(episode_row, record, previous):
+    """A collision seen in `record` that `previous` did not see: the previous record's action caused
+    it. The terminal record counts too, since its obs is the outcome of the episode's last action."""
+    if previous is not None and collided(record) and not collided(previous):
+        episode_row['onsets'] += 1
+        if is_macro(previous.get('habit_id')):
+            episode_row['onsets_in_macro'] += 1
+
+
 def scan(label, path):
     s = Seed(label)
     run = None                                  # [habit, plan, records so far, met]
     previous = None
     for r in runlog.records(path):
         if r.get('done') and 'episode_summary' in r:
+            if previous is not None:
+                count_collision_onset(s.by_episode[previous['episode']], r, previous)
             if run is not None:
                 close(s, run)
                 run = None
@@ -103,10 +115,7 @@ def scan(label, path):
             row['reach'] = r['step']
         elif fired in ('grasp', 'transport'):
             row[fired] += 1
-        if previous is not None and collided(r) and not collided(previous):
-            row['onsets'] += 1
-            if is_macro(previous.get('habit_id')):
-                row['onsets_in_macro'] += 1
+        count_collision_onset(row, r, previous)
         for event in r.get('macro') or ():
             s.events[event['kind']] = s.events.get(event['kind'], 0) + 1
             if event['kind'] in ('created', 'replaced'):

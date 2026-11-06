@@ -24,8 +24,9 @@ def obs(collision=False):
     return {'innerSense': {'envCollision': collision, 'selfCollision': False}}
 
 
-def write(path, episodes):
-    """`episodes`: [[(habit, plan, goal_fired, collision, macro events or None)]]."""
+def write(path, episodes, episodes_ending_in_collision=()):
+    """`episodes`: [[(habit, plan, goal_fired, collision, macro events or None)]]. The terminal record
+    of the episodes in `episodes_ending_in_collision` sees a collision: the last action caused it."""
     with gzip.open(path, 'wt') as f:
         for ep, steps in enumerate(episodes):
             for i, (habit, plan, fired, collision, events) in enumerate(steps):
@@ -35,7 +36,9 @@ def write(path, episodes):
                 if events:
                     r['macro'] = events
                 f.write(json.dumps(r) + '\n')
-            f.write(json.dumps({'episode': ep, 'step': len(steps), 'done': True, 'obs': obs(),
+            terminal_collision = ep in episodes_ending_in_collision
+            f.write(json.dumps({'episode': ep, 'step': len(steps), 'done': True,
+                                'obs': obs(terminal_collision),
                                 'habit_id': None, 'episode_summary': {}}) + '\n')
 
 
@@ -95,6 +98,16 @@ def main():
               macro_report.row('b', s, 100).strip().strip('|').split('|')[-1].strip() == '-')
         text = macro_report.report([tmp], 100)
         check('report has a header and the seed row', text.count('| s1 |') == 1)
+
+        os.makedirs(os.path.join(tmp, 's2'))
+        log_ending_in_collision = os.path.join(tmp, 's2', 'log.jsonl.gz')
+        write(log_ending_in_collision,
+              [[('move_j0_pos', 1, None, False, created_reach),
+                ('macro_reach_1', 2, None, False, None)]],          # its last action collides
+              episodes_ending_in_collision={0})
+        rows = macro_report.last_rows(macro_report.scan('s2', log_ending_in_collision), 100)
+        check('a collision the episode\'s last action caused counts, in the macro',
+              (rows[0]['onsets'], rows[0]['onsets_in_macro']) == (1, 1))
     print('\nmacro report: %s' % ('PASS' if not FAILS else 'FAIL: %s' % FAILS))
     sys.exit(1 if FAILS else 0)
 
