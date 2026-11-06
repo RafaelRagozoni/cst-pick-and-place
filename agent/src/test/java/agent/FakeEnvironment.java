@@ -53,6 +53,8 @@ public final class FakeEnvironment implements Environment {
     public final List<JsonArray> records = new ArrayList<>();
     public final List<JsonObject> annotations = new ArrayList<>();
     public final List<JsonObject> stepReplies = new ArrayList<>();
+    /** The annotation of each episode's end, null when the agent sent none, in order. */
+    public final List<JsonObject> endAnnotations = new ArrayList<>();
     public int resets;
 
     public FakeEnvironment(int stepLimit) {
@@ -119,6 +121,15 @@ public final class FakeEnvironment implements Environment {
         t = 0.0;
         done = false;
         return reply(false);
+    }
+
+    @Override
+    public JsonObject end(JsonObject annotate) {
+        if (!done) {
+            throw new IllegalStateException("episode still in progress: end it after done");
+        }
+        endAnnotations.add(annotate);
+        return new JsonObject();
     }
 
     @Override

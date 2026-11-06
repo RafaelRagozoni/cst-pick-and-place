@@ -18,4 +18,10 @@ public interface Environment {
 
     /** Apply one cycle's records, advance exactly one simulation step. */
     JsonObject step(JsonArray records, JsonObject annotate);
+
+    /**
+     * Write the finished episode's terminal record, with {@code annotate} (may be null): what the
+     * agent did on the terminal observation. Only after a step reported done.
+     */
+    JsonObject end(JsonObject annotate);
 }

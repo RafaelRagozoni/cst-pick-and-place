@@ -679,6 +679,11 @@ class CodeletsTest {
             return reply();
         }
 
+        @Override
+        public JsonObject end(JsonObject annotate) {
+            return new JsonObject();
+        }
+
         private JsonObject reply() {
             JsonObject r = new JsonObject();
             r.add("obs", Traj.json().get(step));

@@ -16,7 +16,10 @@ that decision, which is what keeps the C1 ablation meaningful.
 The bridge also **writes the run log** (translog.py), because it is the one place that sees every
 observation and every command of a CST-driven run; metrics.py reduces that file. A step request may
 carry an `annotate` dict -- the habit id, drive levels, the repertoire for metric 4 -- which is
-logged with that step. Logging is not optional by accident: the bridge refuses to start unless it
+logged with that step. The terminal record of a finished episode waits for the agent's `end`
+request, which may carry an `annotate` too: what the agent did on the terminal observation (a
+macro built from the stage that ended the episode, vault spec MAC-01). A client that never sends
+`end` gets the terminal record at its next reset or at shutdown, without annotation. Logging is not optional by accident: the bridge refuses to start unless it
 is given either `--log` or an explicit `--no-log`, so a run that produces no data is a decision.
 
 Transport is ZeroMQ REQ/REP with JSON bodies (DEC-03). It is deliberately confined to `serve()`:
@@ -50,7 +53,8 @@ from translog import EpisodeLog, check_annotation, open_log
 
 # 2: MOVE records carry a relative `angle` (signed, the angle still to go) and a non-negative
 #    `speed`; in 1 the direction was the sign of `speed` and a record lasted exactly one tick.
-PROTOCOL_VERSION = 2
+# 3: `end {annotate?}` writes the finished episode's terminal record, with the agent's annotation.
+PROTOCOL_VERSION = 3
 DEFAULT_PORT = 5555
 
 
@@ -99,7 +103,7 @@ class Bridge:
         }
 
     def reset(self, seed, episode):
-        self._close_episode(aborted=True)
+        self._close_episode(aborted=not self.done)
         # One discarded reset per process, for the same reason run() does it: a reset is
         # history-independent only from the second one onward (SIM-08).
         if not self.warmed:
@@ -134,20 +138,31 @@ class Bridge:
         self.done = success or self.steps >= self.step_limit
         if self.episode is not None:
             self.episode.step(records, obs, self.tracker.current, fired, success, annotate)
-            if self.done:
-                self._close_episode()
         return {'obs': obs, 'goal': self._goal(obs, fired), 'success': success,
                 'done': self.done, 'step': self.steps}
 
-    def _close_episode(self, aborted=False):
+    def end(self, annotate=None):
+        """Write the finished episode's terminal record, with `annotate` (see the module docstring).
+
+        Refused while the episode is in progress, so a terminal record never says done early. Once
+        written, a second `end` has nothing left to write.
+        """
+        if not self.done:
+            raise RuntimeError('episode still in progress: end it after a step reports done')
+        check_annotation(annotate)
+        self._close_episode(annotate=annotate)
+        return {}
+
+    def _close_episode(self, aborted=False, annotate=None):
         """Write the episode's terminal record. `aborted`: reset or shut down before it was done."""
         if self.episode is not None:
             self.episode.close(self.tracker.current, False if aborted else self.tracker.success,
-                               [t[0] for t in self.tracker.transitions], aborted=aborted)
+                               [t[0] for t in self.tracker.transitions], aborted=aborted,
+                               extra=annotate)
             self.episode = None
 
     def close(self):
-        self._close_episode(aborted=True)
+        self._close_episode(aborted=not self.done)
         if self.sink is not None:
             self.sink.close()
             self.sink = None
@@ -174,6 +189,11 @@ class Bridge:
                 if note is not None and not isinstance(note, dict):
                     return {'ok': False, 'error': 'annotate must be an object'}
                 return dict(ok=True, **self.step(recs, note))
+            if op == 'end':
+                note = req.get('annotate')
+                if note is not None and not isinstance(note, dict):
+                    return {'ok': False, 'error': 'annotate must be an object'}
+                return dict(ok=True, **self.end(note))
             if op == 'shutdown':
                 return {'ok': True, 'bye': True}
             return {'ok': False, 'error': 'unknown op: %r' % op}

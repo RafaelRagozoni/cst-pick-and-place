@@ -15,7 +15,11 @@ import java.util.List;
  * through the bridge -- which advances the simulation exactly one step. With nothing running it
  * sends no records, and the actuator holds every joint still.
  *
- * <p>Inputs: PlanTrackerMO, SensoryMO (to skip the terminal observation, which is not acted on).
+ * <p>On the terminal observation, which is not acted on, it ends the episode instead: the bridge
+ * writes the terminal record then, with what the agent did on that cycle (Telemetry's terminal
+ * annotation).
+ *
+ * <p>Inputs: PlanTrackerMO, SensoryMO (to tell the terminal observation).
  */
 public final class MotorCodelet extends AgentCodelet {
 
@@ -41,6 +45,7 @@ public final class MotorCodelet extends AgentCodelet {
     @Override
     public void proc() {
         if (Observation.of(sensoryMO).terminal()) {
+            link.end(telemetry == null ? null : telemetry.terminalAnnotation());
             return;
         }
         TrackerState trackerState = (TrackerState) trackerMO.getI();

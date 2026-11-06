@@ -99,6 +99,19 @@ public class BridgeClient implements Environment, AutoCloseable {
         return call(o);
     }
 
+    /**
+     * Write the finished episode's terminal record, with {@code annotate} if not null: what the
+     * agent did on the terminal observation, which it perceives and learns from but does not act on
+     * (a macro built from the stage that ended the episode). Bridge protocol 3.
+     */
+    public JsonObject end(JsonObject annotate) {
+        JsonObject o = op("end");
+        if (annotate != null) {
+            o.add("annotate", annotate);
+        }
+        return call(o);
+    }
+
     public void shutdown() {
         call(op("shutdown"));
     }

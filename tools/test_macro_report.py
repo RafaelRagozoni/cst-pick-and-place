@@ -24,9 +24,10 @@ def obs(collision=False):
     return {'innerSense': {'envCollision': collision, 'selfCollision': False}}
 
 
-def write(path, episodes, episodes_ending_in_collision=()):
+def write(path, episodes, episodes_ending_in_collision=(), terminal_macro_events=None):
     """`episodes`: [[(habit, plan, goal_fired, collision, macro events or None)]]. The terminal record
-    of the episodes in `episodes_ending_in_collision` sees a collision: the last action caused it."""
+    of the episodes in `episodes_ending_in_collision` sees a collision: the last action caused it.
+    `terminal_macro_events`: {episode: events} the agent sent with that episode's end."""
     with gzip.open(path, 'wt') as f:
         for ep, steps in enumerate(episodes):
             for i, (habit, plan, fired, collision, events) in enumerate(steps):
@@ -37,9 +38,11 @@ def write(path, episodes, episodes_ending_in_collision=()):
                     r['macro'] = events
                 f.write(json.dumps(r) + '\n')
             terminal_collision = ep in episodes_ending_in_collision
-            f.write(json.dumps({'episode': ep, 'step': len(steps), 'done': True,
-                                'obs': obs(terminal_collision),
-                                'habit_id': None, 'episode_summary': {}}) + '\n')
+            terminal = {'episode': ep, 'step': len(steps), 'done': True,
+                        'obs': obs(terminal_collision), 'habit_id': None, 'episode_summary': {}}
+            if terminal_macro_events and ep in terminal_macro_events:
+                terminal['macro'] = terminal_macro_events[ep]
+            f.write(json.dumps(terminal) + '\n')
 
 
 def text_columns(text):
@@ -101,13 +104,18 @@ def main():
 
         os.makedirs(os.path.join(tmp, 's2'))
         log_ending_in_collision = os.path.join(tmp, 's2', 'log.jsonl.gz')
+        created_release = [{'kind': 'created', 'macro': 'macro_release_1', 'retired': None}]
         write(log_ending_in_collision,
               [[('move_j0_pos', 1, None, False, created_reach),
                 ('macro_reach_1', 2, None, False, None)]],          # its last action collides
-              episodes_ending_in_collision={0})
-        rows = macro_report.last_rows(macro_report.scan('s2', log_ending_in_collision), 100)
+              episodes_ending_in_collision={0},
+              terminal_macro_events={0: created_release})          # the release, built at the end
+        scanned = macro_report.scan('s2', log_ending_in_collision)
+        rows = macro_report.last_rows(scanned, 100)
         check('a collision the episode\'s last action caused counts, in the macro',
               (rows[0]['onsets'], rows[0]['onsets_in_macro']) == (1, 1))
+        check('macro events on the terminal record count',
+              scanned.events['created'] == 2 and 'macro_release_1' in scanned.built)
     print('\nmacro report: %s' % ('PASS' if not FAILS else 'FAIL: %s' % FAILS))
     sys.exit(1 if FAILS else 0)
 

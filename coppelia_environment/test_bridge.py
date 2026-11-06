@@ -47,7 +47,7 @@ def main():
             refused_before_reset = True
         info = c.info()
         checks = [
-            ('protocol advertised', info['protocol'] == 2),
+            ('protocol advertised', info['protocol'] == 3),
             ('14 primitives offered', len(info['primitives']) == 14),
             ('goal steps advertised', info['goalSteps'] == ['reach', 'grasp', 'transport', 'release']),
             ('physics reported, the engine named by the simulator', info['physics']['engineName'] == 'bullet'),
@@ -126,11 +126,20 @@ def main():
             refused_after_done = True
         checks.append(('episode ends at the step limit', steps_ep0 == STEP_LIMIT))
         checks.append(('step after the episode ended refused', refused_after_done))
+        # The terminal record waits for `end`, which carries what the agent did on the terminal
+        # observation.
+        c.end(annotate={'macro': [{'kind': 'created', 'macro': 'macro_release_1'}]})
 
         # A reset mid-episode closes it; a second, short episode is closed by the shutdown.
         c.reset(seed=1, episode=1)
         for _ in range(3):
             c.step([])
+        try:
+            c.end()
+            end_refused_mid_episode = False
+        except BridgeError:
+            end_refused_mid_episode = True
+        checks.append(('end refused while the episode runs', end_refused_mid_episode))
 
         lat = sorted(latency)
         print('  per-cycle round trip: mean %.2f ms, median %.2f, p95 %.2f'
@@ -166,6 +175,9 @@ def main():
         ('log: reduces to the metrics',
          m['episodes'] == 2 and m['totalSteps'] == steps_ep0 + 3 and m['repertoire'] == {'size': 14}),
         ('log: joint energy accumulated', terms[0]['episode_summary']['jointEnergy'] > 0.5),
+        ('log: the end annotation on the terminal record, none on the aborted one',
+         terms[0].get('macro') == [{'kind': 'created', 'macro': 'macro_release_1'}]
+         and 'macro' not in terms[1]),
     ]
     for name, good in log_checks:
         print('  %-40s %s' % (name, 'PASS' if good else 'FAIL'))

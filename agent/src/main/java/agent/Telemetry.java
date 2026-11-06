@@ -120,6 +120,24 @@ public final class Telemetry {
     }
 
     /**
+     * What goes on the episode's terminal record: the macro events of the terminal cycle (a Task
+     * stage met on the last observation, the release of every success, builds its macro there), or
+     * null when there are none, so a run without them logs as before. The rest of the step
+     * annotation describes acting, and the terminal cycle does not act.
+     */
+    public JsonObject terminalAnnotation() {
+        List<HabitLearnerCodelet.MacroEvent> events = macroEvents.get();
+        if (events.isEmpty()) {
+            return null;
+        }
+        JsonArray eventsJson = new JsonArray();
+        events.forEach(event -> eventsJson.add(event.toJson()));
+        JsonObject terminal = new JsonObject();
+        terminal.add("macro", eventsJson);
+        return terminal;
+    }
+
+    /**
      * Pool size and how many habits each operator produced: metric 4's raw material. Retired macros
      * (MAC-01 D4) stay in the pool but are counted apart, as "retired", and not in "size": a
      * repertoire that grew only by replacing would otherwise look like one that grew.

@@ -78,16 +78,21 @@ class EpisodeLog:
         self.obs = nxt
         self.steps += 1
 
-    def close(self, goal_step, success, goals_reached, aborted=False):
-        """Write the terminal record. `aborted`: the episode was reset before it was done."""
+    def close(self, goal_step, success, goals_reached, aborted=False, extra=None):
+        """Write the terminal record. `aborted`: the episode was reset before it was done. `extra`:
+        what the agent attaches to it, from the cycle it spends on the terminal observation (it
+        perceives and learns from it but does not act), under the same rule as a step's."""
+        check_annotation(extra)
         summary = {'steps': self.steps, 'success': success, 'jointEnergy': self.energy,
                    'goalsReached': list(goals_reached), 'cube_start': self.cube_start}
         if aborted:
             summary['aborted'] = True
-        self.sink.write(json.dumps(dict(
+        terminal = dict(
             self.head, step=self.steps, t=self.obs['t'], obs=self.obs, action=None, habit_id=None,
             goal_step=goal_step, goal_fired=None, success=success, done=True, rewards={},
-            episode_summary=summary)) + '\n')
+            episode_summary=summary)
+        terminal.update(extra or {})
+        self.sink.write(json.dumps(terminal) + '\n')
         # Flush every finished episode: a gzip stream is readable up to its last flush, so a
         # summary or a replay can read a run that is still going (summarize_run.py, replay.py).
         self.sink.flush()

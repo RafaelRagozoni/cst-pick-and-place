@@ -28,7 +28,9 @@ executions in its context, the `priorCount` its score borrowed (n0 with the cube
 those at random while there are any), out of the `candidates`. `--macro` (none, copy, sum; default
 none; vault spec MAC-01) is how a Task goal's steps become a macro ("Macros", below); C2, C4 and C6
 refuse any but none. A step on which the HabitLearner did something about a macro logs it as
-`macro` (created, replaced, repeated, exists, empty, refused), and `repertoire` counts retired
+`macro` (created, replaced, repeated, exists, empty, refused); so does the terminal record, for a
+stage met on the last observation (the release of every success), which the Motor sends with the
+episode's `end` (bridge protocol 3) instead of acting. `repertoire` counts retired
 macros apart. `../tools/macro_report.py` reads both. A misspelt flag is refused, not ignored.
 
 Long runs go through `../tools/run_live.py`, which also checkpoints and resumes them (below).
@@ -420,7 +422,8 @@ diffing the logs, and held since by every older test passing unchanged. **Not ru
   state round trip; the Behavior Generator choosing a macro only in its context and never once
   retired, and keeping one in execution beside an untried habit until the goal changes.
   `MacroIntegrationTest`: copy and sum closed-loop over the cube, macros built, chosen and run, the
-  retired ones outside the repertoire's size. `CheckpointTest` adds a resume with macros (format 3).
+  retired ones outside the repertoire's size; the macro events of an episode's terminal cycle on its
+  `end` (mutation-checked: an `end` without them fails). `CheckpointTest` adds a resume with macros (format 3).
   `../tools/test_macro_report.py` holds the report's counts.
 
 Nothing checks the agent *learns the task*: that is WP3's gate, judged on live runs.

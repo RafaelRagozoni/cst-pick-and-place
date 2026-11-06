@@ -8,7 +8,8 @@ row, its macro columns empty. Over the whole run:
 
   events          the HabitLearner's macro events: created / replaced / repeated / exists / empty /
                   refused (HabitLearnerCodelet.MacroEvent, logged as `macro` on the step they
-                  happened in)
+                  happened in, or on the terminal record for the episode's last cycle; logs from
+                  before bridge protocol 3 lack those, the release's among them)
   active, retired at the end (the last logged repertoire)
   never ran       active macros at the end that were never chosen
   runs            plans whose habit was a macro
@@ -91,6 +92,17 @@ def count_collision_onset(episode_row, record, previous):
             episode_row['onsets_in_macro'] += 1
 
 
+def count_macro_events(s, record):
+    """The HabitLearner's macro events logged on `record`, a step or the terminal record (a stage met
+    on the episode's last observation builds its macro on the cycle that ends the episode)."""
+    for event in record.get('macro') or ():
+        s.events[event['kind']] = s.events.get(event['kind'], 0) + 1
+        if event['kind'] in ('created', 'replaced'):
+            s.built.add(event['macro'])
+        if event.get('retired'):
+            s.retired.add(event['retired'])
+
+
 def scan(label, path):
     s = Seed(label)
     run = None                                  # [habit, plan, records so far, met]
@@ -99,6 +111,7 @@ def scan(label, path):
         if r.get('done') and 'episode_summary' in r:
             if previous is not None:
                 count_collision_onset(s.by_episode[previous['episode']], r, previous)
+            count_macro_events(s, r)
             if run is not None:
                 close(s, run)
                 run = None
@@ -116,12 +129,7 @@ def scan(label, path):
         elif fired in ('grasp', 'transport'):
             row[fired] += 1
         count_collision_onset(row, r, previous)
-        for event in r.get('macro') or ():
-            s.events[event['kind']] = s.events.get(event['kind'], 0) + 1
-            if event['kind'] in ('created', 'replaced'):
-                s.built.add(event['macro'])
-            if event.get('retired'):
-                s.retired.add(event['retired'])
+        count_macro_events(s, r)
         if r.get('repertoire'):
             s.repertoire = r['repertoire']
 

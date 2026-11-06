@@ -11,6 +11,7 @@ Protocol: ZeroMQ REQ/REP, one JSON object each way. Every reply carries `ok`; on
     info  -> {primitives, goalSteps, stepLimit, physics}
     reset {seed, episode} -> {obs, placement, goal, success, done, step}
     step  {records, annotate?} -> {obs, goal, success, done, step}
+    end   {annotate?}          -> {}    (after a step reports done: writes its terminal record)
 
 Records follow actions.py. A MOVE record's `angle` is the signed angle the joint still has to turn
 in the current step; `speed` is a magnitude.
@@ -57,6 +58,12 @@ class BridgeClient:
         if annotate is None:
             return self.call(op='step', records=records)
         return self.call(op='step', records=records, annotate=annotate)
+
+    def end(self, annotate=None):
+        """Write the finished episode's terminal record, with `annotate` if given."""
+        if annotate is None:
+            return self.call(op='end')
+        return self.call(op='end', annotate=annotate)
 
     def shutdown(self):
         try:

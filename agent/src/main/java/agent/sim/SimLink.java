@@ -18,6 +18,7 @@ public final class SimLink {
     private JsonObject latest;
     private long cycle = -1;
     private int episode = -1;
+    private boolean ended;
 
     public SimLink(Environment env) {
         this.env = env;
@@ -30,6 +31,7 @@ public final class SimLink {
     public JsonObject reset(int seed, int episode) {
         this.episode = episode;
         latest = env.reset(seed, episode);
+        ended = false;
         cycle++;
         return latest;
     }
@@ -41,6 +43,21 @@ public final class SimLink {
         latest = env.step(records, annotate);
         cycle++;
         return latest;
+    }
+
+    /**
+     * Close the finished episode's log with {@code annotate} (may be null). Once per episode: a
+     * second call, from another cycle on the same terminal observation, sends nothing. No new
+     * observation comes back, so the cycle count does not move.
+     */
+    public void end(JsonObject annotate) {
+        if (!done()) {
+            throw new IllegalStateException("episode still in progress: end it once it is done");
+        }
+        if (!ended) {
+            ended = true;
+            env.end(annotate);
+        }
     }
 
     /** The most recent reply: {obs, success, done, step, ...}. */
